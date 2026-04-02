@@ -90,6 +90,14 @@
 - **FR-004**: System MUST [data requirement, e.g., "persist user preferences"]
 - **FR-005**: System MUST [behavior, e.g., "log all security events"]
 
+### Constitution-Driven Constraints *(mandatory)*
+
+- **C-001 (Stack)**: Features MUST use the project's fixed stack (Next.js + TypeScript + Tailwind + Lucide + Supabase).
+- **C-002 (Auth/RLS)**: Features involving data access MUST use Supabase Auth and enforce authorization via RLS.
+- **C-003 (Schema)**: Any data-model change MUST be reflected in `schema.sql`.
+- **C-004 (Design)**: UI MUST follow the project's brand tokens and consistent styling.
+- **C-005 (Testing)**: Every story MUST define unit + integration + E2E coverage appropriate to its scope.
+
 *Example of marking unclear requirements:*
 
 - **FR-006**: System MUST authenticate users via [NEEDS CLARIFICATION: auth method not specified - email/password, SSO, OAuth?]

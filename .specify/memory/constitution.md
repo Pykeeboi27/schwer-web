@@ -1,50 +1,105 @@
-# [PROJECT_NAME] Constitution
-<!-- Example: Spec Constitution, TaskFlow Constitution, etc. -->
+<!--
+Sync Impact Report (2026-04-02)
+
+- Version change: template -> 1.0.0
+- Modified principles: template placeholders -> project-specific principles (5)
+- Added sections: Technology & Styling Constraints; Workflow & Quality Gates
+- Removed sections: none
+- Templates requiring updates:
+
+  - ✅ updated: .specify/templates/plan-template.md
+  - ✅ updated: .specify/templates/spec-template.md
+  - ✅ updated: .specify/templates/tasks-template.md
+- Deferred TODOs:
+  - TODO(RATIFICATION_DATE): Original adoption date not recorded.
+  - TODO(TECH_STACK_STRICTNESS): Confirm whether existing shadcn/ui + Radix deps are
+    considered acceptable under the "ONLY" stack constraint.
+-->
+
+# Schwer Web Constitution
 
 ## Core Principles
 
-### [PRINCIPLE_1_NAME]
-<!-- Example: I. Library-First -->
-[PRINCIPLE_1_DESCRIPTION]
-<!-- Example: Every feature starts as a standalone library; Libraries must be self-contained, independently testable, documented; Clear purpose required - no organizational-only libraries -->
+### I. Schema-First Database (Authoritative `schema.sql`)
+- `schema.sql` is the canonical database contract for this project.
+- Any change to tables/enums/functions/policies MUST be represented in `schema.sql`.
+- Supabase database changes MUST be applied via SQL (migrations/SQL editor) in a way
+	that keeps production schema consistent with `schema.sql`.
+- Schema drift is a release blocker: if the running DB differs from `schema.sql`,
+	treat it as a defect and reconcile immediately.
 
-### [PRINCIPLE_2_NAME]
-<!-- Example: II. CLI Interface -->
-[PRINCIPLE_2_DESCRIPTION]
-<!-- Example: Every library exposes functionality via CLI; Text in/out protocol: stdin/args → stdout, errors → stderr; Support JSON + human-readable formats -->
+### II. Supabase Auth + RLS Security Model (NON-NEGOTIABLE)
+- Authentication MUST use Supabase Auth (no bespoke auth/session system).
+- Authorization MUST be enforced in the database with Row Level Security (RLS).
+- All tables containing user/org data MUST have RLS enabled with explicit policies.
+- Never use a service-role key in the browser/client bundle.
+- Server-side Supabase access MUST use the server client pattern (cookie-based SSR).
+- Route protection MUST follow Supabase session rules (unauthenticated users cannot
+	access protected routes; server actions/route handlers verify session).
 
-### [PRINCIPLE_3_NAME]
-<!-- Example: III. Test-First (NON-NEGOTIABLE) -->
-[PRINCIPLE_3_DESCRIPTION]
-<!-- Example: TDD mandatory: Tests written → User approved → Tests fail → Then implement; Red-Green-Refactor cycle strictly enforced -->
+### III. Design Tokens + Consistent UI (Clean, Easy-to-Follow)
+- Styling MUST be consistent across the entire app.
+- Use Tailwind CSS and shared UI components/patterns; avoid one-off styling.
+- Brand colors MUST be the only custom palette:
+	- Primary: `#f07b26`
+	- Secondary: `#d4620f`
+	- Black: `#000000`
+	- White: `#ffffff`
+- Do not introduce new hard-coded colors. If a color is needed, it MUST be derived
+	from the above tokens or existing Tailwind neutrals.
+- Icons MUST use Lucide.
 
-### [PRINCIPLE_4_NAME]
-<!-- Example: IV. Integration Testing -->
-[PRINCIPLE_4_DESCRIPTION]
-<!-- Example: Focus areas requiring integration tests: New library contract tests, Contract changes, Inter-service communication, Shared schemas -->
+### IV. Next.js App Router Boundaries (Keep Code Clean)
+- Keep server-only and client-only code clearly separated.
+- Data access and Supabase calls belong in `lib/` and server utilities, not inside
+	presentational components.
+- Components MUST remain focused: UI components render UI; data fetching/side
+	effects live in server components, route handlers, or dedicated helpers.
+- Prefer small, composable functions and predictable file organization.
 
-### [PRINCIPLE_5_NAME]
-<!-- Example: V. Observability, VI. Versioning & Breaking Changes, VII. Simplicity -->
-[PRINCIPLE_5_DESCRIPTION]
-<!-- Example: Text I/O ensures debuggability; Structured logging required; Or: MAJOR.MINOR.BUILD format; Or: Start simple, YAGNI principles -->
+### V. Testing at All Levels (NON-NEGOTIABLE)
+- Every meaningful change MUST include tests at the appropriate levels:
+	- Unit tests: utilities, hooks, component logic.
+	- Integration tests: key user flows that touch Next route handlers/server actions
+		+ Supabase interactions (mocked or local where feasible).
+	- E2E tests: critical journeys in the browser.
+- Tests MUST run in CI (or an equivalent gating workflow) before merge.
+- A PR that changes behavior without updating/adding tests is presumed incomplete.
 
-## [SECTION_2_NAME]
-<!-- Example: Additional Constraints, Security Requirements, Performance Standards, etc. -->
+## Technology & Styling Constraints
 
-[SECTION_2_CONTENT]
-<!-- Example: Technology stack requirements, compliance standards, deployment policies, etc. -->
+- Runtime stack MUST remain limited to:
+	- Next.js (React)
+	- TypeScript
+	- Tailwind CSS
+	- Lucide Icons
+	- Supabase (DB + Auth)
+- Adding new runtime frameworks/libraries that change the architecture requires a
+	constitution amendment.
+- Database MUST follow `schema.sql` and be implemented in Supabase Postgres.
+- Supabase RLS policies are mandatory for any sensitive table.
 
-## [SECTION_3_NAME]
-<!-- Example: Development Workflow, Review Process, Quality Gates, etc. -->
+## Workflow & Quality Gates
 
-[SECTION_3_CONTENT]
-<!-- Example: Code review requirements, testing gates, deployment approval process, etc. -->
+- Every PR MUST satisfy:
+	- TypeScript typecheck (no `any`-based escapes without justification).
+	- Linting passes.
+	- Tests at all required levels updated/added.
+	- Security review: no secrets committed; no service role exposure.
+	- Design review: uses tokens and consistent UI patterns.
+- If work requires a constraint exception (e.g., adding a dependency), the PR MUST
+	propose a constitution amendment in the same change set.
 
 ## Governance
-<!-- Example: Constitution supersedes all other practices; Amendments require documentation, approval, migration plan -->
 
-[GOVERNANCE_RULES]
-<!-- Example: All PRs/reviews must verify compliance; Complexity must be justified; Use [GUIDANCE_FILE] for runtime development guidance -->
+- This constitution supersedes local conventions and defaults.
+- Amendments:
+	- Propose the change (what/why), include migration plan (if needed), and update
+		dependent templates.
+	- Versioning policy:
+		- MAJOR: breaking redefinitions/removal of principles, or security model change.
+		- MINOR: new principle/section or materially expanded constraints.
+		- PATCH: clarifications, wording improvements, non-semantic refinements.
+- Compliance is reviewed on every PR (check principles + constraints + gates).
 
-**Version**: [CONSTITUTION_VERSION] | **Ratified**: [RATIFICATION_DATE] | **Last Amended**: [LAST_AMENDED_DATE]
-<!-- Example: Version: 2.1.1 | Ratified: 2025-06-13 | Last Amended: 2025-07-16 -->
+**Version**: 1.0.0 | **Ratified**: TODO(RATIFICATION_DATE) | **Last Amended**: 2026-04-02
