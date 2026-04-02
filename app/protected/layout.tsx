@@ -25,7 +25,7 @@ export default function ProtectedLayout({
             {!hasEnvVars ? (
               <EnvVarWarning />
             ) : (
-              <Suspense>
+              <Suspense fallback={<div className="text-sm text-muted-foreground">Loading account...</div>}>
                 <AuthButton />
               </Suspense>
             )}

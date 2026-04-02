@@ -1,7 +1,10 @@
 "use client";
 
+import {
+  loginAction,
+  type LoginActionState,
+} from "@/app/auth/login/actions";
 import { cn } from "@/lib/utils";
-import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -12,40 +15,46 @@ import {
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Eye, EyeOff } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useActionState, useEffect, useState } from "react";
+
+export function getLoginErrorMessage(error: string | null): string | null {
+  if (!error) {
+    return null;
+  }
+
+  if (error.toLowerCase().includes("email not confirmed")) {
+    return "Please confirm your email before signing in. Check your inbox for the confirmation link.";
+  }
+
+  return error;
+}
+
+const initialLoginActionState: LoginActionState = {
+  error: null,
+  success: false,
+};
 
 export function LoginForm({
   className,
   ...props
 }: React.ComponentPropsWithoutRef<"div">) {
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [error, setError] = useState<string | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
+  const [isPasswordVisible, setIsPasswordVisible] = useState(false);
+  const [state, formAction, isPending] = useActionState(
+    loginAction,
+    initialLoginActionState,
+  );
   const router = useRouter();
 
-  const handleLogin = async (e: React.FormEvent) => {
-    e.preventDefault();
-    const supabase = createClient();
-    setIsLoading(true);
-    setError(null);
+  const errorMessage = getLoginErrorMessage(state.error);
 
-    try {
-      const { error } = await supabase.auth.signInWithPassword({
-        email,
-        password,
-      });
-      if (error) throw error;
-      // Update this route to redirect to an authenticated route. The user already has an active session.
+  useEffect(() => {
+    if (state.success) {
       router.push("/protected");
-    } catch (error: unknown) {
-      setError(error instanceof Error ? error.message : "An error occurred");
-    } finally {
-      setIsLoading(false);
     }
-  };
+  }, [router, state.success]);
 
   return (
     <div className={cn("flex flex-col gap-6", className)} {...props}>
@@ -57,17 +66,16 @@ export function LoginForm({
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <form onSubmit={handleLogin}>
+          <form action={formAction}>
             <div className="flex flex-col gap-6">
               <div className="grid gap-2">
                 <Label htmlFor="email">Email</Label>
                 <Input
                   id="email"
+                  name="email"
                   type="email"
                   placeholder="m@example.com"
                   required
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
                 />
               </div>
               <div className="grid gap-2">
@@ -82,15 +90,25 @@ export function LoginForm({
                 </div>
                 <Input
                   id="password"
-                  type="password"
+                  name="password"
+                  type={isPasswordVisible ? "text" : "password"}
                   required
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
                 />
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setIsPasswordVisible((prev) => !prev)}
+                  aria-label={isPasswordVisible ? "Hide password" : "Show password"}
+                >
+                  {isPasswordVisible ? <EyeOff size={16} /> : <Eye size={16} />}
+                </Button>
               </div>
-              {error && <p className="text-sm text-red-500">{error}</p>}
-              <Button type="submit" className="w-full" disabled={isLoading}>
-                {isLoading ? "Logging in..." : "Login"}
+              {errorMessage && <p className="text-sm text-red-500">{errorMessage}</p>}
+              <Button type="submit" className="w-full" disabled={isPending}>
+                {isPending ? "Logging in..." : "Login"}
+              </Button>
+              <Button type="button" variant="outline" className="w-full" asChild>
+                <Link href="/auth/oauth/google">Continue with Google</Link>
               </Button>
             </div>
             <div className="mt-4 text-center text-sm">

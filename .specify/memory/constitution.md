@@ -1,7 +1,7 @@
 <!--
 Sync Impact Report (2026-04-02)
 
-- Version change: template -> 1.0.0
+- Version change: 1.0.0 -> 1.0.1
 - Modified principles: template placeholders -> project-specific principles (5)
 - Added sections: Technology & Styling Constraints; Workflow & Quality Gates
 - Removed sections: none
@@ -10,10 +10,6 @@ Sync Impact Report (2026-04-02)
   - ✅ updated: .specify/templates/plan-template.md
   - ✅ updated: .specify/templates/spec-template.md
   - ✅ updated: .specify/templates/tasks-template.md
-- Deferred TODOs:
-  - TODO(RATIFICATION_DATE): Original adoption date not recorded.
-  - TODO(TECH_STACK_STRICTNESS): Confirm whether existing shadcn/ui + Radix deps are
-    considered acceptable under the "ONLY" stack constraint.
 -->
 
 # Schwer Web Constitution
@@ -74,6 +70,9 @@ Sync Impact Report (2026-04-02)
 	- Tailwind CSS
 	- Lucide Icons
 	- Supabase (DB + Auth)
+- UI primitives already in use (shadcn/ui + Radix UI) are explicitly approved and
+	MAY be used as the component foundation. Introducing additional UI frameworks
+	still requires a constitution amendment.
 - Adding new runtime frameworks/libraries that change the architecture requires a
 	constitution amendment.
 - Database MUST follow `schema.sql` and be implemented in Supabase Postgres.
@@ -102,4 +101,4 @@ Sync Impact Report (2026-04-02)
 		- PATCH: clarifications, wording improvements, non-semantic refinements.
 - Compliance is reviewed on every PR (check principles + constraints + gates).
 
-**Version**: 1.0.0 | **Ratified**: TODO(RATIFICATION_DATE) | **Last Amended**: 2026-04-02
+**Version**: 1.0.1 | **Ratified**: 2026-04-03 | **Last Amended**: 2026-04-03

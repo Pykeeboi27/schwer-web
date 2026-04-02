@@ -174,6 +174,47 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
+-- Create profile rows for newly created auth users.
+CREATE OR REPLACE FUNCTION public.fn_handle_new_auth_user()
+RETURNS TRIGGER AS $$
+DECLARE
+  raw_department TEXT;
+BEGIN
+  IF NEW.email IS NULL THEN
+    RAISE EXCEPTION 'Cannot create profile for user %: email is required', NEW.id;
+  END IF;
+
+  raw_department := NEW.raw_user_meta_data ->> 'department';
+
+  INSERT INTO public.profiles (id, email, department)
+  VALUES (
+    NEW.id,
+    NEW.email,
+    CASE
+      WHEN raw_department IN ('hr', 'sales', 'accounting', 'engineering', 'purchasing', 'executive')
+        THEN raw_department::department_enum
+      ELSE NULL
+    END
+  )
+  ON CONFLICT (id) DO UPDATE
+    SET email = EXCLUDED.email;
+
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- Enforce department set-once behavior for this MVP.
+CREATE OR REPLACE FUNCTION public.fn_profiles_department_set_once()
+RETURNS TRIGGER AS $$
+BEGIN
+  IF OLD.department IS NOT NULL AND NEW.department IS DISTINCT FROM OLD.department THEN
+    RAISE EXCEPTION 'Department cannot be changed once set';
+  END IF;
+
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
 
 -- ============================================================
 -- SECTION 3: HR MODULE
@@ -688,6 +729,7 @@ CREATE TRIGGER trg_audit_approval_steps
 -- ============================================================
 
 CREATE TRIGGER trg_updated_at_profiles             BEFORE UPDATE ON public.profiles             FOR EACH ROW EXECUTE FUNCTION public.fn_set_updated_at();
+CREATE TRIGGER trg_profiles_department_set_once    BEFORE UPDATE OF department ON public.profiles FOR EACH ROW EXECUTE FUNCTION public.fn_profiles_department_set_once();
 CREATE TRIGGER trg_updated_at_employees            BEFORE UPDATE ON public.employees            FOR EACH ROW EXECUTE FUNCTION public.fn_set_updated_at();
 CREATE TRIGGER trg_updated_at_employee_documents   BEFORE UPDATE ON public.employee_documents   FOR EACH ROW EXECUTE FUNCTION public.fn_set_updated_at();
 CREATE TRIGGER trg_updated_at_leave_requests       BEFORE UPDATE ON public.leave_requests       FOR EACH ROW EXECUTE FUNCTION public.fn_set_updated_at();
@@ -763,10 +805,20 @@ ALTER TABLE public.department_requests  ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.approval_steps       ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.audit_logs           ENABLE ROW LEVEL SECURITY;
 
+DROP TRIGGER IF EXISTS trg_on_auth_user_created ON auth.users;
+CREATE TRIGGER trg_on_auth_user_created
+  AFTER INSERT ON auth.users
+  FOR EACH ROW EXECUTE FUNCTION public.fn_handle_new_auth_user();
+
 -- Profiles: users can read their own profile; admins can read all
 CREATE POLICY "profiles_self_read"
   ON public.profiles FOR SELECT
   USING (auth.uid() = id);
+
+CREATE POLICY "profiles_self_update"
+  ON public.profiles FOR UPDATE
+  USING (auth.uid() = id)
+  WITH CHECK (auth.uid() = id);
 
 CREATE POLICY "profiles_admin_all"
   ON public.profiles FOR ALL
