@@ -1,10 +1,10 @@
 <a href="https://demo-nextjs-with-supabase.vercel.app/">
-  <img alt="Next.js and Supabase Starter Kit - the fastest way to build apps with Next.js and Supabase" src="https://demo-nextjs-with-supabase.vercel.app/opengraph-image.png">
-  <h1 align="center">Next.js and Supabase Starter Kit</h1>
+  <img alt="Schwer Online Management" src="https://demo-nextjs-with-supabase.vercel.app/opengraph-image.png">
+  <h1 align="center">Schwer Online Management</h1>
 </a>
 
 <p align="center">
- The fastest way to build apps with Next.js and Supabase
+ Department-first operations portal with Next.js and Supabase
 </p>
 
 <p align="center">
@@ -16,6 +16,15 @@
   <a href="#more-supabase-examples"><strong>More Examples</strong></a>
 </p>
 <br/>
+
+## Current Behavior
+
+- `/` is a public landing page with Login and Sign up calls to action.
+- Protected routes redirect unauthenticated users to `/auth/login` and preserve intended destination via `redirectTo`.
+- Post-auth routing converges to:
+  - `/auth/choose-department` when department is missing
+  - `/protected/{department}` when department is set
+- Profile self-healing is enabled via server-side ensurement fallback and schema-backed RLS policy support.
 
 ## Features
 

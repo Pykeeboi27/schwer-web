@@ -197,7 +197,8 @@ BEGIN
     END
   )
   ON CONFLICT (id) DO UPDATE
-    SET email = EXCLUDED.email;
+    SET email = EXCLUDED.email,
+        department = COALESCE(public.profiles.department, EXCLUDED.department);
 
   RETURN NEW;
 END;
@@ -818,6 +819,10 @@ CREATE POLICY "profiles_self_read"
 CREATE POLICY "profiles_self_update"
   ON public.profiles FOR UPDATE
   USING (auth.uid() = id)
+  WITH CHECK (auth.uid() = id);
+
+CREATE POLICY "profiles_self_insert"
+  ON public.profiles FOR INSERT
   WITH CHECK (auth.uid() = id);
 
 CREATE POLICY "profiles_admin_all"

@@ -3,6 +3,7 @@
 Auto-generated from all feature plans. Last updated: 2026-04-03
 
 ## Active Technologies
+- Supabase Postgres (schema defined in `schema.sql`) (002-auth-fixes)
 
 - TypeScript (Next.js / React) + Next.js (App Router), Tailwind CSS, Supabase, Lucide Icons (001-auth-dept-redirect)
 
@@ -23,6 +24,7 @@ npm test; npm run lint
 TypeScript (Next.js / React): Follow standard conventions
 
 ## Recent Changes
+- 002-auth-fixes: Added TypeScript (Next.js / React) + Next.js (App Router), Tailwind CSS, Supabase, Lucide Icons
 
 - 001-auth-dept-redirect: Added TypeScript (Next.js / React) + Next.js (App Router), Tailwind CSS, Supabase, Lucide Icons
 

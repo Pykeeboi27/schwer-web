@@ -1,56 +1,64 @@
-import { DeployButton } from "@/components/deploy-button";
-import { EnvVarWarning } from "@/components/env-var-warning";
-import { AuthButton } from "@/components/auth-button";
-import { Hero } from "@/components/hero";
 import { ThemeSwitcher } from "@/components/theme-switcher";
-import { ConnectSupabaseSteps } from "@/components/tutorial/connect-supabase-steps";
-import { SignUpUserSteps } from "@/components/tutorial/sign-up-user-steps";
-import { hasEnvVars } from "@/lib/utils";
+import { SchwerLogo } from "@/components/schwer-logo";
 import Link from "next/link";
-import { Suspense } from "react";
 
 export default function Home() {
   return (
-    <main className="min-h-screen flex flex-col items-center">
-      <div className="flex-1 w-full flex flex-col gap-20 items-center">
-        <nav className="w-full flex justify-center border-b border-b-foreground/10 h-16">
-          <div className="w-full max-w-5xl flex justify-between items-center p-3 px-5 text-sm">
-            <div className="flex gap-5 items-center font-semibold">
-              <Link href={"/"}>Next.js Supabase Starter</Link>
-              <div className="flex items-center gap-2">
-                <DeployButton />
-              </div>
-            </div>
-            {!hasEnvVars ? (
-              <EnvVarWarning />
-            ) : (
-              <Suspense fallback={<div className="text-sm text-muted-foreground">Loading account...</div>}>
-                <AuthButton />
-              </Suspense>
-            )}
-          </div>
-        </nav>
-        <div className="flex-1 flex flex-col gap-20 max-w-5xl p-5">
-          <Hero />
-          <main className="flex-1 flex flex-col gap-6 px-4">
-            <h2 className="font-medium text-xl mb-4">Next steps</h2>
-            {hasEnvVars ? <SignUpUserSteps /> : <ConnectSupabaseSteps />}
-          </main>
-        </div>
-
-        <footer className="w-full flex items-center justify-center border-t mx-auto text-center text-xs gap-8 py-16">
-          <p>
-            Powered by{" "}
-            <a
-              href="https://supabase.com/?utm_source=create-next-app&utm_medium=template&utm_term=nextjs"
-              target="_blank"
-              className="font-bold hover:underline"
-              rel="noreferrer"
-            >
-              Supabase
-            </a>
-          </p>
+    <main className="min-h-screen bg-gradient-to-b from-secondary/20 via-background to-background text-foreground">
+      <div className="mx-auto flex min-h-screen w-full max-w-6xl flex-col px-6 py-8 md:px-10">
+        <header className="flex items-center justify-between">
+          <Link href="/" className="inline-flex items-center gap-3 text-lg font-semibold tracking-tight">
+            <SchwerLogo className="h-7" />
+            Schwer Online Management
+          </Link>
           <ThemeSwitcher />
+        </header>
+
+        <section className="flex flex-1 flex-col items-start justify-center py-16">
+          <SchwerLogo className="h-14" />
+          <p className="rounded-full border border-primary/30 bg-primary/10 px-4 py-1 text-xs font-semibold uppercase tracking-[0.12em] text-primary">
+            Schwer ERP Portal
+          </p>
+          <h1 className="mt-6 max-w-3xl text-4xl font-semibold leading-tight md:text-6xl">
+            Schwer Online Management
+          </h1>
+          <p className="mt-6 max-w-2xl text-base text-muted-foreground md:text-lg">
+            Centralize operations for HR, Sales, Accounting, Engineering, and Purchasing in one secure system.
+          </p>
+
+          <div className="mt-10 flex flex-wrap gap-4">
+            <Link
+              href="/auth/login"
+              className="inline-flex h-11 items-center justify-center rounded-md bg-primary px-6 text-sm font-medium text-primary-foreground"
+            >
+              Login
+            </Link>
+            <Link
+              href="/auth/sign-up"
+              className="inline-flex h-11 items-center justify-center rounded-md border border-input bg-background px-6 text-sm font-medium"
+            >
+              Sign up
+            </Link>
+          </div>
+
+          <div className="mt-14 grid w-full gap-4 md:grid-cols-3">
+            <div className="rounded-xl border bg-card p-5">
+              <h2 className="text-sm font-semibold text-primary">Secure Access</h2>
+              <p className="mt-2 text-sm text-muted-foreground">Supabase Auth with profile-aware routing and protected department dashboards.</p>
+            </div>
+            <div className="rounded-xl border bg-card p-5">
+              <h2 className="text-sm font-semibold text-primary">Department-first Flow</h2>
+              <p className="mt-2 text-sm text-muted-foreground">Users without a department are guided to onboarding before entering protected pages.</p>
+            </div>
+            <div className="rounded-xl border bg-card p-5">
+              <h2 className="text-sm font-semibold text-primary">Unified Operations</h2>
+              <p className="mt-2 text-sm text-muted-foreground">Keep teams aligned with a single source of truth for business workflows.</p>
+            </div>
+          </div>
+        </section>
+
+        <footer className="border-t py-6 text-sm text-muted-foreground">
+          <p>Schwer Online Management</p>
         </footer>
       </div>
     </main>

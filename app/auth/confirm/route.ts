@@ -1,9 +1,24 @@
 import { createClient } from "@/lib/supabase/server";
-import { getCurrentProfile } from "@/lib/profile/get-current-profile";
-import { getPostAuthRedirectPath } from "@/lib/profile/redirect-to-dashboard";
+import {
+  ensureCurrentProfile,
+  isEnsureCurrentProfileError,
+} from "@/lib/profile/ensure-current-profile";
+import {
+  getPostAuthRedirectPath,
+  isSafeProtectedRedirectTarget,
+} from "@/lib/profile/redirect-to-dashboard";
 import { type EmailOtpType } from "@supabase/supabase-js";
 import { redirect } from "next/navigation";
 import { type NextRequest } from "next/server";
+
+function getProfileErrorRedirect(retryPath: string): string {
+  const params = new URLSearchParams({
+    error: "We couldn't load your profile. Please try again.",
+    retry: retryPath,
+  });
+
+  return `/auth/error?${params.toString()}`;
+}
 
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
@@ -11,6 +26,8 @@ export async function GET(request: NextRequest) {
   const code = searchParams.get("code");
   const type = searchParams.get("type") as EmailOtpType | null;
   const next = searchParams.get("next") ?? "/protected";
+  const redirectTo = isSafeProtectedRedirectTarget(next) ? next : null;
+  const retryPath = redirectTo ? `/auth/login?redirectTo=${encodeURIComponent(redirectTo)}` : "/auth/login";
 
   const supabase = await createClient();
 
@@ -24,16 +41,16 @@ export async function GET(request: NextRequest) {
       redirect(`/auth/error?error=${encodeURIComponent(error.message)}`);
     }
 
-    // If a department exists, route to that dashboard. Otherwise require selection.
-    const profile = await getCurrentProfile();
-    const targetPath = getPostAuthRedirectPath(profile);
+    try {
+      const profile = await ensureCurrentProfile();
+      redirect(getPostAuthRedirectPath(profile, redirectTo));
+    } catch (error) {
+      if (isEnsureCurrentProfileError(error)) {
+        redirect(getProfileErrorRedirect(retryPath));
+      }
 
-    // Preserve explicit non-root next param only when department is already known.
-    if (targetPath.startsWith("/protected/") && next !== "/" && next !== "/protected") {
-      redirect(next);
+      throw error;
     }
-
-    redirect(targetPath);
   }
 
   if (code) {
@@ -43,8 +60,16 @@ export async function GET(request: NextRequest) {
       redirect(`/auth/error?error=${encodeURIComponent(error.message)}`);
     }
 
-    const profile = await getCurrentProfile();
-    redirect(getPostAuthRedirectPath(profile));
+    try {
+      const profile = await ensureCurrentProfile();
+      redirect(getPostAuthRedirectPath(profile, redirectTo));
+    } catch (error) {
+      if (isEnsureCurrentProfileError(error)) {
+        redirect(getProfileErrorRedirect(retryPath));
+      }
+
+      throw error;
+    }
   }
 
   redirect("/auth/error?error=No token hash, code, or type");

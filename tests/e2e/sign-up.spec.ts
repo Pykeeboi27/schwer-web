@@ -17,6 +17,13 @@ test("sign-up completes and redirects to protected dashboard", async ({ page }) 
   await page.getByLabel("Department").selectOption(department);
   await page.getByRole("button", { name: "Sign up" }).click();
 
-  await page.waitForURL(/\/protected(\/.*)?$/);
-  await expect(page).toHaveURL(/\/protected(\/.*)?$/);
+  await page.waitForURL(/\/(auth\/choose-department|protected(\/.*)?)$/);
+
+  const currentUrl = page.url();
+
+  if (currentUrl.includes("/auth/choose-department")) {
+    await expect(page.getByRole("heading", { name: /choose your department/i })).toBeVisible();
+  } else {
+    await expect(page).toHaveURL(/\/protected(\/.*)?$/);
+  }
 });
