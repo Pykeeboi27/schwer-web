@@ -94,7 +94,7 @@ tests/
 See [research.md](./research.md).
 
 Key outcomes:
-- Revenue basis: booked revenue (sum of purchase_orders.po_amount)g
+- Revenue basis: booked revenue (sum of purchase_orders.po_amount)
 - Margin: weighted margin % for YTD
 - Target scope: overall annual target only
 - Sales performance ranking: PO owner
@@ -110,7 +110,7 @@ Notable design implications:
 - No new core entities required for v1.
 - To support editing targets, add RLS policies for revenue_targets INSERT/UPDATE for Target Editors only (profiles.role IN ('owner','executive') AND profiles.is_active = TRUE).
 - Ensure executive dashboard reads are allowed only for Executive Dashboard Viewers (profiles.is_executive_viewer = TRUE AND profiles.is_active = TRUE).
-- Add a read-only RLS SELECT policy for public.purchase_orders that allows active Executive Dashboard Viewers (profiles.is_executive_viewer = TRUE AND is_active = TRUE) to read rows for dashboard aggregation; current schema grants Sales full access but does not grant Executive Dashboard Viewers read access.
+- Add a read-only RLS SELECT policy for public.purchase_orders that allows active Executive Dashboard Viewers (profiles.is_executive_viewer = TRUE AND is_active = TRUE) to read rows for dashboard aggregation; current schema grants Sales full access but does not grant Executive Dashboard Viewers read access.- Add a read-only RLS SELECT policy for public.purchase_orders that allows active executive viewers (profiles.is_executive_viewer = TRUE AND is_active = TRUE) to read rows for dashboard aggregation; current schema grants Sales full access but does not grant executive viewers read access.
 
 
 ### Contracts

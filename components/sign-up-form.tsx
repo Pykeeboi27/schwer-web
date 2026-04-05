@@ -46,10 +46,10 @@ export function SignUpForm({
 
   return (
     <div className={cn("flex flex-col gap-6", className)} {...props}>
-      <Card>
+      <Card className="border-primary/20 bg-background/85 shadow-2xl backdrop-blur-sm">
         <CardHeader>
-          <CardTitle className="text-2xl">Sign up</CardTitle>
-          <CardDescription>Create a new account</CardDescription>
+          <CardTitle className="text-2xl tracking-tight">Sign up</CardTitle>
+          <CardDescription>Create your Schwer Online Management account</CardDescription>
         </CardHeader>
         <CardContent>
           <form action={formAction}>
@@ -126,7 +126,7 @@ export function SignUpForm({
                 </Button>
               </div>
               {state.error && <p className="text-sm text-red-500">{state.error}</p>}
-              <Button type="submit" className="w-full" disabled={isPending}>
+              <Button type="submit" className="w-full font-semibold" disabled={isPending}>
                 {isPending ? "Creating an account..." : "Sign up"}
               </Button>
             </div>

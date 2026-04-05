@@ -1,39 +1,26 @@
-import { createClient } from "@/lib/supabase/server";
+import {
+  ensureCurrentProfile,
+  type CurrentProfile,
+} from "@/lib/profile/ensure-current-profile";
 
-import type { Department } from "@/lib/profile/departments";
-
-export type CurrentProfile = {
-  id: string;
-  email: string;
-  department: Department | null;
-  isActive: boolean;
-};
+export type { CurrentProfile };
 
 export async function getCurrentProfile(): Promise<CurrentProfile | null> {
-  const supabase = await createClient();
-  const {
-    data: { user },
-    error: userError,
-  } = await supabase.auth.getUser();
-
-  if (userError || !user) {
+  try {
+    return await ensureCurrentProfile();
+  } catch {
     return null;
   }
+}
 
-  const { data, error } = await supabase
-    .from("profiles")
-    .select("id, email, department, is_active")
-    .eq("id", user.id)
-    .maybeSingle();
-
-  if (error || !data) {
-    return null;
+export function hasExecutiveApprovalAccess(profile: CurrentProfile | null): boolean {
+  if (!profile || !profile.isActive) {
+    return false;
   }
 
-  return {
-    id: data.id,
-    email: data.email,
-    department: data.department,
-    isActive: data.is_active,
-  };
+  return (
+    profile.isExecutiveViewer ||
+    profile.role === "owner" ||
+    profile.role === "executive"
+  );
 }

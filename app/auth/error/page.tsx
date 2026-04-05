@@ -1,12 +1,14 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import Link from "next/link";
 import { Suspense } from "react";
 
 async function ErrorContent({
   searchParams,
 }: {
-  searchParams: Promise<{ error: string }>;
+  searchParams: Promise<{ error?: string; retry?: string }>;
 }) {
   const params = await searchParams;
+  const retryPath = params?.retry ?? "/auth/login";
 
   return (
     <>
@@ -19,6 +21,21 @@ async function ErrorContent({
           An unspecified error occurred.
         </p>
       )}
+
+      <div className="mt-6 flex gap-3">
+        <Link
+          href={retryPath}
+          className="inline-flex h-9 items-center justify-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground"
+        >
+          Try again
+        </Link>
+        <Link
+          href="/auth/login"
+          className="inline-flex h-9 items-center justify-center rounded-md border border-input bg-background px-4 py-2 text-sm font-medium"
+        >
+          Back to login
+        </Link>
+      </div>
     </>
   );
 }
@@ -26,7 +43,7 @@ async function ErrorContent({
 export default function Page({
   searchParams,
 }: {
-  searchParams: Promise<{ error: string }>;
+  searchParams: Promise<{ error?: string; retry?: string }>;
 }) {
   return (
     <div className="flex min-h-svh w-full items-center justify-center p-6 md:p-10">

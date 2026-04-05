@@ -1,6 +1,10 @@
 import { DEPARTMENTS, isDepartment } from "@/lib/profile/departments";
-import { getCurrentProfile } from "@/lib/profile/get-current-profile";
+import {
+  ensureCurrentProfile,
+  isEnsureCurrentProfileError,
+} from "@/lib/profile/ensure-current-profile";
 import { getDepartmentDashboardPath } from "@/lib/profile/redirect-to-dashboard";
+import { isSafeProtectedRedirectTarget } from "@/lib/profile/redirect-to-dashboard";
 import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
 import { Suspense } from "react";
@@ -14,24 +18,48 @@ export function validateDepartmentSelection(department: string): string | null {
 }
 
 type ChooseDepartmentPageProps = {
-  searchParams?: Promise<{ error?: string }>;
+  searchParams?: Promise<{ error?: string; redirectTo?: string }>;
 };
 
 async function ChooseDepartmentContent({
   searchParams,
 }: ChooseDepartmentPageProps) {
-  const profile = await getCurrentProfile();
+  const resolvedSearchParams = searchParams ? await searchParams : undefined;
+  const errorMessage = resolvedSearchParams?.error ?? null;
+  const redirectTo = resolvedSearchParams?.redirectTo;
+  const safeRedirectTo = isSafeProtectedRedirectTarget(redirectTo) ? redirectTo : null;
+  const retryPath = safeRedirectTo
+    ? `/auth/choose-department?redirectTo=${encodeURIComponent(safeRedirectTo)}`
+    : "/auth/choose-department";
+
+  let profile;
+
+  try {
+    profile = await ensureCurrentProfile();
+  } catch (error) {
+    if (isEnsureCurrentProfileError(error)) {
+      const params = new URLSearchParams({
+        error: "We couldn't load your profile. Please try again.",
+        retry: retryPath,
+      });
+
+      redirect(`/auth/error?${params.toString()}`);
+    }
+
+    throw error;
+  }
 
   if (!profile) {
-    redirect("/auth/login");
+    const params = new URLSearchParams({
+      redirectTo: safeRedirectTo ?? "/protected",
+    });
+
+    redirect(`/auth/login?${params.toString()}`);
   }
 
   if (profile.department) {
-    redirect(getDepartmentDashboardPath(profile.department));
+    redirect(safeRedirectTo ?? getDepartmentDashboardPath(profile.department));
   }
-
-  const resolvedSearchParams = searchParams ? await searchParams : undefined;
-  const errorMessage = resolvedSearchParams?.error ?? null;
 
   async function chooseDepartmentAction(formData: FormData) {
     "use server";
@@ -40,9 +68,15 @@ async function ChooseDepartmentContent({
     const validationError = validateDepartmentSelection(departmentRaw);
 
     if (validationError) {
-      redirect(
-        `/auth/choose-department?error=${encodeURIComponent(validationError)}`,
-      );
+      const params = new URLSearchParams({
+        error: validationError,
+      });
+
+      if (safeRedirectTo) {
+        params.set("redirectTo", safeRedirectTo);
+      }
+
+      redirect(`/auth/choose-department?${params.toString()}`);
     }
 
     const supabase = await createClient();
@@ -52,7 +86,11 @@ async function ChooseDepartmentContent({
     } = await supabase.auth.getUser();
 
     if (userError || !user) {
-      redirect("/auth/login");
+      const params = new URLSearchParams({
+        redirectTo: safeRedirectTo ?? "/protected",
+      });
+
+      redirect(`/auth/login?${params.toString()}`);
     }
 
     const { error } = await supabase
@@ -61,10 +99,18 @@ async function ChooseDepartmentContent({
       .eq("id", user.id);
 
     if (error) {
-      redirect(`/auth/choose-department?error=${encodeURIComponent(error.message)}`);
+      const params = new URLSearchParams({
+        error: error.message,
+      });
+
+      if (safeRedirectTo) {
+        params.set("redirectTo", safeRedirectTo);
+      }
+
+      redirect(`/auth/choose-department?${params.toString()}`);
     }
 
-    redirect(getDepartmentDashboardPath(departmentRaw));
+    redirect(safeRedirectTo ?? getDepartmentDashboardPath(departmentRaw));
   }
 
   return (

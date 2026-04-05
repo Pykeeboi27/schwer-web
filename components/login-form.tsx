@@ -38,9 +38,12 @@ const initialLoginActionState: LoginActionState = {
 };
 
 export function LoginForm({
+  redirectTo,
   className,
   ...props
-}: React.ComponentPropsWithoutRef<"div">) {
+}: React.ComponentPropsWithoutRef<"div"> & {
+  redirectTo?: string | null;
+}) {
   const [isPasswordVisible, setIsPasswordVisible] = useState(false);
   const [state, formAction, isPending] = useActionState(
     loginAction,
@@ -52,17 +55,21 @@ export function LoginForm({
 
   useEffect(() => {
     if (state.success) {
-      router.push("/protected");
+      const nextPath = redirectTo
+        ? `/protected?redirectTo=${encodeURIComponent(redirectTo)}`
+        : "/protected";
+
+      router.push(nextPath);
     }
-  }, [router, state.success]);
+  }, [redirectTo, router, state.success]);
 
   return (
     <div className={cn("flex flex-col gap-6", className)} {...props}>
-      <Card>
+      <Card className="border-primary/20 bg-background/85 shadow-2xl backdrop-blur-sm">
         <CardHeader>
-          <CardTitle className="text-2xl">Login</CardTitle>
+          <CardTitle className="text-2xl tracking-tight">Login</CardTitle>
           <CardDescription>
-            Enter your email below to login to your account
+            Enter your credentials to access Schwer Online Management
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -104,7 +111,7 @@ export function LoginForm({
                 </Button>
               </div>
               {errorMessage && <p className="text-sm text-red-500">{errorMessage}</p>}
-              <Button type="submit" className="w-full" disabled={isPending}>
+              <Button type="submit" className="w-full font-semibold" disabled={isPending}>
                 {isPending ? "Logging in..." : "Login"}
               </Button>
               <Button type="button" variant="outline" className="w-full" asChild>
