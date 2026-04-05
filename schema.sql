@@ -13,7 +13,6 @@ CREATE EXTENSION IF NOT EXISTS "pgcrypto";
 
 -- ============================================================
 -- ENUMS
--- ============================================================
 
 CREATE TYPE user_role_enum AS ENUM (
   'owner',
@@ -45,6 +44,7 @@ CREATE TYPE sector_enum AS ENUM (
 );
 
 CREATE TYPE approval_status_enum AS ENUM (
+  'draft',
   'pending',
   'approved',
   'rejected',
@@ -293,8 +293,14 @@ CREATE INDEX idx_leave_requests_status   ON public.leave_requests(status);
 
 CREATE TABLE public.clients (
   id                  UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  department_id       UUID,
   client_code         TEXT UNIQUE NOT NULL,
+  code                TEXT GENERATED ALWAYS AS (client_code) STORED,
   company_name        TEXT NOT NULL,
+  name                TEXT GENERATED ALWAYS AS (company_name) STORED,
+  contact_person      TEXT,
+  email               TEXT,
+  phone               TEXT,
   sector              sector_enum NOT NULL,
   address             TEXT,
   city                TEXT,
@@ -312,6 +318,7 @@ CREATE TABLE public.clients (
 
 CREATE INDEX idx_clients_sector    ON public.clients(sector);
 CREATE INDEX idx_clients_is_active ON public.clients(is_active);
+CREATE UNIQUE INDEX idx_clients_code_unique ON public.clients(code);
 
 CREATE TABLE public.client_contacts (
   id           UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
@@ -333,6 +340,7 @@ CREATE TABLE public.client_contacts (
 
 CREATE TABLE public.quotations (
   id                  UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  department_id       UUID,
   quotation_number    TEXT UNIQUE NOT NULL,
   client_id           UUID NOT NULL REFERENCES public.clients(id) ON DELETE RESTRICT,
   sector              sector_enum NOT NULL,
@@ -344,12 +352,16 @@ CREATE TABLE public.quotations (
   margin_percent      NUMERIC(6, 2) GENERATED ALWAYS AS (
                         CASE WHEN amount > 0 THEN ((amount - COALESCE(cost, 0)) / amount) * 100 ELSE 0 END
                       ) STORED,
-  -- Approval tier: < 3M = sales_manager, >= 3M = owner + 2 executives
+  -- Approval tier: < 3M = sales_manager, >= 3M = sales_manager + owner + executive
   requires_executive_approval BOOLEAN GENERATED ALWAYS AS (amount >= 3000000) STORED,
-  status              approval_status_enum NOT NULL DEFAULT 'pending',
+  status              approval_status_enum NOT NULL DEFAULT 'draft',
+  approval_chain      JSONB NOT NULL DEFAULT '{}'::jsonb,
+  rejection_reason    TEXT,
+  submitted_at        TIMESTAMPTZ,
   valid_until         DATE,
   notes               TEXT,
   prepared_by         UUID NOT NULL REFERENCES public.profiles(id) ON DELETE RESTRICT,
+  created_by          UUID GENERATED ALWAYS AS (prepared_by) STORED,
   created_at          TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at          TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
@@ -362,11 +374,21 @@ CREATE TABLE public.quotation_approvals (
   id               UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   quotation_id     UUID NOT NULL REFERENCES public.quotations(id) ON DELETE CASCADE,
   approver_id      UUID NOT NULL REFERENCES public.profiles(id) ON DELETE RESTRICT,
+  approved_by      UUID GENERATED ALWAYS AS (approver_id) STORED,
   approver_role    user_role_enum NOT NULL,
+  role             user_role_enum GENERATED ALWAYS AS (approver_role) STORED,
   approval_order   INTEGER NOT NULL DEFAULT 1,  -- sequence if multi-level
   status           approval_status_enum NOT NULL DEFAULT 'pending',
+  action           TEXT GENERATED ALWAYS AS (
+                     CASE
+                       WHEN status = 'approved' THEN 'approved'
+                       WHEN status = 'rejected' THEN 'rejected'
+                       ELSE NULL
+                     END
+                   ) STORED,
   approved_at      TIMESTAMPTZ,
   rejection_reason TEXT,
+  reason           TEXT GENERATED ALWAYS AS (rejection_reason) STORED,
   notes            TEXT,
   created_at       TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at       TIMESTAMPTZ NOT NULL DEFAULT NOW(),
@@ -375,19 +397,23 @@ CREATE TABLE public.quotation_approvals (
 
 CREATE TABLE public.purchase_orders (
   id                  UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  department_id       UUID,
   po_number           TEXT UNIQUE NOT NULL,
   quotation_id        UUID REFERENCES public.quotations(id) ON DELETE SET NULL,
   client_id           UUID NOT NULL REFERENCES public.clients(id) ON DELETE RESTRICT,
   sector              sector_enum NOT NULL,
   subject             TEXT NOT NULL,
   po_amount           NUMERIC(15, 2) NOT NULL,       -- Closed Sale (total PO value)
+  total_amount        NUMERIC(15, 2) GENERATED ALWAYS AS (po_amount) STORED,
   cost                NUMERIC(15, 2),
   margin_amount       NUMERIC(15, 2) GENERATED ALWAYS AS (po_amount - COALESCE(cost, 0)) STORED,
   margin_percent      NUMERIC(6, 2) GENERATED ALWAYS AS (
                         CASE WHEN po_amount > 0 THEN ((po_amount - COALESCE(cost, 0)) / po_amount) * 100 ELSE 0 END
                       ) STORED,
   recognized_amount   NUMERIC(15, 2) NOT NULL DEFAULT 0, -- Recognized Sale (collected so far)
+  collected_amount    NUMERIC(15, 2) GENERATED ALWAYS AS (recognized_amount) STORED,
   payment_terms_days  INTEGER NOT NULL DEFAULT 30,
+  status              TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('draft', 'active', 'closed')),
   payment_status      payment_status_enum NOT NULL DEFAULT 'unpaid',
   po_date             DATE NOT NULL DEFAULT CURRENT_DATE,
   expected_completion DATE,
@@ -416,6 +442,17 @@ CREATE TABLE public.po_payments (
 );
 
 CREATE INDEX idx_po_payments_po_id ON public.po_payments(po_id);
+
+-- Compatibility table for collection tracking contract in spec 004.
+CREATE TABLE public.collections (
+  id                UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  purchase_order_id UUID NOT NULL REFERENCES public.purchase_orders(id) ON DELETE CASCADE,
+  amount            NUMERIC(15, 2) NOT NULL CHECK (amount > 0),
+  recorded_by       UUID REFERENCES public.profiles(id) ON DELETE SET NULL,
+  created_at        TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX idx_collections_po_id ON public.collections(purchase_order_id);
 
 
 -- ============================================================
@@ -699,6 +736,11 @@ CREATE TRIGGER trg_audit_revenue_records
   AFTER INSERT OR UPDATE OR DELETE ON public.revenue_records
   FOR EACH ROW EXECUTE FUNCTION public.fn_audit_trigger();
 
+-- revenue_targets
+CREATE TRIGGER trg_audit_revenue_targets
+  AFTER INSERT OR UPDATE OR DELETE ON public.revenue_targets
+  FOR EACH ROW EXECUTE FUNCTION public.fn_audit_trigger();
+
 -- vendors
 CREATE TRIGGER trg_audit_vendors
   AFTER INSERT OR UPDATE OR DELETE ON public.vendors
@@ -789,6 +831,225 @@ SELECT
 FROM public.purchase_orders po
 JOIN public.clients c ON c.id = po.client_id;
 
+-- Keep purchase_orders.recognized_amount and payment_status in sync with po_payments
+CREATE OR REPLACE FUNCTION public.fn_refresh_po_payment_totals(target_po_id UUID)
+RETURNS VOID
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  v_po_amount NUMERIC(15, 2);
+  v_collected_total NUMERIC(15, 2);
+BEGIN
+  IF target_po_id IS NULL THEN
+    RETURN;
+  END IF;
+
+  SELECT po_amount
+  INTO v_po_amount
+  FROM public.purchase_orders
+  WHERE id = target_po_id
+  FOR UPDATE;
+
+  IF NOT FOUND THEN
+    RETURN;
+  END IF;
+
+  SELECT COALESCE(SUM(amount_collected), 0)
+  INTO v_collected_total
+  FROM public.po_payments
+  WHERE po_id = target_po_id;
+
+  IF v_collected_total > v_po_amount THEN
+    RAISE EXCEPTION
+      'Collected amount (%.2f) exceeds PO amount (%.2f) for PO %',
+      v_collected_total,
+      v_po_amount,
+      target_po_id
+      USING ERRCODE = '23514';
+  END IF;
+
+  UPDATE public.purchase_orders po
+  SET recognized_amount = v_collected_total,
+      payment_status = CASE
+        WHEN v_collected_total = 0 THEN 'unpaid'::payment_status_enum
+        WHEN v_collected_total < v_po_amount THEN 'partial'::payment_status_enum
+        ELSE 'paid'::payment_status_enum
+      END,
+      updated_at = NOW()
+  WHERE po.id = target_po_id;
+END;
+$$;
+
+CREATE OR REPLACE FUNCTION public.fn_sync_po_totals_from_payments()
+RETURNS TRIGGER
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+BEGIN
+  PERFORM public.fn_refresh_po_payment_totals(COALESCE(NEW.po_id, OLD.po_id));
+
+  IF TG_OP = 'UPDATE' AND NEW.po_id IS DISTINCT FROM OLD.po_id THEN
+    PERFORM public.fn_refresh_po_payment_totals(OLD.po_id);
+  END IF;
+
+  RETURN COALESCE(NEW, OLD);
+END;
+$$;
+
+DROP TRIGGER IF EXISTS trg_sync_po_totals_from_payments ON public.po_payments;
+CREATE TRIGGER trg_sync_po_totals_from_payments
+AFTER INSERT OR UPDATE OR DELETE ON public.po_payments
+FOR EACH ROW EXECUTE FUNCTION public.fn_sync_po_totals_from_payments();
+
+-- Keep purchase_orders.recognized_amount in sync with collections compatibility table.
+CREATE OR REPLACE FUNCTION public.fn_sync_po_totals_from_collections()
+RETURNS TRIGGER
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  target_po_id UUID;
+  v_po_amount NUMERIC(15, 2);
+  v_collected_total NUMERIC(15, 2);
+BEGIN
+  target_po_id := COALESCE(NEW.purchase_order_id, OLD.purchase_order_id);
+
+  IF target_po_id IS NULL THEN
+    RETURN COALESCE(NEW, OLD);
+  END IF;
+
+  SELECT po_amount
+  INTO v_po_amount
+  FROM public.purchase_orders
+  WHERE id = target_po_id
+  FOR UPDATE;
+
+  IF NOT FOUND THEN
+    RETURN COALESCE(NEW, OLD);
+  END IF;
+
+  SELECT COALESCE(SUM(amount), 0)
+  INTO v_collected_total
+  FROM public.collections
+  WHERE purchase_order_id = target_po_id;
+
+  IF v_collected_total > v_po_amount THEN
+    RAISE EXCEPTION
+      'Collected amount (%.2f) exceeds PO amount (%.2f) for PO %',
+      v_collected_total,
+      v_po_amount,
+      target_po_id
+      USING ERRCODE = '23514';
+  END IF;
+
+  UPDATE public.purchase_orders po
+  SET recognized_amount = v_collected_total,
+      payment_status = CASE
+        WHEN v_collected_total = 0 THEN 'unpaid'::payment_status_enum
+        WHEN v_collected_total < v_po_amount THEN 'partial'::payment_status_enum
+        ELSE 'paid'::payment_status_enum
+      END,
+      updated_at = NOW()
+  WHERE po.id = target_po_id;
+
+  RETURN COALESCE(NEW, OLD);
+END;
+$$;
+
+DROP TRIGGER IF EXISTS trg_sync_po_totals_from_collections ON public.collections;
+CREATE TRIGGER trg_sync_po_totals_from_collections
+AFTER INSERT OR UPDATE OR DELETE ON public.collections
+FOR EACH ROW EXECUTE FUNCTION public.fn_sync_po_totals_from_collections();
+
+-- Keep quotations.status in sync with quotation_approvals decisions
+CREATE OR REPLACE FUNCTION public.fn_sync_quotation_status_from_approvals()
+RETURNS TRIGGER
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  qid UUID;
+BEGIN
+  qid := COALESCE(NEW.quotation_id, OLD.quotation_id);
+
+  -- Prevent recursion if this trigger updates rows that re-fire the trigger
+  IF pg_trigger_depth() > 1 THEN
+    RETURN COALESCE(NEW, OLD);
+  END IF;
+
+  -- If one approver approves for a role, cancel other pending approvals for that same role
+  IF TG_OP = 'UPDATE'
+     AND NEW.status = 'approved'
+     AND (OLD.status IS DISTINCT FROM NEW.status) THEN
+    UPDATE public.quotation_approvals
+    SET status = 'cancelled',
+        updated_at = NOW()
+    WHERE quotation_id = qid
+      AND approver_role = NEW.approver_role
+      AND status = 'pending'
+      AND id <> NEW.id;
+  END IF;
+
+  -- Aggregate overall quotation status
+  UPDATE public.quotations q
+  SET status = CASE
+    WHEN EXISTS (
+      SELECT 1 FROM public.quotation_approvals qa
+      WHERE qa.quotation_id = qid AND qa.status = 'rejected'
+    ) THEN 'rejected'::approval_status_enum
+    WHEN EXISTS (
+      SELECT 1 FROM public.quotation_approvals qa
+      WHERE qa.quotation_id = qid AND qa.status = 'pending'
+    ) THEN 'pending'::approval_status_enum
+    WHEN EXISTS (
+      SELECT 1 FROM public.quotation_approvals qa
+      WHERE qa.quotation_id = qid AND qa.status = 'approved'
+    )
+    AND NOT EXISTS (
+      SELECT 1 FROM public.quotation_approvals qa
+      WHERE qa.quotation_id = qid AND qa.status = 'pending'
+    ) THEN 'approved'::approval_status_enum
+    ELSE 'pending'::approval_status_enum
+  END,
+  updated_at = NOW()
+  WHERE q.id = qid;
+
+  RETURN COALESCE(NEW, OLD);
+END;
+$$;
+
+DROP TRIGGER IF EXISTS trg_sync_quotation_status_from_approvals ON public.quotation_approvals;
+CREATE TRIGGER trg_sync_quotation_status_from_approvals
+AFTER INSERT OR UPDATE OR DELETE ON public.quotation_approvals
+FOR EACH ROW EXECUTE FUNCTION public.fn_sync_quotation_status_from_approvals();
+
+-- Update recognized_amount on POs when payments are recorded
+CREATE OR REPLACE FUNCTION public.fn_update_po_recognized_amount()
+RETURNS TRIGGER AS $$
+BEGIN
+  -- Update the PO's recognized_amount to sum of all payments
+  UPDATE public.purchase_orders
+  SET recognized_amount = COALESCE((
+    SELECT SUM(amount_collected)
+    FROM public.po_payments
+    WHERE po_id = COALESCE(NEW.po_id, OLD.po_id)
+  ), 0),
+  updated_at = NOW()
+  WHERE id = COALESCE(NEW.po_id, OLD.po_id);
+  
+  RETURN COALESCE(NEW, OLD);
+END;
+$$ LANGUAGE plpgsql;
+
+DROP TRIGGER IF EXISTS trg_update_po_recognized_amount ON public.po_payments;
+CREATE TRIGGER trg_update_po_recognized_amount
+AFTER INSERT OR UPDATE OR DELETE ON public.po_payments
+FOR EACH ROW EXECUTE FUNCTION public.fn_update_po_recognized_amount();
 
 -- ============================================================
 -- SECTION 14: ROW LEVEL SECURITY (RLS) — STARTER POLICIES
@@ -805,6 +1066,10 @@ ALTER TABLE public.revenue_targets      ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.department_requests  ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.approval_steps       ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.audit_logs           ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.client_contacts      ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.quotation_approvals  ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.po_payments          ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.collections          ENABLE ROW LEVEL SECURITY;
 
 DROP TRIGGER IF EXISTS trg_on_auth_user_created ON auth.users;
 CREATE TRIGGER trg_on_auth_user_created
@@ -854,9 +1119,347 @@ CREATE POLICY "revenue_targets_exec_only"
       SELECT 1 FROM public.profiles p
       WHERE p.id = auth.uid()
         AND p.is_executive_viewer = TRUE
+        AND p.is_active = TRUE
     )
   );
 
+CREATE POLICY "revenue_targets_target_editor_insert"
+  ON public.revenue_targets FOR INSERT
+  WITH CHECK (
+    EXISTS (
+      SELECT 1 FROM public.profiles p
+      WHERE p.id = auth.uid()
+        AND p.role IN ('owner', 'executive')
+        AND p.is_active = TRUE
+    )
+  );
+
+CREATE POLICY "revenue_targets_target_editor_update"
+  ON public.revenue_targets FOR UPDATE
+  USING (
+    EXISTS (
+      SELECT 1 FROM public.profiles p
+      WHERE p.id = auth.uid()
+        AND p.role IN ('owner', 'executive')
+        AND p.is_active = TRUE
+    )
+  )
+  WITH CHECK (
+    EXISTS (
+      SELECT 1 FROM public.profiles p
+      WHERE p.id = auth.uid()
+        AND p.role IN ('owner', 'executive')
+        AND p.is_active = TRUE
+    )
+  );
+
+-- ============================================================
+-- SALES MODULE RLS POLICIES (required for Sales module features)
+-- ============================================================
+
+-- Helper check: active Sales user
+-- (Inline EXISTS used to avoid introducing new functions.)
+
+-- Clients: Sales department full access
+CREATE POLICY "sales_clients_sales_all"
+  ON public.clients FOR ALL
+  USING (
+    EXISTS (
+      SELECT 1 FROM public.profiles p
+      WHERE p.id = auth.uid()
+        AND p.department = 'sales'
+        AND p.is_active = TRUE
+    )
+  )
+  WITH CHECK (
+    EXISTS (
+      SELECT 1 FROM public.profiles p
+      WHERE p.id = auth.uid()
+        AND p.department = 'sales'
+        AND p.is_active = TRUE
+    )
+  );
+
+-- Client contacts: Sales department full access
+CREATE POLICY "sales_client_contacts_sales_all"
+  ON public.client_contacts FOR ALL
+  USING (
+    EXISTS (
+      SELECT 1 FROM public.profiles p
+      WHERE p.id = auth.uid()
+        AND p.department = 'sales'
+        AND p.is_active = TRUE
+    )
+  )
+  WITH CHECK (
+    EXISTS (
+      SELECT 1 FROM public.profiles p
+      WHERE p.id = auth.uid()
+        AND p.department = 'sales'
+        AND p.is_active = TRUE
+    )
+  );
+
+-- Quotations:
+-- - Sales department full access
+-- - Assigned approvers can SELECT quotations they must approve
+CREATE POLICY "sales_quotations_sales_all"
+  ON public.quotations FOR ALL
+  USING (
+    EXISTS (
+      SELECT 1 FROM public.profiles p
+      WHERE p.id = auth.uid()
+        AND p.department = 'sales'
+        AND p.is_active = TRUE
+    )
+  )
+  WITH CHECK (
+    EXISTS (
+      SELECT 1 FROM public.profiles p
+      WHERE p.id = auth.uid()
+        AND p.department = 'sales'
+        AND p.is_active = TRUE
+    )
+  );
+
+CREATE POLICY "sales_quotations_approver_select"
+  ON public.quotations FOR SELECT
+  USING (
+    EXISTS (
+      SELECT 1
+      FROM public.quotation_approvals qa
+      WHERE qa.quotation_id = id
+        AND qa.approver_id = auth.uid()
+    )
+  );
+
+-- Executives can view high-value quotations (>= 3M) for approval visibility.
+CREATE POLICY "sales_quotations_executive_high_value_select"
+  ON public.quotations FOR SELECT
+  USING (
+    amount >= 3000000
+    AND EXISTS (
+      SELECT 1 FROM public.profiles p
+      WHERE p.id = auth.uid()
+        AND p.department = 'executive'
+        AND p.role IN ('owner', 'executive')
+        AND p.is_active = TRUE
+    )
+  );
+
+-- Quotation approvals:
+-- - Sales can create/manage approval rows
+-- - Assigned approver can SELECT + UPDATE only their own approval row
+CREATE POLICY "sales_quotation_approvals_sales_select"
+  ON public.quotation_approvals FOR SELECT
+  USING (
+    EXISTS (
+      SELECT 1 FROM public.profiles p
+      WHERE p.id = auth.uid()
+        AND p.department = 'sales'
+        AND p.is_active = TRUE
+    )
+  );
+
+-- Helper: Sales can only assign approvals to valid approver profiles
+CREATE OR REPLACE FUNCTION public.fn_sales_can_assign_quotation_approver(
+  target_approver_id UUID,
+  target_role user_role_enum
+)
+RETURNS BOOLEAN
+LANGUAGE sql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+  SELECT
+    -- caller must be an active Sales user
+    EXISTS (
+      SELECT 1 FROM public.profiles caller
+      WHERE caller.id = auth.uid()
+        AND caller.department = 'sales'
+        AND caller.is_active = TRUE
+    )
+    AND
+    -- assignment must match an active approver profile with correct role+department
+    (
+      (target_role = 'sales_manager' AND EXISTS (
+        SELECT 1 FROM public.profiles a
+        WHERE a.id = target_approver_id
+          AND a.is_active = TRUE
+          AND a.role = 'sales_manager'
+          AND a.department = 'sales'
+      ))
+      OR
+      (target_role = 'owner' AND EXISTS (
+        SELECT 1 FROM public.profiles a
+        WHERE a.id = target_approver_id
+          AND a.is_active = TRUE
+          AND a.role = 'owner'
+          AND a.department = 'executive'
+      ))
+      OR
+      (target_role = 'executive' AND EXISTS (
+        SELECT 1 FROM public.profiles a
+        WHERE a.id = target_approver_id
+          AND a.is_active = TRUE
+          AND a.role = 'executive'
+          AND a.department = 'executive'
+      ))
+    );
+$$;
+
+DROP POLICY IF EXISTS "sales_quotation_approvals_sales_insert" ON public.quotation_approvals;
+CREATE POLICY "sales_quotation_approvals_sales_insert"
+  ON public.quotation_approvals FOR INSERT
+  WITH CHECK (
+    public.fn_sales_can_assign_quotation_approver(approver_id, approver_role)
+
+    -- harden: sales cannot “pre-approve” by inserting non-pending rows
+    AND status = 'pending'
+    AND approved_at IS NULL
+    AND rejection_reason IS NULL
+  );  
+
+-- Sales must NOT be able to change approval decisions.
+-- They can SELECT approval rows and INSERT assignment rows, but only the approver can UPDATE their own row.
+
+DROP POLICY IF EXISTS "sales_quotation_approvals_sales_update" ON public.quotation_approvals;
+-- (Optional hardening) Allow Sales to delete only pending approvals (e.g., to correct assignments)
+-- Replace the existing policy with a draft-gated version
+DROP POLICY IF EXISTS "sales_quotation_approvals_sales_delete_pending"
+ON public.quotation_approvals;
+
+CREATE POLICY "sales_quotation_approvals_sales_delete_pending"
+  ON public.quotation_approvals FOR DELETE
+  USING (
+    -- requester must be active Sales
+    EXISTS (
+      SELECT 1
+      FROM public.profiles p
+      WHERE p.id = auth.uid()
+        AND p.department = 'sales'
+        AND p.is_active = TRUE
+    )
+    -- only delete pending approval rows
+    AND status = 'pending'
+    -- only while the parent quotation is still draft
+    AND EXISTS (
+      SELECT 1
+      FROM public.quotations q
+      WHERE q.id = quotation_id
+        AND q.status = 'draft'
+    )
+  );
+
+CREATE POLICY "sales_quotation_approvals_approver_select_own"
+  ON public.quotation_approvals FOR SELECT
+  USING (approver_id = auth.uid());
+
+CREATE POLICY "sales_quotation_approvals_visible_quotation_select"
+  ON public.quotation_approvals FOR SELECT
+  USING (
+    EXISTS (
+      SELECT 1
+      FROM public.quotations q
+      WHERE q.id = quotation_id
+        AND (
+          EXISTS (
+            SELECT 1 FROM public.profiles p
+            WHERE p.id = auth.uid()
+              AND p.department = 'sales'
+              AND p.is_active = TRUE
+          )
+          OR (
+            q.amount >= 3000000
+            AND EXISTS (
+              SELECT 1 FROM public.profiles p
+              WHERE p.id = auth.uid()
+                AND p.department = 'executive'
+                AND p.role IN ('owner', 'executive')
+                AND p.is_active = TRUE
+            )
+          )
+          OR approver_id = auth.uid()
+        )
+    )
+  );
+
+CREATE POLICY "sales_quotation_approvals_approver_update_own"
+  ON public.quotation_approvals FOR UPDATE
+  USING (approver_id = auth.uid())
+  WITH CHECK (approver_id = auth.uid());
+
+-- Purchase orders: Sales department full access
+CREATE POLICY "sales_purchase_orders_sales_all"
+  ON public.purchase_orders FOR ALL
+  USING (
+    EXISTS (
+      SELECT 1 FROM public.profiles p
+      WHERE p.id = auth.uid()
+        AND p.department = 'sales'
+        AND p.is_active = TRUE
+    )
+  )
+  WITH CHECK (
+    EXISTS (
+      SELECT 1 FROM public.profiles p
+      WHERE p.id = auth.uid()
+        AND p.department = 'sales'
+        AND p.is_active = TRUE
+    )
+  );
+
+-- Purchase orders: Executive Dashboard Viewers can read for executive aggregates
+CREATE POLICY "executive_purchase_orders_viewer_read"
+  ON public.purchase_orders FOR SELECT
+  USING (
+    EXISTS (
+      SELECT 1 FROM public.profiles p
+      WHERE p.id = auth.uid()
+        AND p.is_executive_viewer = TRUE
+        AND p.is_active = TRUE
+    )
+  );
+
+-- PO payments: Sales department full access
+CREATE POLICY "sales_po_payments_sales_all"
+  ON public.po_payments FOR ALL
+  USING (
+    EXISTS (
+      SELECT 1 FROM public.profiles p
+      WHERE p.id = auth.uid()
+        AND p.department = 'sales'
+        AND p.is_active = TRUE
+    )
+  )
+  WITH CHECK (
+    EXISTS (
+      SELECT 1 FROM public.profiles p
+      WHERE p.id = auth.uid()
+        AND p.department = 'sales'
+        AND p.is_active = TRUE
+    )
+  );
+
+-- Collections compatibility table follows the same sales scoping as po_payments.
+CREATE POLICY "sales_collections_sales_all"
+  ON public.collections FOR ALL
+  USING (
+    EXISTS (
+      SELECT 1 FROM public.profiles p
+      WHERE p.id = auth.uid()
+        AND p.department = 'sales'
+        AND p.is_active = TRUE
+    )
+  )
+  WITH CHECK (
+    EXISTS (
+      SELECT 1 FROM public.profiles p
+      WHERE p.id = auth.uid()
+        AND p.department = 'sales'
+        AND p.is_active = TRUE
+    )
+  );
 
 -- ============================================================
 -- END OF SCHEMA

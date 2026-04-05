@@ -12,3 +12,15 @@ export async function getCurrentProfile(): Promise<CurrentProfile | null> {
     return null;
   }
 }
+
+export function hasExecutiveApprovalAccess(profile: CurrentProfile | null): boolean {
+  if (!profile || !profile.isActive) {
+    return false;
+  }
+
+  return (
+    profile.isExecutiveViewer ||
+    profile.role === "owner" ||
+    profile.role === "executive"
+  );
+}

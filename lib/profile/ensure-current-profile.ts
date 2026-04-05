@@ -7,6 +7,8 @@ export type CurrentProfile = {
   email: string;
   department: Department | null;
   isActive: boolean;
+  role?: string | null;
+  isExecutiveViewer?: boolean;
 };
 
 export class EnsureCurrentProfileError extends Error {
@@ -28,12 +30,16 @@ function toCurrentProfile(data: {
   email: string;
   department: Department | null;
   is_active: boolean;
+  role: string | null;
+  is_executive_viewer: boolean;
 }): CurrentProfile {
   return {
     id: data.id,
     email: data.email,
     department: data.department,
     isActive: data.is_active,
+    role: data.role,
+    isExecutiveViewer: data.is_executive_viewer,
   };
 }
 
@@ -50,7 +56,7 @@ export async function ensureCurrentProfile(): Promise<CurrentProfile | null> {
 
   const { data: profile, error: profileError } = await supabase
     .from("profiles")
-    .select("id, email, department, is_active")
+    .select("id, email, department, is_active, role, is_executive_viewer")
     .eq("id", user.id)
     .maybeSingle();
 
@@ -84,7 +90,7 @@ export async function ensureCurrentProfile(): Promise<CurrentProfile | null> {
 
   const { data: repairedProfile, error: repairedProfileError } = await supabase
     .from("profiles")
-    .select("id, email, department, is_active")
+    .select("id, email, department, is_active, role, is_executive_viewer")
     .eq("id", user.id)
     .single();
 

@@ -26,6 +26,47 @@
   - `/protected/{department}` when department is set
 - Profile self-healing is enabled via server-side ensurement fallback and schema-backed RLS policy support.
 
+## Feature 004: Sales Dashboard UI Overhaul
+
+The sales workspace under `/protected/sales` now includes:
+
+- Responsive sales navigation with tabbed sections for clients, quotations, and purchase orders.
+- Client management with generated client codes, searchable table UI, and detail dialogs.
+- Quotation approval workflow with role-based submit/approve/reject actions.
+- Purchase-order tracking with collection recording and running recognized totals.
+- Improved form validation and accessibility polish (inline errors, keyboard row activation, Esc-close dialogs).
+
+### Feature 004 test commands
+
+```bash
+npm run test:unit
+npm run test:integration
+npx playwright test tests/e2e/sales-dashboard-layout.spec.ts tests/e2e/clients-create-search.spec.ts tests/e2e/quotations-approval-workflow.spec.ts tests/e2e/purchase-orders-collection.spec.ts
+```
+
+Authenticated Playwright specs require environment variables such as `E2E_SALES_LOGIN_EMAIL` / `E2E_SALES_LOGIN_PASSWORD` and role-specific approver credentials.
+
+## Feature 005: Executive Dashboard
+
+The executive workspace under `/protected/executive` now includes:
+
+- Revenue YTD vs target, weighted YTD margin, and PO summary cards.
+- Period-filtered revenue breakdown (`monthly`, `quarterly`, `ytd`) with URL-based filter state.
+- Sales performance overview ranked by PO owner for the selected period.
+- Yearly target editing with Target Editor authorization checks and server-side updates.
+
+### Executive access model
+
+- Viewer (read): `profiles.is_executive_viewer = true` and `profiles.is_active = true`
+- Target Editor (write): `profiles.role in ('owner', 'executive')` and `profiles.is_active = true`
+
+### Feature 005 test commands
+
+```bash
+npx vitest run tests/unit/executive/period.test.ts tests/unit/executive/metrics.test.ts tests/unit/executive/targets-validation.test.ts tests/unit/executive/sales-performance.test.ts tests/integration/executive-dashboard-kpis.test.ts tests/integration/executive-targets.test.ts tests/integration/executive-sales-performance.test.ts
+npx playwright test tests/e2e/executive-dashboard.spec.ts tests/e2e/executive-dashboard-target.spec.ts tests/e2e/executive-dashboard-performance.spec.ts
+```
+
 ## Features
 
 - Works across the entire [Next.js](https://nextjs.org) stack
