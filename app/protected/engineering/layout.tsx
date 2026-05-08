@@ -4,28 +4,27 @@ import { cn } from "@/lib/utils";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
-const EXECUTIVE_TABS = [
-  { href: "/protected/executive", label: "Dashboard" },
-  { href: "/protected/executive/approvals", label: "Approvals" },
-  { href: "/protected/executive/costing-approvals", label: "Costing Approval" },
+const ENGINEERING_TABS = [
+  { href: "/protected/engineering", label: "Dashboard" },
+  { href: "/protected/engineering/quotations", label: "Quotations" },
 ];
 
 function isTabActive(pathname: string, href: string): boolean {
-  if (href === "/protected/executive") {
+  if (href === "/protected/engineering") {
     return pathname === href;
   }
 
   return pathname === href || pathname.startsWith(`${href}/`);
 }
 
-export default function ExecutiveLayout({ children }: { children: React.ReactNode }) {
+export default function EngineeringLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
 
   return (
     <div className="flex min-w-0 flex-1 flex-col gap-4">
-      <nav className="rounded-md border bg-card p-2" aria-label="Executive section tabs">
+      <nav className="rounded-md border bg-card p-2" aria-label="Engineering section tabs">
         <ul className="flex flex-wrap items-center gap-2 text-sm">
-          {EXECUTIVE_TABS.map((tab) => (
+          {ENGINEERING_TABS.map((tab) => (
             <li key={tab.href}>
               <Link
                 href={tab.href}

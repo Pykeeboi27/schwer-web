@@ -59,6 +59,11 @@ CREATE TYPE payment_status_enum AS ENUM (
   'overdue'
 );
 
+CREATE TYPE quotation_phase_enum AS ENUM (
+  'costing',
+  'sales'
+);
+
 
 -- ============================================================
 -- SECTION 1: USER PROFILES & ROLES
@@ -238,6 +243,9 @@ CREATE TABLE public.quotations (
                       ) STORED,
   requires_executive_approval BOOLEAN GENERATED ALWAYS AS (amount >= 3000000) STORED,
   status              approval_status_enum NOT NULL DEFAULT 'draft',
+  phase               quotation_phase_enum NOT NULL DEFAULT 'sales',
+  google_drive_link   TEXT,
+  costing_rejection_reason TEXT,
   approval_chain      JSONB NOT NULL DEFAULT '{}'::jsonb,
   rejection_reason    TEXT,
   submitted_at        TIMESTAMPTZ,
@@ -637,6 +645,16 @@ CREATE POLICY "sales_clients_sales_all"
     )
   );
 
+-- Clients: Engineering read access (to select a client when starting a costing quotation)
+CREATE POLICY "eng_clients_eng_select"
+  ON public.clients FOR SELECT
+  USING (
+    EXISTS (
+      SELECT 1 FROM public.profiles p
+      WHERE p.id = auth.uid() AND p.department = 'engineering' AND p.is_active = TRUE
+    )
+  );
+
 -- Client contacts: Sales full access
 CREATE POLICY "sales_client_contacts_sales_all"
   ON public.client_contacts FOR ALL
@@ -653,19 +671,78 @@ CREATE POLICY "sales_client_contacts_sales_all"
     )
   );
 
--- Quotations: Sales full access
+-- Quotations: Sales full access (sales-phase rows only; costing-phase rows are
+-- engineering's until handover)
 CREATE POLICY "sales_quotations_sales_all"
   ON public.quotations FOR ALL
   USING (
-    EXISTS (
+    phase = 'sales'
+    AND EXISTS (
       SELECT 1 FROM public.profiles p
       WHERE p.id = auth.uid() AND p.department = 'sales' AND p.is_active = TRUE
     )
   )
   WITH CHECK (
-    EXISTS (
+    phase = 'sales'
+    AND EXISTS (
       SELECT 1 FROM public.profiles p
       WHERE p.id = auth.uid() AND p.department = 'sales' AND p.is_active = TRUE
+    )
+  );
+
+-- Quotations: Engineering full access on costing-phase rows
+CREATE POLICY "eng_quotations_eng_all"
+  ON public.quotations FOR ALL
+  USING (
+    phase = 'costing'
+    AND EXISTS (
+      SELECT 1 FROM public.profiles p
+      WHERE p.id = auth.uid() AND p.department = 'engineering' AND p.is_active = TRUE
+    )
+  )
+  WITH CHECK (
+    phase = 'costing'
+    AND EXISTS (
+      SELECT 1 FROM public.profiles p
+      WHERE p.id = auth.uid() AND p.department = 'engineering' AND p.is_active = TRUE
+    )
+  );
+
+-- Quotations: Executive (role='executive') can read all costing-phase rows
+CREATE POLICY "eng_quotations_executive_costing_select"
+  ON public.quotations FOR SELECT
+  USING (
+    phase = 'costing'
+    AND EXISTS (
+      SELECT 1 FROM public.profiles p
+      WHERE p.id = auth.uid()
+        AND p.department = 'executive'
+        AND p.role = 'executive'
+        AND p.is_active = TRUE
+    )
+  );
+
+-- Quotations: Executive (role='executive') can update costing-phase rows (approve/reject).
+-- Server actions enforce which columns may change; this policy only gates access.
+CREATE POLICY "eng_quotations_executive_costing_update"
+  ON public.quotations FOR UPDATE
+  USING (
+    phase = 'costing'
+    AND EXISTS (
+      SELECT 1 FROM public.profiles p
+      WHERE p.id = auth.uid()
+        AND p.department = 'executive'
+        AND p.role = 'executive'
+        AND p.is_active = TRUE
+    )
+  )
+  WITH CHECK (
+    EXISTS (
+      SELECT 1 FROM public.profiles p
+      WHERE p.id = auth.uid()
+        AND p.department = 'executive'
+        AND p.role = 'executive'
+        AND p.is_active = TRUE
     )
   );
 

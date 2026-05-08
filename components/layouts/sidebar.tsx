@@ -12,6 +12,7 @@ export function Sidebar() {
   const isMobile = useMediaQuery("(max-width: 767px)");
   const pathname = usePathname();
   const isExecutiveRoute = pathname.startsWith("/protected/executive");
+  const isEngineeringRoute = pathname.startsWith("/protected/engineering");
 
   useEffect(() => {
     if (isMobile) {
@@ -23,12 +24,18 @@ export function Sidebar() {
     ? [
         { href: "/protected/executive", label: "Dashboard" },
         { href: "/protected/executive/approvals", label: "Approvals" },
+        { href: "/protected/executive/costing-approvals", label: "Costing Approval" },
       ]
-    : [
-        { href: "/protected/sales/clients", label: "Clients" },
-        { href: "/protected/sales/quotations", label: "Quotations" },
-        { href: "/protected/sales/purchase-orders", label: "Purchase Orders" },
-      ];
+    : isEngineeringRoute
+      ? [
+          { href: "/protected/engineering", label: "Dashboard" },
+          { href: "/protected/engineering/quotations", label: "Quotations" },
+        ]
+      : [
+          { href: "/protected/sales/clients", label: "Clients" },
+          { href: "/protected/sales/quotations", label: "Quotations" },
+          { href: "/protected/sales/purchase-orders", label: "Purchase Orders" },
+        ];
 
   const isActive = (href: string) => pathname === href || pathname.startsWith(`${href}/`);
 
@@ -40,7 +47,13 @@ export function Sidebar() {
           size="icon"
           onClick={() => setIsOpen(!isOpen)}
           className="fixed left-4 top-20 z-50 md:hidden"
-          aria-label={isExecutiveRoute ? "Toggle executive navigation" : "Toggle sales navigation"}
+          aria-label={
+            isExecutiveRoute
+              ? "Toggle executive navigation"
+              : isEngineeringRoute
+                ? "Toggle engineering navigation"
+                : "Toggle sales navigation"
+          }
         >
           {isOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
         </Button>
@@ -63,7 +76,11 @@ export function Sidebar() {
       >
         <div className="border-b p-5">
           <h2 className="text-lg font-semibold">
-            {isExecutiveRoute ? "Executive Dashboard" : "Sales Dashboard"}
+            {isExecutiveRoute
+              ? "Executive Dashboard"
+              : isEngineeringRoute
+                ? "Engineering Dashboard"
+                : "Sales Dashboard"}
           </h2>
           <p className="mt-1 text-xs text-muted-foreground">Workspace navigation</p>
         </div>

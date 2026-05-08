@@ -10,6 +10,7 @@ export type SalesQuotation = {
   subject: string;
   amount: number;
   cost: number | null;
+  googleDriveLink: string | null;
   notes: string | null;
   status: "draft" | "pending" | "approved" | "rejected" | "cancelled";
   preparedBy: string;
@@ -100,8 +101,9 @@ export async function listSalesQuotations(): Promise<SalesQuotation[]> {
   const { data, error } = await supabase
     .from("quotations")
     .select(
-      "id, quotation_number, client_id, subject, amount, cost, notes, status, prepared_by, created_at, clients:client_id(company_name), quotation_approvals(approver_role, status)",
+      "id, quotation_number, client_id, subject, amount, cost, google_drive_link, notes, status, prepared_by, created_at, clients:client_id(company_name), quotation_approvals(approver_role, status)",
     )
+    .eq("phase", "sales")
     .order("created_at", { ascending: false });
 
   if (error) {
@@ -129,6 +131,7 @@ export async function listSalesQuotations(): Promise<SalesQuotation[]> {
       subject: row.subject,
       amount: Number(row.amount),
       cost: row.cost === null ? null : Number(row.cost),
+      googleDriveLink: row.google_drive_link,
       notes: row.notes,
       status: row.status,
       preparedBy: row.prepared_by,
@@ -209,7 +212,7 @@ export async function updateQuotationDraft(input: {
 
   const { data: quotationRow, error: quotationError } = await supabase
     .from("quotations")
-    .select("id, status, prepared_by")
+    .select("id, status, phase")
     .eq("id", input.quotationId)
     .single();
 
@@ -217,12 +220,12 @@ export async function updateQuotationDraft(input: {
     throw new Error("Quotation was not found.");
   }
 
-  if (quotationRow.status !== "draft") {
-    throw new Error("Only draft quotations can be edited.");
+  if (quotationRow.phase !== "sales") {
+    throw new Error("This quotation is not yet in the sales phase.");
   }
 
-  if (quotationRow.prepared_by !== user.id) {
-    throw new Error("Only the quotation creator can edit this draft.");
+  if (quotationRow.status !== "draft") {
+    throw new Error("Only draft quotations can be edited.");
   }
 
   const { data: clientRow, error: clientError } = await supabase
@@ -265,7 +268,7 @@ export async function deleteQuotationDraft(quotationId: string): Promise<void> {
 
   const { data: quotationRow, error: quotationError } = await supabase
     .from("quotations")
-    .select("id, status, prepared_by")
+    .select("id, status, phase")
     .eq("id", quotationId)
     .single();
 
@@ -273,12 +276,12 @@ export async function deleteQuotationDraft(quotationId: string): Promise<void> {
     throw new Error("Quotation was not found.");
   }
 
-  if (quotationRow.status !== "draft") {
-    throw new Error("Only draft quotations can be deleted.");
+  if (quotationRow.phase !== "sales") {
+    throw new Error("This quotation is not yet in the sales phase.");
   }
 
-  if (quotationRow.prepared_by !== user.id) {
-    throw new Error("Only the quotation creator can delete this draft.");
+  if (quotationRow.status !== "draft") {
+    throw new Error("Only draft quotations can be deleted.");
   }
 
   const { error: deleteError } = await supabase
@@ -322,7 +325,7 @@ export async function submitQuotationForApproval(quotationId: string): Promise<v
 
   const { data: quotation, error: quotationError } = await supabase
     .from("quotations")
-    .select("id, amount, status, prepared_by")
+    .select("id, amount, status, phase")
     .eq("id", quotationId)
     .single();
 
@@ -330,12 +333,12 @@ export async function submitQuotationForApproval(quotationId: string): Promise<v
     throw new Error("Quotation was not found.");
   }
 
-  if (quotation.status !== "draft") {
-    throw new Error("Only draft quotations can be submitted for approval.");
+  if (quotation.phase !== "sales") {
+    throw new Error("This quotation is not yet in the sales phase.");
   }
 
-  if (quotation.prepared_by !== user.id) {
-    throw new Error("Only the quotation creator can submit this quotation for approval.");
+  if (quotation.status !== "draft") {
+    throw new Error("Only draft quotations can be submitted for approval.");
   }
 
   const roles = requiredApproverRolesForAmount(Number(quotation.amount));
