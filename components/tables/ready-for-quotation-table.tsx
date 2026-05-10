@@ -1,9 +1,10 @@
 "use client";
 
 import { QuotationDetailsDialog } from "@/components/dialogs/quotation-details-dialog";
+import { Input } from "@/components/ui/input";
 import type { SalesQuotation } from "@/lib/sales/quotations";
-import { Inbox } from "lucide-react";
-import { useState, type KeyboardEvent } from "react";
+import { Inbox, Search } from "lucide-react";
+import { useMemo, useState, type KeyboardEvent } from "react";
 
 type ReadyForQuotationTableProps = {
   quotations: SalesQuotation[];
@@ -20,10 +21,7 @@ function formatCurrency(amount: number): string {
 }
 
 function formatDate(iso: string | null): string {
-  if (!iso) {
-    return "-";
-  }
-
+  if (!iso) return "-";
   return new Date(iso).toLocaleDateString("en-PH", {
     year: "numeric",
     month: "short",
@@ -32,18 +30,12 @@ function formatDate(iso: string | null): string {
 }
 
 function formatPercent(value: number | null): string {
-  if (value === null) {
-    return "—";
-  }
-
+  if (value === null) return "—";
   return `${value.toFixed(2)}%`;
 }
 
 function formatLeadTime(days: number | null): string {
-  if (days === null) {
-    return "—";
-  }
-
+  if (days === null) return "—";
   return `${days} day${days === 1 ? "" : "s"}`;
 }
 
@@ -63,9 +55,33 @@ export function ReadyForQuotationTable({
   currentUserRole,
 }: ReadyForQuotationTableProps) {
   const [selectedQuotation, setSelectedQuotation] = useState<SalesQuotation | null>(null);
+  const [searchQuery, setSearchQuery] = useState("");
+
+  const filtered = useMemo(() => {
+    const query = searchQuery.trim().toLowerCase();
+    if (!query) return quotations;
+    return quotations.filter(
+      (q) =>
+        q.clientName.toLowerCase().includes(query) ||
+        q.quotationNumber.toLowerCase().includes(query) ||
+        q.subject.toLowerCase().includes(query),
+    );
+  }, [quotations, searchQuery]);
 
   return (
     <>
+      <div className="mb-4">
+        <div className="relative">
+          <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+          <Input
+            placeholder="Search by client, quotation #, or subject…"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="pl-8"
+          />
+        </div>
+      </div>
+
       <div className="overflow-x-auto rounded-md border">
         <table className="w-full min-w-[1100px] text-sm">
           <thead className="bg-muted/40 text-left">
@@ -82,22 +98,26 @@ export function ReadyForQuotationTable({
             </tr>
           </thead>
           <tbody>
-            {quotations.length === 0 ? (
+            {filtered.length === 0 ? (
               <tr>
                 <td colSpan={9} className="px-3 py-10 text-center text-muted-foreground">
                   <div className="flex flex-col items-center gap-2">
                     <Inbox className="h-5 w-5" aria-hidden="true" />
                     <p className="font-medium text-foreground">
-                      No quotations awaiting sales details yet.
+                      {searchQuery
+                        ? "No quotations match your search."
+                        : "No quotations awaiting sales details yet."}
                     </p>
-                    <p className="text-xs text-muted-foreground">
-                      Costing quotations approved by the executive will appear here.
-                    </p>
+                    {!searchQuery && (
+                      <p className="text-xs text-muted-foreground">
+                        Costing quotations approved by the executive will appear here.
+                      </p>
+                    )}
                   </div>
                 </td>
               </tr>
             ) : (
-              quotations.map((quotation) => (
+              filtered.map((quotation) => (
                 <tr
                   key={quotation.id}
                   className="cursor-pointer border-t hover:bg-muted/30 focus-visible:bg-muted/40 focus-visible:outline-none"
@@ -135,9 +155,7 @@ export function ReadyForQuotationTable({
         currentUserId={currentUserId}
         currentUserRole={currentUserRole}
         onOpenChange={(open) => {
-          if (!open) {
-            setSelectedQuotation(null);
-          }
+          if (!open) setSelectedQuotation(null);
         }}
       />
     </>

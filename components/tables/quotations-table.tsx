@@ -1,9 +1,11 @@
 "use client";
 
-import { QuotationDetailsDialog } from "@/components/dialogs/quotation-details-dialog";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { QuotationDetailsDialog } from "@/components/dialogs/quotation-details-dialog";
 import type { SalesQuotation } from "@/lib/sales/quotations";
-import { FileText } from "lucide-react";
+import { FileText, Search } from "lucide-react";
 import { useMemo, useState, type KeyboardEvent } from "react";
 
 type QuotationsTableProps = {
@@ -14,6 +16,31 @@ type QuotationsTableProps = {
 
 type SortBy = "createdAt" | "amount";
 type SortDirection = "asc" | "desc";
+type StatusFilter = "all" | SalesQuotation["status"];
+
+const STATUS_LABELS: Record<SalesQuotation["status"], string> = {
+  draft: "Draft",
+  pending: "Pending",
+  approved: "Approved",
+  rejected: "Rejected",
+  cancelled: "Cancelled",
+};
+
+const STATUS_CLASSES: Record<SalesQuotation["status"], string> = {
+  draft: "border-slate-200 bg-slate-50 text-slate-600",
+  pending: "border-amber-200 bg-amber-50 text-amber-700",
+  approved: "border-green-200 bg-green-50 text-green-700",
+  rejected: "border-red-200 bg-red-50 text-red-700",
+  cancelled: "border-gray-200 bg-gray-50 text-gray-500",
+};
+
+const ALL_STATUSES: SalesQuotation["status"][] = [
+  "draft",
+  "pending",
+  "approved",
+  "rejected",
+  "cancelled",
+];
 
 function formatCurrency(amount: number): string {
   return new Intl.NumberFormat("en-PH", {
@@ -23,24 +50,12 @@ function formatCurrency(amount: number): string {
   }).format(amount);
 }
 
-function statusLabel(status: SalesQuotation["status"]): string {
-  if (status === "draft") {
-    return "Draft";
-  }
-
-  if (status === "pending") {
-    return "Pending";
-  }
-
-  if (status === "approved") {
-    return "Approved";
-  }
-
-  if (status === "rejected") {
-    return "Rejected";
-  }
-
-  return "Cancelled";
+function StatusBadge({ status }: { status: SalesQuotation["status"] }) {
+  return (
+    <Badge className={STATUS_CLASSES[status]} variant="outline">
+      {STATUS_LABELS[status]}
+    </Badge>
+  );
 }
 
 function sortQuotations(
@@ -49,17 +64,10 @@ function sortQuotations(
   direction: SortDirection,
 ): SalesQuotation[] {
   const sorted = [...quotations].sort((first, second) => {
-    if (sortBy === "amount") {
-      return first.amount - second.amount;
-    }
-
+    if (sortBy === "amount") return first.amount - second.amount;
     return new Date(first.createdAt).getTime() - new Date(second.createdAt).getTime();
   });
-
-  if (direction === "desc") {
-    sorted.reverse();
-  }
-
+  if (direction === "desc") sorted.reverse();
   return sorted;
 }
 
@@ -81,42 +89,89 @@ export function QuotationsTable({
   const [sortBy, setSortBy] = useState<SortBy>("createdAt");
   const [sortDirection, setSortDirection] = useState<SortDirection>("desc");
   const [selectedQuotation, setSelectedQuotation] = useState<SalesQuotation | null>(null);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
 
-  const sortedQuotations = useMemo(
-    () => sortQuotations(quotations, sortBy, sortDirection),
-    [quotations, sortBy, sortDirection],
-  );
+  const filteredAndSorted = useMemo(() => {
+    const query = searchQuery.trim().toLowerCase();
+    let filtered = quotations;
+
+    if (query) {
+      filtered = filtered.filter(
+        (q) =>
+          q.clientName.toLowerCase().includes(query) ||
+          q.quotationNumber.toLowerCase().includes(query) ||
+          q.subject.toLowerCase().includes(query),
+      );
+    }
+
+    if (statusFilter !== "all") {
+      filtered = filtered.filter((q) => q.status === statusFilter);
+    }
+
+    return sortQuotations(filtered, sortBy, sortDirection);
+  }, [quotations, searchQuery, statusFilter, sortBy, sortDirection]);
 
   const toggleSort = (targetSortBy: SortBy) => {
     if (sortBy === targetSortBy) {
       setSortDirection((current) => (current === "asc" ? "desc" : "asc"));
       return;
     }
-
     setSortBy(targetSortBy);
     setSortDirection("desc");
   };
 
   return (
     <>
-      <div className="mb-4 flex flex-wrap items-center gap-2 text-xs">
-        <span className="text-muted-foreground">Sort by:</span>
-        <Button
-          type="button"
-          variant={sortBy === "createdAt" ? "default" : "outline"}
-          size="sm"
-          onClick={() => toggleSort("createdAt")}
-        >
-          Date {sortBy === "createdAt" ? (sortDirection === "asc" ? "↑" : "↓") : ""}
-        </Button>
-        <Button
-          type="button"
-          variant={sortBy === "amount" ? "default" : "outline"}
-          size="sm"
-          onClick={() => toggleSort("amount")}
-        >
-          Amount {sortBy === "amount" ? (sortDirection === "asc" ? "↑" : "↓") : ""}
-        </Button>
+      <div className="mb-4 space-y-3">
+        <div className="relative">
+          <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+          <Input
+            placeholder="Search by client, quotation #, or subject…"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="pl-8"
+          />
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="text-xs text-muted-foreground">Filter:</span>
+          <Button
+            type="button"
+            variant={statusFilter === "all" ? "default" : "outline"}
+            size="sm"
+            onClick={() => setStatusFilter("all")}
+          >
+            All
+          </Button>
+          {ALL_STATUSES.map((s) => (
+            <Button
+              key={s}
+              type="button"
+              variant={statusFilter === s ? "default" : "outline"}
+              size="sm"
+              onClick={() => setStatusFilter(s)}
+            >
+              {STATUS_LABELS[s]}
+            </Button>
+          ))}
+          <span className="ml-2 text-xs text-muted-foreground">Sort:</span>
+          <Button
+            type="button"
+            variant={sortBy === "createdAt" ? "default" : "outline"}
+            size="sm"
+            onClick={() => toggleSort("createdAt")}
+          >
+            Date {sortBy === "createdAt" ? (sortDirection === "asc" ? "↑" : "↓") : ""}
+          </Button>
+          <Button
+            type="button"
+            variant={sortBy === "amount" ? "default" : "outline"}
+            size="sm"
+            onClick={() => toggleSort("amount")}
+          >
+            Amount {sortBy === "amount" ? (sortDirection === "asc" ? "↑" : "↓") : ""}
+          </Button>
+        </div>
       </div>
 
       <div className="overflow-x-auto rounded-md border">
@@ -131,20 +186,22 @@ export function QuotationsTable({
             </tr>
           </thead>
           <tbody>
-            {sortedQuotations.length === 0 ? (
+            {filteredAndSorted.length === 0 ? (
               <tr>
                 <td colSpan={5} className="px-3 py-10 text-center text-muted-foreground">
                   <div className="flex flex-col items-center gap-2">
                     <FileText className="h-5 w-5" aria-hidden="true" />
                     <p className="font-medium text-foreground">No quotations found.</p>
                     <p className="text-xs text-muted-foreground">
-                      Submitted quotations will appear here after creation.
+                      {searchQuery || statusFilter !== "all"
+                        ? "Try adjusting your search or filter."
+                        : "Submitted quotations will appear here after creation."}
                     </p>
                   </div>
                 </td>
               </tr>
             ) : (
-              sortedQuotations.map((quotation) => (
+              filteredAndSorted.map((quotation) => (
                 <tr
                   key={quotation.id}
                   className="cursor-pointer border-t hover:bg-muted/30 focus-visible:bg-muted/40 focus-visible:outline-none"
@@ -157,8 +214,12 @@ export function QuotationsTable({
                   <td className="px-3 py-2 font-mono text-xs">{quotation.quotationNumber}</td>
                   <td className="px-3 py-2">{quotation.clientName}</td>
                   <td className="px-3 py-2">{formatCurrency(quotation.amount)}</td>
-                  <td className="px-3 py-2">{statusLabel(quotation.status)}</td>
-                  <td className="px-3 py-2">{new Date(quotation.createdAt).toLocaleDateString()}</td>
+                  <td className="px-3 py-2">
+                    <StatusBadge status={quotation.status} />
+                  </td>
+                  <td className="px-3 py-2">
+                    {new Date(quotation.createdAt).toLocaleDateString()}
+                  </td>
                 </tr>
               ))
             )}
@@ -172,9 +233,7 @@ export function QuotationsTable({
         currentUserId={currentUserId}
         currentUserRole={currentUserRole}
         onOpenChange={(open) => {
-          if (!open) {
-            setSelectedQuotation(null);
-          }
+          if (!open) setSelectedQuotation(null);
         }}
       />
     </>
