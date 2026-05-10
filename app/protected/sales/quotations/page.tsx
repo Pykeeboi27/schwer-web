@@ -1,8 +1,7 @@
 import { fetchQuotationsAction } from "@/app/protected/sales/quotations/actions";
-import { CreateQuotationDialog } from "@/components/dialogs/create-quotation-dialog";
 import { QuotationsTable } from "@/components/tables/quotations-table";
+import { ReadyForQuotationTable } from "@/components/tables/ready-for-quotation-table";
 import { getCurrentProfile } from "@/lib/profile/get-current-profile";
-import { listClients } from "@/lib/sales/clients";
 import { getSalesAccessRedirect } from "@/lib/sales/access";
 import { redirect } from "next/navigation";
 
@@ -16,29 +15,52 @@ export default async function SalesQuotationsPage() {
 
   const isSalesDepartment = profile?.department === "sales";
 
-  const [response, clients] = await Promise.all([
-    fetchQuotationsAction(profile?.department ?? undefined, profile?.role ?? undefined),
-    isSalesDepartment ? listClients() : Promise.resolve([]),
-  ]);
+  const response = await fetchQuotationsAction(
+    profile?.department ?? undefined,
+    profile?.role ?? undefined,
+  );
 
   const quotations = response.success ? response.data ?? [] : [];
-  const pendingCount = quotations.filter((quotation) => quotation.status === "pending").length;
-  const approvedCount = quotations.filter((quotation) => quotation.status === "approved").length;
-  const rejectedCount = quotations.filter((quotation) => quotation.status === "rejected").length;
+
+  const readyForQuotation = quotations.filter(
+    (quotation) => quotation.status === "draft" && quotation.costingApprovedAt !== null,
+  );
+  const activeQuotations = quotations.filter((quotation) => quotation.status !== "draft");
+
+  const pendingCount = activeQuotations.filter((quotation) => quotation.status === "pending").length;
+  const approvedCount = activeQuotations.filter((quotation) => quotation.status === "approved").length;
+  const rejectedCount = activeQuotations.filter((quotation) => quotation.status === "rejected").length;
 
   return (
     <div className="flex flex-col gap-4">
       <div className="rounded-md border bg-card p-5">
         <h1 className="text-2xl font-semibold">Quotations</h1>
         <p className="mt-2 text-sm text-muted-foreground">
-          Review quotation details and process amount-based approvals for pending records.
+          Quotations originate in engineering and reach this page after executive approves the
+          costing. Add the sales details, then submit through the approval workflow.
         </p>
-        {isSalesDepartment ? (
-          <div className="mt-4">
-            <CreateQuotationDialog clients={clients} />
-          </div>
-        ) : null}
       </div>
+
+      {isSalesDepartment ? (
+        <section className="rounded-md border bg-card p-5">
+          <h2 className="mb-1 text-lg font-semibold">Ready for Quotation</h2>
+          <p className="mb-4 text-sm text-muted-foreground">
+            Costing quotations approved by the executive. Add the margin, payment terms, and lead
+            time, then submit for sales approval.
+          </p>
+          {response.success ? (
+            <ReadyForQuotationTable
+              quotations={readyForQuotation}
+              currentUserId={profile?.id ?? ""}
+              currentUserRole={profile?.role ?? null}
+            />
+          ) : (
+            <p className="text-sm text-destructive">
+              {response.error ?? "Failed to load quotations."}
+            </p>
+          )}
+        </section>
+      ) : null}
 
       <section className="grid gap-3 rounded-md border bg-card p-5 sm:grid-cols-3">
         <div className="rounded border p-3">
@@ -56,12 +78,12 @@ export default async function SalesQuotationsPage() {
       </section>
 
       <section className="rounded-md border bg-card p-5">
+        <h2 className="mb-3 text-lg font-semibold">Quotations</h2>
         {response.success ? (
           <QuotationsTable
-            quotations={quotations}
+            quotations={activeQuotations}
             currentUserId={profile?.id ?? ""}
             currentUserRole={profile?.role ?? null}
-            clients={clients}
           />
         ) : (
           <p className="text-sm text-destructive">

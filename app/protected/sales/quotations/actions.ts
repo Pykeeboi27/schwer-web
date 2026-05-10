@@ -2,14 +2,13 @@
 
 import {
   approveQuotationApproval,
-  createQuotationDraft,
-  deleteQuotationDraft,
   fetchQuotations,
   findPendingApprovalForRole,
-  parseQuotationAmount,
+  parseLeadTimeDays,
+  parseSalesMarginPercent,
   rejectQuotationApproval,
   submitQuotationForApproval,
-  updateQuotationDraft,
+  updateSalesQuotationDetails,
   type RequiredApproverRole,
   type SalesQuotation,
 } from "@/lib/sales/quotations";
@@ -36,21 +35,6 @@ function asOptionalString(value: FormDataEntryValue | null): string | null {
   return normalized ? normalized : null;
 }
 
-function asOptionalNumber(value: FormDataEntryValue | null, fieldName: string): number | null {
-  const normalized = String(value ?? "").trim();
-
-  if (!normalized) {
-    return null;
-  }
-
-  const parsed = Number(normalized);
-  if (!Number.isFinite(parsed) || parsed < 0) {
-    throw new Error(`${fieldName} must be a non-negative number.`);
-  }
-
-  return parsed;
-}
-
 function normalizeRole(role: string | undefined): RequiredApproverRole | null {
   const normalized = String(role ?? "").trim().toLowerCase();
 
@@ -68,38 +52,6 @@ function normalizeRole(role: string | undefined): RequiredApproverRole | null {
 function shouldRestrictToHighValue(role: string | undefined): boolean {
   const normalized = String(role ?? "").trim().toLowerCase();
   return normalized === "owner" || normalized === "executive";
-}
-
-export async function createQuotationDraftAction(
-  formData: FormData,
-): Promise<ActionResponse<{ quotationId: string }>> {
-  try {
-    const clientId = asRequiredString(formData.get("clientId"), "Client");
-    const subject = asRequiredString(formData.get("subject"), "Subject");
-    const amount = parseQuotationAmount(formData.get("amount"));
-    const cost = asOptionalNumber(formData.get("cost"), "Cost");
-    const notes = asOptionalString(formData.get("notes"));
-
-    const result = await createQuotationDraft({
-      clientId,
-      subject,
-      amount,
-      cost,
-      notes,
-    });
-
-    revalidatePath("/protected/sales/quotations");
-
-    return {
-      success: true,
-      data: result,
-    };
-  } catch (error) {
-    return {
-      success: false,
-      error: error instanceof Error ? error.message : "Failed to create quotation draft.",
-    };
-  }
 }
 
 export async function submitQuotationForApprovalAction(
@@ -274,23 +226,27 @@ export async function fetchQuotationsAction(
   }
 }
 
-export async function updateQuotationDraftAction(
+export async function updateSalesQuotationDetailsAction(
   formData: FormData,
 ): Promise<ActionResponse<{ quotationId: string }>> {
   try {
     const quotationId = asRequiredString(formData.get("quotationId"), "Quotation");
-    const clientId = asRequiredString(formData.get("clientId"), "Client");
-    const subject = asRequiredString(formData.get("subject"), "Subject");
-    const amount = parseQuotationAmount(formData.get("amount"));
-    const cost = asOptionalNumber(formData.get("cost"), "Cost");
+
+    const rawMargin = String(formData.get("salesMarginPercent") ?? "").trim();
+    const salesMarginPercent = rawMargin === "" ? null : parseSalesMarginPercent(rawMargin);
+
+    const paymentTerms = asOptionalString(formData.get("paymentTerms"));
+
+    const rawLeadTime = String(formData.get("leadTimeDays") ?? "").trim();
+    const leadTimeDays = rawLeadTime === "" ? null : parseLeadTimeDays(rawLeadTime);
+
     const notes = asOptionalString(formData.get("notes"));
 
-    await updateQuotationDraft({
+    await updateSalesQuotationDetails({
       quotationId,
-      clientId,
-      subject,
-      amount,
-      cost,
+      salesMarginPercent,
+      paymentTerms,
+      leadTimeDays,
       notes,
     });
 
@@ -303,35 +259,7 @@ export async function updateQuotationDraftAction(
   } catch (error) {
     return {
       success: false,
-      error: error instanceof Error ? error.message : "Failed to update quotation draft.",
-    };
-  }
-}
-
-export async function deleteQuotationDraftAction(
-  quotationId: string,
-): Promise<ActionResponse<{ quotationId: string }>> {
-  const normalizedQuotationId = String(quotationId ?? "").trim();
-
-  if (!normalizedQuotationId) {
-    return {
-      success: false,
-      error: "Quotation id is required.",
-    };
-  }
-
-  try {
-    await deleteQuotationDraft(normalizedQuotationId);
-    revalidatePath("/protected/sales/quotations");
-
-    return {
-      success: true,
-      data: { quotationId: normalizedQuotationId },
-    };
-  } catch (error) {
-    return {
-      success: false,
-      error: error instanceof Error ? error.message : "Failed to delete quotation draft.",
+      error: error instanceof Error ? error.message : "Failed to update sales details.",
     };
   }
 }

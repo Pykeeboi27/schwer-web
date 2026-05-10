@@ -83,10 +83,12 @@ export const executiveDashboardQueries = {
   async fetchPurchaseOrderRows(range: PurchaseOrderRange): Promise<PurchaseOrderMetricRow[]> {
     const supabase = await createClient();
     const { data, error } = await supabase
-      .from("purchase_orders")
-      .select("po_amount, margin_amount, po_date, created_by")
-      .gte("po_date", range.startDate)
-      .lte("po_date", range.endDate);
+      .from("quotations")
+      .select("po_amount:amount, margin_amount, po_date:approved_at, created_by:prepared_by")
+      .eq("status", "approved")
+      .eq("phase", "sales")
+      .gte("approved_at", range.startDate)
+      .lte("approved_at", `${range.endDate}T23:59:59.999Z`);
 
     if (error) {
       throw new Error("Failed to load executive dashboard purchase orders.");

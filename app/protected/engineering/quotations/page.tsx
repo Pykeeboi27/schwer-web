@@ -1,7 +1,11 @@
 import { CreateCostingQuotationDialog } from "@/components/dialogs/create-costing-quotation-dialog";
+import { CostingHistoryTable } from "@/components/engineering/costing-history-table";
 import { CostingQuotationsTable } from "@/components/engineering/costing-quotations-table";
 import { getEngineeringAccessRedirect } from "@/lib/engineering/access";
-import { listCostingQuotations } from "@/lib/engineering/costing-quotations";
+import {
+  listCostingApprovedHistory,
+  listCostingQuotations,
+} from "@/lib/engineering/costing-quotations";
 import { getCurrentProfile } from "@/lib/profile/get-current-profile";
 import { listClients } from "@/lib/sales/clients";
 import { redirect } from "next/navigation";
@@ -16,9 +20,10 @@ export default async function EngineeringQuotationsPage() {
 
   const isCostingEngineer = profile?.role === "costing_engineer";
 
-  const [quotations, clients] = await Promise.all([
+  const [quotations, clients, history] = await Promise.all([
     listCostingQuotations(),
     isCostingEngineer ? listClients() : Promise.resolve([]),
+    listCostingApprovedHistory(),
   ]);
 
   return (
@@ -52,6 +57,14 @@ export default async function EngineeringQuotationsPage() {
             isActive: c.isActive,
           }))}
         />
+      </section>
+
+      <section className="rounded-md border bg-card p-5">
+        <h2 className="mb-3 text-lg font-semibold">Approved History</h2>
+        <p className="mb-4 text-sm text-muted-foreground">
+          Costing quotations that have been approved by the executive and handed over to Sales.
+        </p>
+        <CostingHistoryTable items={history} />
       </section>
     </div>
   );

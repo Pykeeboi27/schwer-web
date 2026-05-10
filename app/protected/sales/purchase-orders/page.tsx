@@ -1,8 +1,6 @@
 import { fetchPurchaseOrdersAction } from "@/app/protected/sales/purchase-orders/actions";
-import { CreatePoDialog } from "@/components/dialogs/create-po-dialog";
 import { PurchaseOrdersTable } from "@/components/tables/purchase-orders-table";
 import { getCurrentProfile } from "@/lib/profile/get-current-profile";
-import { listClients } from "@/lib/sales/clients";
 import { getSalesAccessRedirect } from "@/lib/sales/access";
 import { listPoPayments } from "@/lib/sales/purchase-orders";
 import { redirect } from "next/navigation";
@@ -23,9 +21,8 @@ export default async function SalesPurchaseOrdersPage() {
     redirect(redirectPath);
   }
 
-  const [response, clients, payments] = await Promise.all([
+  const [response, payments] = await Promise.all([
     fetchPurchaseOrdersAction(profile?.department ?? undefined),
-    listClients(),
     listPoPayments(),
   ]);
 
@@ -46,11 +43,8 @@ export default async function SalesPurchaseOrdersPage() {
       <div className="rounded-md border bg-card p-5">
         <h1 className="text-2xl font-semibold">Purchase Orders</h1>
         <p className="mt-2 text-sm text-muted-foreground">
-          Create purchase orders, track collections, and monitor recognized revenue.
+          Approved quotations awaiting collection. Track payments here as they come in.
         </p>
-        <div className="mt-4">
-          <CreatePoDialog clients={clients} />
-        </div>
       </div>
 
       <section className="grid gap-3 rounded-md border bg-card p-5 sm:grid-cols-2">

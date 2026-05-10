@@ -16,6 +16,10 @@ export type SalesQuotation = {
   preparedBy: string;
   pendingApprovalRoles: RequiredApproverRole[];
   createdAt: string;
+  costingApprovedAt: string | null;
+  salesMarginPercent: number | null;
+  paymentTerms: string | null;
+  leadTimeDays: number | null;
 };
 
 export type PendingApprovalItem = {
@@ -62,6 +66,26 @@ export function parseQuotationAmount(raw: unknown): number {
   return value;
 }
 
+export function parseSalesMarginPercent(raw: unknown): number {
+  const value = Number(raw);
+
+  if (!Number.isFinite(value) || value < 0 || value > 100) {
+    throw new Error("Margin percent must be between 0 and 100.");
+  }
+
+  return value;
+}
+
+export function parseLeadTimeDays(raw: unknown): number {
+  const value = Number(raw);
+
+  if (!Number.isFinite(value) || !Number.isInteger(value) || value < 0) {
+    throw new Error("Lead time must be a whole number of days (0 or greater).");
+  }
+
+  return value;
+}
+
 export function requiresExecutiveApproval(amount: number): boolean {
   return amount >= 3_000_000;
 }
@@ -101,13 +125,13 @@ export async function listSalesQuotations(): Promise<SalesQuotation[]> {
   const { data, error } = await supabase
     .from("quotations")
     .select(
-      "id, quotation_number, client_id, subject, amount, cost, google_drive_link, notes, status, prepared_by, created_at, clients:client_id(company_name), quotation_approvals(approver_role, status)",
+      "id, quotation_number, client_id, subject, amount, cost, google_drive_link, notes, status, prepared_by, created_at, costing_approved_at, sales_margin_percent, payment_terms, lead_time_days, clients:client_id(company_name), quotation_approvals(approver_role, status)",
     )
     .eq("phase", "sales")
     .order("created_at", { ascending: false });
 
   if (error) {
-    throw new Error("Failed to load quotations.");
+    throw new Error(error.message || "Failed to load quotations.");
   }
 
   return (data ?? []).map((row) => {
@@ -137,68 +161,26 @@ export async function listSalesQuotations(): Promise<SalesQuotation[]> {
       preparedBy: row.prepared_by,
       pendingApprovalRoles,
       createdAt: row.created_at,
+      costingApprovedAt: row.costing_approved_at ?? null,
+      salesMarginPercent:
+        row.sales_margin_percent === null || row.sales_margin_percent === undefined
+          ? null
+          : Number(row.sales_margin_percent),
+      paymentTerms: row.payment_terms ?? null,
+      leadTimeDays:
+        row.lead_time_days === null || row.lead_time_days === undefined
+          ? null
+          : Number(row.lead_time_days),
     };
   });
 }
 
-export async function createQuotationDraft(input: {
-  clientId: string;
-  subject: string;
-  amount: number;
-  cost?: number | null;
-  notes?: string | null;
-}): Promise<{ quotationId: string }> {
-  const supabase = await createClient();
-  const {
-    data: { user },
-    error: userError,
-  } = await supabase.auth.getUser();
-
-  if (userError || !user) {
-    throw new Error("You must be signed in.");
-  }
-
-  const { data: clientRow, error: clientError } = await supabase
-    .from("clients")
-    .select("sector")
-    .eq("id", input.clientId)
-    .single();
-
-  if (clientError || !clientRow) {
-    throw new Error("Selected client was not found.");
-  }
-
-  const quotationNumber = `QT-${Date.now()}`;
-  const { data, error } = await supabase
-    .from("quotations")
-    .insert({
-      quotation_number: quotationNumber,
-      client_id: input.clientId,
-      sector: clientRow.sector,
-      subject: input.subject,
-      amount: input.amount,
-      cost: input.cost ?? null,
-      notes: input.notes ?? null,
-      prepared_by: user.id,
-      status: "draft",
-    })
-    .select("id")
-    .single();
-
-  if (error || !data) {
-    throw new Error(error?.message || "Failed to create quotation draft.");
-  }
-
-  return { quotationId: data.id };
-}
-
-export async function updateQuotationDraft(input: {
+export async function updateSalesQuotationDetails(input: {
   quotationId: string;
-  clientId: string;
-  subject: string;
-  amount: number;
-  cost?: number | null;
-  notes?: string | null;
+  salesMarginPercent: number | null;
+  paymentTerms: string | null;
+  leadTimeDays: number | null;
+  notes: string | null;
 }): Promise<void> {
   const supabase = await createClient();
   const {
@@ -225,72 +207,21 @@ export async function updateQuotationDraft(input: {
   }
 
   if (quotationRow.status !== "draft") {
-    throw new Error("Only draft quotations can be edited.");
-  }
-
-  const { data: clientRow, error: clientError } = await supabase
-    .from("clients")
-    .select("sector")
-    .eq("id", input.clientId)
-    .single();
-
-  if (clientError || !clientRow) {
-    throw new Error("Selected client was not found.");
+    throw new Error("Sales details can only be edited while the quotation is a draft.");
   }
 
   const { error: updateError } = await supabase
     .from("quotations")
     .update({
-      client_id: input.clientId,
-      sector: clientRow.sector,
-      subject: input.subject,
-      amount: input.amount,
-      cost: input.cost ?? null,
-      notes: input.notes ?? null,
+      sales_margin_percent: input.salesMarginPercent,
+      payment_terms: input.paymentTerms,
+      lead_time_days: input.leadTimeDays,
+      notes: input.notes,
     })
     .eq("id", input.quotationId);
 
   if (updateError) {
-    throw new Error(updateError.message || "Failed to update quotation draft.");
-  }
-}
-
-export async function deleteQuotationDraft(quotationId: string): Promise<void> {
-  const supabase = await createClient();
-  const {
-    data: { user },
-    error: userError,
-  } = await supabase.auth.getUser();
-
-  if (userError || !user) {
-    throw new Error("You must be signed in.");
-  }
-
-  const { data: quotationRow, error: quotationError } = await supabase
-    .from("quotations")
-    .select("id, status, phase")
-    .eq("id", quotationId)
-    .single();
-
-  if (quotationError || !quotationRow) {
-    throw new Error("Quotation was not found.");
-  }
-
-  if (quotationRow.phase !== "sales") {
-    throw new Error("This quotation is not yet in the sales phase.");
-  }
-
-  if (quotationRow.status !== "draft") {
-    throw new Error("Only draft quotations can be deleted.");
-  }
-
-  const { error: deleteError } = await supabase
-    .from("quotations")
-    .delete()
-    .eq("id", quotationId);
-
-  if (deleteError) {
-    throw new Error(deleteError.message || "Failed to delete quotation draft.");
+    throw new Error(updateError.message || "Failed to update sales details.");
   }
 }
 
@@ -325,7 +256,9 @@ export async function submitQuotationForApproval(quotationId: string): Promise<v
 
   const { data: quotation, error: quotationError } = await supabase
     .from("quotations")
-    .select("id, amount, status, phase")
+    .select(
+      "id, amount, status, phase, sales_margin_percent, payment_terms, lead_time_days",
+    )
     .eq("id", quotationId)
     .single();
 
@@ -339,6 +272,19 @@ export async function submitQuotationForApproval(quotationId: string): Promise<v
 
   if (quotation.status !== "draft") {
     throw new Error("Only draft quotations can be submitted for approval.");
+  }
+
+  if (
+    quotation.sales_margin_percent === null ||
+    quotation.sales_margin_percent === undefined ||
+    !quotation.payment_terms ||
+    String(quotation.payment_terms).trim() === "" ||
+    quotation.lead_time_days === null ||
+    quotation.lead_time_days === undefined
+  ) {
+    throw new Error(
+      "Margin, payment terms, and lead time are required before submitting.",
+    );
   }
 
   const roles = requiredApproverRolesForAmount(Number(quotation.amount));

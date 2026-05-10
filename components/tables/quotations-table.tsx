@@ -10,11 +10,6 @@ type QuotationsTableProps = {
   quotations: SalesQuotation[];
   currentUserId: string;
   currentUserRole: string | null;
-  clients: Array<{
-    id: string;
-    companyName: string;
-    isActive: boolean;
-  }>;
 };
 
 type SortBy = "createdAt" | "amount";
@@ -82,7 +77,6 @@ export function QuotationsTable({
   quotations,
   currentUserId,
   currentUserRole,
-  clients,
 }: QuotationsTableProps) {
   const [sortBy, setSortBy] = useState<SortBy>("createdAt");
   const [sortDirection, setSortDirection] = useState<SortDirection>("desc");
@@ -177,7 +171,6 @@ export function QuotationsTable({
         quotation={selectedQuotation}
         currentUserId={currentUserId}
         currentUserRole={currentUserRole}
-        clients={clients}
         onOpenChange={(open) => {
           if (!open) {
             setSelectedQuotation(null);

@@ -22,19 +22,23 @@ describe("fetchPurchaseOrdersAction", () => {
     mockFetchPurchaseOrders.mockReset();
   });
 
-  it("returns purchase orders for the active department", async () => {
+  it("returns approved quotations as purchase orders for the active department", async () => {
     mockFetchPurchaseOrders.mockResolvedValue([
       {
-        id: "po-1",
-        poNumber: "PO-SALES-2026-0001",
+        id: "quotation-1",
+        quotationId: "quotation-1",
+        poNumber: "Q-SALES-2026-0001",
         clientId: "client-1",
         clientName: "ACME Industrial",
         subject: "Main electrical package",
         poAmount: 1_000_000,
+        cost: 600_000,
         recognizedAmount: 200_000,
         paymentStatus: "partial",
-        paymentTermsDays: 30,
-        poDate: "2026-04-05",
+        paymentTerms: "Net 30",
+        leadTimeDays: 45,
+        salesMarginPercent: 40,
+        approvedAt: "2026-04-05T10:00:00Z",
       },
     ]);
 
@@ -42,6 +46,6 @@ describe("fetchPurchaseOrdersAction", () => {
 
     expect(response.success).toBe(true);
     expect(response.data).toHaveLength(1);
-    expect(response.data?.[0].poNumber).toBe("PO-SALES-2026-0001");
+    expect(response.data?.[0].poNumber).toBe("Q-SALES-2026-0001");
   });
 });

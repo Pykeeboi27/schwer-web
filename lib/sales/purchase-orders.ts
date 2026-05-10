@@ -3,15 +3,19 @@ import { validatePoTotalAmount } from "@/lib/utils/form-validation";
 
 export type SalesPurchaseOrder = {
   id: string;
+  quotationId: string;
   poNumber: string;
   clientId: string;
   clientName: string;
   subject: string;
   poAmount: number;
+  cost: number | null;
   recognizedAmount: number;
   paymentStatus: "unpaid" | "partial" | "paid" | "overdue";
-  paymentTermsDays: number;
-  poDate: string;
+  paymentTerms: string | null;
+  leadTimeDays: number | null;
+  salesMarginPercent: number | null;
+  approvedAt: string | null;
 };
 
 export type SalesPoPayment = {
@@ -40,7 +44,6 @@ function derivePaymentStatus(
 
 export async function fetchPurchaseOrders(_departmentId?: string): Promise<SalesPurchaseOrder[]> {
   void _departmentId;
-  // Department filtering is enforced through RLS for the current session.
   return listPurchaseOrders();
 }
 
@@ -70,14 +73,16 @@ export function assertCollectionDoesNotExceedPo(poAmount: number, collectedAmoun
 export async function listPurchaseOrders(): Promise<SalesPurchaseOrder[]> {
   const supabase = await createClient();
   const { data, error } = await supabase
-    .from("purchase_orders")
+    .from("quotations")
     .select(
-      "id, po_number, client_id, subject, po_amount, recognized_amount, payment_status, payment_terms_days, po_date, clients:client_id(company_name)",
+      "id, quotation_number, client_id, subject, amount, cost, recognized_amount, payment_status, payment_terms, lead_time_days, sales_margin_percent, approved_at, clients:client_id(company_name)",
     )
-    .order("created_at", { ascending: false });
+    .eq("status", "approved")
+    .eq("phase", "sales")
+    .order("approved_at", { ascending: false, nullsFirst: false });
 
   if (error) {
-    throw new Error("Failed to load purchase orders.");
+    throw new Error(error.message || "Failed to load purchase orders.");
   }
 
   return (data ?? []).map((row) => {
@@ -85,49 +90,27 @@ export async function listPurchaseOrders(): Promise<SalesPurchaseOrder[]> {
 
     return {
       id: row.id,
-      poNumber: row.po_number,
+      quotationId: row.id,
+      poNumber: row.quotation_number,
       clientId: row.client_id,
       clientName: client?.company_name ?? "Unknown client",
       subject: row.subject,
-      poAmount: Number(row.po_amount),
-      recognizedAmount: Number(row.recognized_amount),
-      paymentStatus: row.payment_status,
-      paymentTermsDays: row.payment_terms_days,
-      poDate: row.po_date,
+      poAmount: Number(row.amount),
+      cost: row.cost === null || row.cost === undefined ? null : Number(row.cost),
+      recognizedAmount: Number(row.recognized_amount ?? 0),
+      paymentStatus: row.payment_status ?? "unpaid",
+      paymentTerms: row.payment_terms ?? null,
+      leadTimeDays:
+        row.lead_time_days === null || row.lead_time_days === undefined
+          ? null
+          : Number(row.lead_time_days),
+      salesMarginPercent:
+        row.sales_margin_percent === null || row.sales_margin_percent === undefined
+          ? null
+          : Number(row.sales_margin_percent),
+      approvedAt: row.approved_at ?? null,
     };
   });
-}
-
-export async function generateNextPoNumber(
-  departmentCode = "SALES",
-): Promise<string> {
-  const supabase = await createClient();
-  const year = new Date().getFullYear();
-  const normalizedDepartmentCode = String(departmentCode ?? "")
-    .trim()
-    .toUpperCase();
-  const prefix = `PO-${normalizedDepartmentCode}-${year}-`;
-
-  const { data, error } = await supabase
-    .from("purchase_orders")
-    .select("po_number")
-    .like("po_number", `${prefix}%`)
-    .order("po_number", { ascending: false })
-    .limit(1);
-
-  if (error) {
-    throw new Error("Failed to generate purchase order number.");
-  }
-
-  const latestPoNumber = data?.[0]?.po_number ?? null;
-  const currentSequence = latestPoNumber
-    ? Number((latestPoNumber.match(/(\d{4})$/) ?? ["", "0"])[1])
-    : 0;
-
-  const nextSequence = currentSequence + 1;
-  const sequence = String(nextSequence).padStart(4, "0");
-
-  return `${prefix}${sequence}`;
 }
 
 export async function listPoPayments(poId?: string): Promise<SalesPoPayment[]> {
@@ -157,53 +140,6 @@ export async function listPoPayments(poId?: string): Promise<SalesPoPayment[]> {
   }));
 }
 
-export async function createPurchaseOrder(input: {
-  clientId: string;
-  subject: string;
-  poAmount: number;
-  poNumber?: string;
-  cost?: number | null;
-  paymentTermsDays: number;
-  notes?: string | null;
-}): Promise<void> {
-  const supabase = await createClient();
-  const {
-    data: { user },
-    error: userError,
-  } = await supabase.auth.getUser();
-
-  if (userError || !user) {
-    throw new Error("You must be signed in.");
-  }
-
-  const { data: clientRow, error: clientError } = await supabase
-    .from("clients")
-    .select("sector")
-    .eq("id", input.clientId)
-    .single();
-
-  if (clientError || !clientRow) {
-    throw new Error("Selected client was not found.");
-  }
-
-  const poNumber = input.poNumber ?? `PO-${Date.now()}`;
-  const { error } = await supabase.from("purchase_orders").insert({
-    po_number: poNumber,
-    client_id: input.clientId,
-    sector: clientRow.sector,
-    subject: input.subject,
-    po_amount: input.poAmount,
-    cost: input.cost ?? null,
-    payment_terms_days: input.paymentTermsDays,
-    notes: input.notes ?? null,
-    created_by: user.id,
-  });
-
-  if (error) {
-    throw new Error(error.message || "Failed to create purchase order.");
-  }
-}
-
 export async function addPoPayment(input: {
   poId: string;
   amountCollected: number;
@@ -217,20 +153,24 @@ export async function addPoPayment(input: {
     data: { user },
   } = await supabase.auth.getUser();
 
-  const { data: poRow, error: poError } = await supabase
-    .from("purchase_orders")
-    .select("po_amount, recognized_amount")
+  const { data: quotationRow, error: quotationError } = await supabase
+    .from("quotations")
+    .select("amount, status, recognized_amount")
     .eq("id", input.poId)
     .single();
 
-  if (poError || !poRow) {
-    throw new Error("Purchase order was not found.");
+  if (quotationError || !quotationRow) {
+    throw new Error("Approved quotation was not found.");
   }
 
-  assertCollectionDoesNotExceedPo(
-    Number(poRow.po_amount),
-    Number(poRow.recognized_amount) + input.amountCollected,
-  );
+  if (quotationRow.status !== "approved") {
+    throw new Error("Payments can only be recorded against approved quotations.");
+  }
+
+  const poAmount = Number(quotationRow.amount);
+  const currentRecognized = Number(quotationRow.recognized_amount ?? 0);
+
+  assertCollectionDoesNotExceedPo(poAmount, currentRecognized + input.amountCollected);
 
   const { error } = await supabase.from("po_payments").insert({
     po_id: input.poId,
@@ -246,34 +186,32 @@ export async function addPoPayment(input: {
     throw new Error(error.message || "Failed to add PO payment.");
   }
 
-  // Recompute and persist PO collection totals in-app so UI remains correct
-  // even when DB triggers/functions are missing or outdated.
+  // Recompute and persist quotation collection totals in-app so the UI remains
+  // correct even if the DB trigger is missing or out of date.
   const { data: paymentRows, error: paymentsError } = await supabase
     .from("po_payments")
     .select("amount_collected")
     .eq("po_id", input.poId);
 
   if (paymentsError) {
-    throw new Error(paymentsError.message || "Failed to refresh purchase order totals.");
+    throw new Error(paymentsError.message || "Failed to refresh quotation totals.");
   }
 
   const refreshedRecognizedAmount = (paymentRows ?? []).reduce((sum, row) => {
     return sum + Number(row.amount_collected ?? 0);
   }, 0);
 
-  const poAmount = Number(poRow.po_amount);
-
   assertCollectionDoesNotExceedPo(poAmount, refreshedRecognizedAmount);
 
-  const { error: updatePoError } = await supabase
-    .from("purchase_orders")
+  const { error: updateError } = await supabase
+    .from("quotations")
     .update({
       recognized_amount: refreshedRecognizedAmount,
       payment_status: derivePaymentStatus(poAmount, refreshedRecognizedAmount),
     })
     .eq("id", input.poId);
 
-  if (updatePoError) {
-    throw new Error(updatePoError.message || "Failed to update purchase order totals.");
+  if (updateError) {
+    throw new Error(updateError.message || "Failed to update quotation totals.");
   }
 }

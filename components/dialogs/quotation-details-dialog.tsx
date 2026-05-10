@@ -2,10 +2,9 @@
 
 import {
   approveQuotationAction,
-  deleteQuotationDraftAction,
   rejectQuotationAction,
   submitQuotationForApprovalAction,
-  updateQuotationDraftAction,
+  updateSalesQuotationDetailsAction,
 } from "@/app/protected/sales/quotations/actions";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -15,19 +14,12 @@ import { useToast } from "@/lib/utils/toast-notification";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 
-type ClientOption = {
-  id: string;
-  companyName: string;
-  isActive: boolean;
-};
-
 type QuotationDetailsDialogProps = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   quotation: SalesQuotation | null;
   currentUserId: string;
   currentUserRole: string | null;
-  clients: ClientOption[];
 };
 
 function formatCurrency(amount: number): string {
@@ -36,6 +28,28 @@ function formatCurrency(amount: number): string {
     currency: "PHP",
     maximumFractionDigits: 2,
   }).format(amount);
+}
+
+function formatPercent(value: number | null): string {
+  if (value === null) {
+    return "—";
+  }
+  return `${value.toFixed(2)}%`;
+}
+
+function formatLeadTime(days: number | null): string {
+  if (days === null) {
+    return "—";
+  }
+  return `${days} day${days === 1 ? "" : "s"}`;
+}
+
+function computedMarginPercent(amount: number, cost: number | null): string {
+  if (cost === null || amount <= 0) {
+    return "—";
+  }
+  const value = ((amount - cost) / amount) * 100;
+  return `${value.toFixed(2)}%`;
 }
 
 function statusLabel(status: SalesQuotation["status"]): string {
@@ -64,29 +78,24 @@ export function QuotationDetailsDialog({
   quotation,
   currentUserId,
   currentUserRole,
-  clients,
 }: QuotationDetailsDialogProps) {
   const router = useRouter();
   const { success, error } = useToast();
   const [rejectionReason, setRejectionReason] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [isEditingDraft, setIsEditingDraft] = useState(false);
-  const [draftClientId, setDraftClientId] = useState("");
-  const [draftSubject, setDraftSubject] = useState("");
-  const [draftAmount, setDraftAmount] = useState("");
-  const [draftCost, setDraftCost] = useState("");
-  const [draftNotes, setDraftNotes] = useState("");
+  const [marginPercent, setMarginPercent] = useState("");
+  const [paymentTerms, setPaymentTerms] = useState("");
+  const [leadTimeDays, setLeadTimeDays] = useState("");
+  const [notes, setNotes] = useState("");
 
   const normalizedRole = useMemo(
     () => String(currentUserRole ?? "").trim().toLowerCase(),
     [currentUserRole],
   );
 
-  const canSubmitForApproval =
-    quotation?.status === "draft" && quotation.preparedBy === currentUserId;
+  void currentUserId;
 
-  const canManageDraft =
-    quotation?.status === "draft" && quotation.preparedBy === currentUserId;
+  const isDraft = quotation?.status === "draft";
 
   const canApproveReject =
     quotation?.status === "pending" &&
@@ -102,7 +111,6 @@ export function QuotationDetailsDialog({
   const handleClose = () => {
     onOpenChange(false);
     setRejectionReason("");
-    setIsEditingDraft(false);
   };
 
   useEffect(() => {
@@ -110,12 +118,14 @@ export function QuotationDetailsDialog({
       return;
     }
 
-    setDraftClientId(quotation.clientId);
-    setDraftSubject(quotation.subject);
-    setDraftAmount(String(quotation.amount));
-    setDraftCost(quotation.cost === null ? "" : String(quotation.cost));
-    setDraftNotes(quotation.notes ?? "");
-    setIsEditingDraft(false);
+    setMarginPercent(
+      quotation.salesMarginPercent === null ? "" : String(quotation.salesMarginPercent),
+    );
+    setPaymentTerms(quotation.paymentTerms ?? "");
+    setLeadTimeDays(
+      quotation.leadTimeDays === null ? "" : String(quotation.leadTimeDays),
+    );
+    setNotes(quotation.notes ?? "");
   }, [quotation, open]);
 
   useEffect(() => {
@@ -141,7 +151,59 @@ export function QuotationDetailsDialog({
     return null;
   }
 
+  const salesDetailsComplete =
+    marginPercent.trim() !== "" &&
+    paymentTerms.trim() !== "" &&
+    leadTimeDays.trim() !== "";
+
+  const handleSaveSalesDetails = async () => {
+    const trimmedMargin = marginPercent.trim();
+    const trimmedPaymentTerms = paymentTerms.trim();
+    const trimmedLeadTime = leadTimeDays.trim();
+
+    if (trimmedMargin !== "") {
+      const margin = Number(trimmedMargin);
+      if (!Number.isFinite(margin) || margin < 0 || margin > 100) {
+        error("Margin must be between 0 and 100.");
+        return;
+      }
+    }
+
+    if (trimmedLeadTime !== "") {
+      const days = Number(trimmedLeadTime);
+      if (!Number.isFinite(days) || !Number.isInteger(days) || days < 0) {
+        error("Lead time must be a whole number of days (0 or greater).");
+        return;
+      }
+    }
+
+    setIsSubmitting(true);
+
+    const formData = new FormData();
+    formData.set("quotationId", quotation.id);
+    formData.set("salesMarginPercent", trimmedMargin);
+    formData.set("paymentTerms", trimmedPaymentTerms);
+    formData.set("leadTimeDays", trimmedLeadTime);
+    formData.set("notes", notes.trim());
+
+    const response = await updateSalesQuotationDetailsAction(formData);
+    if (!response.success) {
+      error(response.error ?? "Failed to update sales details.");
+      setIsSubmitting(false);
+      return;
+    }
+
+    success("Sales details saved.");
+    setIsSubmitting(false);
+    router.refresh();
+  };
+
   const handleSubmitForApproval = async () => {
+    if (!salesDetailsComplete) {
+      error("Margin, payment terms, and lead time are required before submitting.");
+      return;
+    }
+
     setIsSubmitting(true);
 
     const response = await submitQuotationForApprovalAction(quotation.id);
@@ -200,84 +262,13 @@ export function QuotationDetailsDialog({
     setIsSubmitting(false);
   };
 
-  const handleSaveDraftChanges = async () => {
-    const normalizedClientId = draftClientId.trim();
-    const normalizedSubject = draftSubject.trim();
-
-    if (!normalizedClientId) {
-      error("Please select a client.");
-      return;
-    }
-
-    if (!normalizedSubject) {
-      error("Subject is required.");
-      return;
-    }
-
-    const amount = Number(draftAmount);
-    if (!Number.isFinite(amount) || amount <= 0) {
-      error("Amount must be greater than 0.");
-      return;
-    }
-
-    if (draftCost.trim()) {
-      const cost = Number(draftCost);
-      if (!Number.isFinite(cost) || cost < 0) {
-        error("Cost must be 0 or greater.");
-        return;
-      }
-    }
-
-    setIsSubmitting(true);
-
-    const formData = new FormData();
-    formData.set("quotationId", quotation.id);
-    formData.set("clientId", normalizedClientId);
-    formData.set("subject", normalizedSubject);
-    formData.set("amount", String(amount));
-    formData.set("cost", draftCost.trim());
-    formData.set("notes", draftNotes.trim());
-
-    const response = await updateQuotationDraftAction(formData);
-    if (!response.success) {
-      error(response.error ?? "Failed to update quotation draft.");
-      setIsSubmitting(false);
-      return;
-    }
-
-    success("Draft quotation updated.");
-    handleClose();
-    router.refresh();
-    setIsSubmitting(false);
-  };
-
-  const handleDeleteDraft = async () => {
-    if (!window.confirm("Delete this draft quotation? This action cannot be undone.")) {
-      return;
-    }
-
-    setIsSubmitting(true);
-    const response = await deleteQuotationDraftAction(quotation.id);
-
-    if (!response.success) {
-      error(response.error ?? "Failed to delete quotation draft.");
-      setIsSubmitting(false);
-      return;
-    }
-
-    success("Draft quotation deleted.");
-    handleClose();
-    router.refresh();
-    setIsSubmitting(false);
-  };
-
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
       <div
         role="dialog"
         aria-modal="true"
         aria-labelledby="quotation-details-title"
-        className="w-full max-w-2xl rounded-lg border bg-card p-5 shadow-lg"
+        className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-lg border bg-card p-5 shadow-lg"
       >
         <div className="mb-4 flex items-start justify-between gap-4">
           <div>
@@ -285,7 +276,9 @@ export function QuotationDetailsDialog({
               Quotation Details
             </h2>
             <p className="text-sm text-muted-foreground">
-              Review details and process approval actions.
+              {isDraft
+                ? "Add the sales details, then submit for approval."
+                : "Review details and process approval actions."}
             </p>
           </div>
           <Button variant="ghost" onClick={handleClose} aria-label="Close quotation details dialog">
@@ -293,112 +286,123 @@ export function QuotationDetailsDialog({
           </Button>
         </div>
 
-        {isEditingDraft ? (
-          <div className="grid gap-3 text-sm">
-            <div>
-              <Label htmlFor="edit-quotation-client">Client</Label>
-              <select
-                id="edit-quotation-client"
-                value={draftClientId}
-                onChange={(event) => setDraftClientId(event.target.value)}
-                className="mt-1 flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm"
-              >
-                {clients
-                  .filter((client) => client.isActive || client.id === quotation.clientId)
-                  .map((client) => (
-                    <option key={client.id} value={client.id}>
-                      {client.companyName}
-                    </option>
-                  ))}
-              </select>
-            </div>
+        <dl className="grid gap-3 text-sm">
+          <div className="grid grid-cols-[160px_1fr] gap-2">
+            <dt className="text-muted-foreground">Quotation ID</dt>
+            <dd className="font-medium">{quotation.quotationNumber}</dd>
+          </div>
+          <div className="grid grid-cols-[160px_1fr] gap-2">
+            <dt className="text-muted-foreground">Client</dt>
+            <dd>{quotation.clientName}</dd>
+          </div>
+          <div className="grid grid-cols-[160px_1fr] gap-2">
+            <dt className="text-muted-foreground">Subject</dt>
+            <dd>{quotation.subject}</dd>
+          </div>
+          <div className="grid grid-cols-[160px_1fr] gap-2">
+            <dt className="text-muted-foreground">Amount</dt>
+            <dd>{formatCurrency(quotation.amount)}</dd>
+          </div>
+          <div className="grid grid-cols-[160px_1fr] gap-2">
+            <dt className="text-muted-foreground">Cost</dt>
+            <dd>{quotation.cost === null ? "-" : formatCurrency(quotation.cost)}</dd>
+          </div>
+          <div className="grid grid-cols-[160px_1fr] gap-2">
+            <dt className="text-muted-foreground">Computed Margin</dt>
+            <dd>{computedMarginPercent(quotation.amount, quotation.cost)}</dd>
+          </div>
+          <div className="grid grid-cols-[160px_1fr] gap-2">
+            <dt className="text-muted-foreground">Status</dt>
+            <dd>{statusLabel(quotation.status)}</dd>
+          </div>
+          <div className="grid grid-cols-[160px_1fr] gap-2">
+            <dt className="text-muted-foreground">Approval Chain</dt>
+            <dd>{pendingApprovalText}</dd>
+          </div>
+          <div className="grid grid-cols-[160px_1fr] gap-2">
+            <dt className="text-muted-foreground">Created</dt>
+            <dd>{new Date(quotation.createdAt).toLocaleString()}</dd>
+          </div>
+        </dl>
 
-            <div>
-              <Label htmlFor="edit-quotation-subject">Subject</Label>
-              <Input
-                id="edit-quotation-subject"
-                value={draftSubject}
-                onChange={(event) => setDraftSubject(event.target.value)}
-                className="mt-1"
-              />
-            </div>
+        {isDraft ? (
+          <div className="mt-5 space-y-3 rounded-md border bg-muted/20 p-4 text-sm">
+            <h3 className="text-base font-semibold">Sales Details</h3>
+            <p className="text-xs text-muted-foreground">
+              All three fields are required before this quotation can be submitted for approval.
+            </p>
 
             <div className="grid gap-3 md:grid-cols-2">
               <div>
-                <Label htmlFor="edit-quotation-amount">Amount</Label>
+                <Label htmlFor="sales-margin-percent">Sales Margin %</Label>
                 <Input
-                  id="edit-quotation-amount"
+                  id="sales-margin-percent"
                   type="number"
-                  min={0.01}
+                  min={0}
+                  max={100}
                   step="0.01"
-                  value={draftAmount}
-                  onChange={(event) => setDraftAmount(event.target.value)}
+                  value={marginPercent}
+                  onChange={(event) => setMarginPercent(event.target.value)}
                   className="mt-1"
+                  placeholder="e.g. 25"
                 />
               </div>
               <div>
-                <Label htmlFor="edit-quotation-cost">Cost</Label>
+                <Label htmlFor="sales-lead-time">Lead Time (days)</Label>
                 <Input
-                  id="edit-quotation-cost"
+                  id="sales-lead-time"
                   type="number"
                   min={0}
-                  step="0.01"
-                  value={draftCost}
-                  onChange={(event) => setDraftCost(event.target.value)}
+                  step="1"
+                  value={leadTimeDays}
+                  onChange={(event) => setLeadTimeDays(event.target.value)}
                   className="mt-1"
+                  placeholder="e.g. 30"
                 />
               </div>
             </div>
 
             <div>
-              <Label htmlFor="edit-quotation-notes">Notes</Label>
+              <Label htmlFor="sales-payment-terms">Payment Terms</Label>
               <Input
-                id="edit-quotation-notes"
-                value={draftNotes}
-                onChange={(event) => setDraftNotes(event.target.value)}
+                id="sales-payment-terms"
+                value={paymentTerms}
+                onChange={(event) => setPaymentTerms(event.target.value)}
                 className="mt-1"
+                placeholder="e.g. Net 30"
               />
             </div>
 
-            <div className="grid grid-cols-[160px_1fr] gap-2">
-              <dt className="text-muted-foreground">Status</dt>
-              <dd>{statusLabel(quotation.status)}</dd>
-            </div>
-            <div className="grid grid-cols-[160px_1fr] gap-2">
-              <dt className="text-muted-foreground">Created</dt>
-              <dd>{new Date(quotation.createdAt).toLocaleString()}</dd>
+            <div>
+              <Label htmlFor="sales-notes">Notes</Label>
+              <Input
+                id="sales-notes"
+                value={notes}
+                onChange={(event) => setNotes(event.target.value)}
+                className="mt-1"
+              />
             </div>
           </div>
         ) : (
-          <dl className="grid gap-3 text-sm">
+          <dl className="mt-5 grid gap-3 rounded-md border bg-muted/20 p-4 text-sm">
             <div className="grid grid-cols-[160px_1fr] gap-2">
-              <dt className="text-muted-foreground">Quotation ID</dt>
-              <dd className="font-medium">{quotation.quotationNumber}</dd>
+              <dt className="text-muted-foreground">Sales Margin %</dt>
+              <dd>{formatPercent(quotation.salesMarginPercent)}</dd>
             </div>
             <div className="grid grid-cols-[160px_1fr] gap-2">
-              <dt className="text-muted-foreground">Client</dt>
-              <dd>{quotation.clientName}</dd>
+              <dt className="text-muted-foreground">Payment Terms</dt>
+              <dd>{quotation.paymentTerms ?? "—"}</dd>
             </div>
             <div className="grid grid-cols-[160px_1fr] gap-2">
-              <dt className="text-muted-foreground">Subject</dt>
-              <dd>{quotation.subject}</dd>
+              <dt className="text-muted-foreground">Lead Time</dt>
+              <dd>{formatLeadTime(quotation.leadTimeDays)}</dd>
             </div>
-            <div className="grid grid-cols-[160px_1fr] gap-2">
-              <dt className="text-muted-foreground">Amount</dt>
-              <dd>{formatCurrency(quotation.amount)}</dd>
-            </div>
-            <div className="grid grid-cols-[160px_1fr] gap-2">
-              <dt className="text-muted-foreground">Status</dt>
-              <dd>{statusLabel(quotation.status)}</dd>
-            </div>
-            <div className="grid grid-cols-[160px_1fr] gap-2">
-              <dt className="text-muted-foreground">Approval Chain</dt>
-              <dd>{pendingApprovalText}</dd>
-            </div>
-            <div className="grid grid-cols-[160px_1fr] gap-2">
-              <dt className="text-muted-foreground">Created</dt>
-              <dd>{new Date(quotation.createdAt).toLocaleString()}</dd>
-            </div>
+            {quotation.notes ? (
+              <div className="grid grid-cols-[160px_1fr] gap-2">
+                <dt className="text-muted-foreground">Notes</dt>
+                <dd>{quotation.notes}</dd>
+              </div>
+            ) : null}
           </dl>
         )}
 
@@ -414,33 +418,18 @@ export function QuotationDetailsDialog({
         ) : null}
 
         <div className="mt-5 flex flex-wrap justify-end gap-2">
-          {canManageDraft && !isEditingDraft ? (
-            <Button variant="outline" onClick={() => setIsEditingDraft(true)} disabled={isSubmitting}>
-              Edit Draft
-            </Button>
-          ) : null}
-
-          {canManageDraft && isEditingDraft ? (
+          {isDraft ? (
             <>
-              <Button variant="outline" onClick={() => setIsEditingDraft(false)} disabled={isSubmitting}>
-                Cancel Edit
+              <Button variant="outline" onClick={handleSaveSalesDetails} disabled={isSubmitting}>
+                {isSubmitting ? "Saving..." : "Save Sales Details"}
               </Button>
-              <Button onClick={handleSaveDraftChanges} disabled={isSubmitting}>
-                {isSubmitting ? "Saving..." : "Save Draft Changes"}
+              <Button
+                onClick={handleSubmitForApproval}
+                disabled={isSubmitting || !salesDetailsComplete}
+              >
+                {isSubmitting ? "Submitting..." : "Submit for Approval"}
               </Button>
             </>
-          ) : null}
-
-          {canManageDraft && !isEditingDraft ? (
-            <Button variant="outline" onClick={handleDeleteDraft} disabled={isSubmitting}>
-              Delete Draft
-            </Button>
-          ) : null}
-
-          {canSubmitForApproval ? (
-            <Button onClick={handleSubmitForApproval} disabled={isSubmitting}>
-              {isSubmitting ? "Submitting..." : "Submit for Approval"}
-            </Button>
           ) : null}
 
           {canApproveReject ? (

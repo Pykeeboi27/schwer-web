@@ -20,6 +20,19 @@ function formatCurrency(amount: number): string {
   }).format(amount);
 }
 
+function formatDateTime(value: string | null): string {
+  if (!value) {
+    return "—";
+  }
+
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) {
+    return "—";
+  }
+
+  return parsed.toLocaleString();
+}
+
 export function PurchaseOrderDetailsDialog({
   open,
   onOpenChange,
@@ -79,7 +92,7 @@ export function PurchaseOrderDetailsDialog({
                 Purchase Order Details
               </h2>
               <p className="text-sm text-muted-foreground">
-                Review PO values and collection history.
+                Approved quotation tracked as a purchase order.
               </p>
             </div>
             <Button variant="ghost" onClick={handleClose} aria-label="Close purchase order details dialog">
@@ -89,7 +102,7 @@ export function PurchaseOrderDetailsDialog({
 
           <dl className="grid gap-3 text-sm">
             <div className="grid grid-cols-[160px_1fr] gap-2">
-              <dt className="text-muted-foreground">PO Number</dt>
+              <dt className="text-muted-foreground">Quotation #</dt>
               <dd className="font-medium">{purchaseOrder.poNumber}</dd>
             </div>
             <div className="grid grid-cols-[160px_1fr] gap-2">
@@ -107,6 +120,30 @@ export function PurchaseOrderDetailsDialog({
             <div className="grid grid-cols-[160px_1fr] gap-2">
               <dt className="text-muted-foreground">Collected Amount</dt>
               <dd>{formatCurrency(purchaseOrder.recognizedAmount)}</dd>
+            </div>
+            <div className="grid grid-cols-[160px_1fr] gap-2">
+              <dt className="text-muted-foreground">Sales Margin %</dt>
+              <dd>
+                {purchaseOrder.salesMarginPercent === null
+                  ? "—"
+                  : `${purchaseOrder.salesMarginPercent.toFixed(2)}%`}
+              </dd>
+            </div>
+            <div className="grid grid-cols-[160px_1fr] gap-2">
+              <dt className="text-muted-foreground">Payment Terms</dt>
+              <dd>{purchaseOrder.paymentTerms ?? "—"}</dd>
+            </div>
+            <div className="grid grid-cols-[160px_1fr] gap-2">
+              <dt className="text-muted-foreground">Lead Time</dt>
+              <dd>
+                {purchaseOrder.leadTimeDays === null
+                  ? "—"
+                  : `${purchaseOrder.leadTimeDays} day${purchaseOrder.leadTimeDays === 1 ? "" : "s"}`}
+              </dd>
+            </div>
+            <div className="grid grid-cols-[160px_1fr] gap-2">
+              <dt className="text-muted-foreground">Approved At</dt>
+              <dd>{formatDateTime(purchaseOrder.approvedAt)}</dd>
             </div>
             <div className="grid grid-cols-[160px_1fr] gap-2">
               <dt className="text-muted-foreground">Status</dt>

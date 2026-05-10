@@ -1,5 +1,16 @@
 import { createClient } from "@/lib/supabase/server";
 
+export type CostingApprovedHistoryItem = {
+  quotationId: string;
+  quotationNumber: string;
+  clientName: string;
+  subject: string;
+  amount: number;
+  cost: number | null;
+  googleDriveLink: string | null;
+  approvedAt: string;
+};
+
 export type CostingQuotation = {
   id: string;
   quotationNumber: string;
@@ -71,6 +82,35 @@ export async function listCostingQuotations(): Promise<CostingQuotation[]> {
       costingRejectionReason: row.costing_rejection_reason,
       preparedBy: row.prepared_by,
       createdAt: row.created_at,
+    };
+  });
+}
+
+export async function listCostingApprovedHistory(): Promise<CostingApprovedHistoryItem[]> {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("quotations")
+    .select(
+      "id, quotation_number, subject, amount, cost, google_drive_link, costing_approved_at, clients:client_id(company_name)",
+    )
+    .not("costing_approved_at", "is", null)
+    .order("costing_approved_at", { ascending: false });
+
+  if (error) {
+    throw new Error("Failed to load costing approval history.");
+  }
+
+  return (data ?? []).map((row) => {
+    const client = Array.isArray(row.clients) ? row.clients[0] : row.clients;
+    return {
+      quotationId: row.id,
+      quotationNumber: row.quotation_number,
+      clientName: client?.company_name ?? "Unknown client",
+      subject: row.subject,
+      amount: Number(row.amount),
+      cost: row.cost === null ? null : Number(row.cost),
+      googleDriveLink: row.google_drive_link,
+      approvedAt: row.costing_approved_at,
     };
   });
 }

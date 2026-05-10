@@ -1,7 +1,11 @@
+import { CostingApprovalHistoryTable } from "@/components/executive/costing-approval-history-table";
 import { ExecutiveCostingApprovalsTable } from "@/components/executive/costing-approvals-table";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { getExecutiveAccessRedirect } from "@/lib/executive/access";
-import { listPendingCostingApprovals } from "@/lib/executive/costing-approvals";
+import {
+  listCostingApprovalHistory,
+  listPendingCostingApprovals,
+} from "@/lib/executive/costing-approvals";
 import { getCurrentProfile } from "@/lib/profile/get-current-profile";
 import { redirect } from "next/navigation";
 
@@ -19,7 +23,9 @@ export default async function ExecutiveCostingApprovalsPage() {
   const isExecutiveActor =
     profile?.role === "executive" && profile?.department === "executive";
 
-  const items = isExecutiveActor ? await listPendingCostingApprovals() : [];
+  const [items, history] = isExecutiveActor
+    ? await Promise.all([listPendingCostingApprovals(), listCostingApprovalHistory()])
+    : [[], []];
 
   return (
     <div className="flex flex-col gap-4">
@@ -40,6 +46,20 @@ export default async function ExecutiveCostingApprovalsPage() {
 
       {isExecutiveActor ? (
         <ExecutiveCostingApprovalsTable items={items} />
+      ) : null}
+
+      {isExecutiveActor ? (
+        <Card>
+          <CardHeader>
+            <CardTitle>Approval History</CardTitle>
+            <CardDescription>
+              Past costing quotations that were approved or sent back for edits.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <CostingApprovalHistoryTable items={history} />
+          </CardContent>
+        </Card>
       ) : null}
     </div>
   );

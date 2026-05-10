@@ -246,6 +246,13 @@ CREATE TABLE public.quotations (
   phase               quotation_phase_enum NOT NULL DEFAULT 'sales',
   google_drive_link   TEXT,
   costing_rejection_reason TEXT,
+  costing_approved_at TIMESTAMPTZ,
+  sales_margin_percent NUMERIC(6, 2),
+  payment_terms       TEXT,
+  lead_time_days      INTEGER,
+  approved_at         TIMESTAMPTZ,
+  recognized_amount   NUMERIC(15, 2) NOT NULL DEFAULT 0,
+  payment_status      payment_status_enum NOT NULL DEFAULT 'unpaid',
   approval_chain      JSONB NOT NULL DEFAULT '{}'::jsonb,
   rejection_reason    TEXT,
   submitted_at        TIMESTAMPTZ,
@@ -285,41 +292,13 @@ CREATE TABLE public.quotation_approvals (
   UNIQUE (quotation_id, approver_id)
 );
 
-CREATE TABLE public.purchase_orders (
-  id                  UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  department_id       UUID,
-  po_number           TEXT UNIQUE NOT NULL,
-  quotation_id        UUID REFERENCES public.quotations(id) ON DELETE SET NULL,
-  client_id           UUID NOT NULL REFERENCES public.clients(id) ON DELETE RESTRICT,
-  sector              sector_enum NOT NULL,
-  subject             TEXT NOT NULL,
-  po_amount           NUMERIC(15, 2) NOT NULL,
-  total_amount        NUMERIC(15, 2) GENERATED ALWAYS AS (po_amount) STORED,
-  cost                NUMERIC(15, 2),
-  margin_amount       NUMERIC(15, 2) GENERATED ALWAYS AS (po_amount - COALESCE(cost, 0)) STORED,
-  margin_percent      NUMERIC(6, 2) GENERATED ALWAYS AS (
-                        CASE WHEN po_amount > 0 THEN ((po_amount - COALESCE(cost, 0)) / po_amount) * 100 ELSE 0 END
-                      ) STORED,
-  recognized_amount   NUMERIC(15, 2) NOT NULL DEFAULT 0,
-  collected_amount    NUMERIC(15, 2) GENERATED ALWAYS AS (recognized_amount) STORED,
-  payment_terms_days  INTEGER NOT NULL DEFAULT 30,
-  status              TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('draft', 'active', 'closed')),
-  payment_status      payment_status_enum NOT NULL DEFAULT 'unpaid',
-  po_date             DATE NOT NULL DEFAULT CURRENT_DATE,
-  expected_completion DATE,
-  notes               TEXT,
-  created_by          UUID NOT NULL REFERENCES public.profiles(id) ON DELETE RESTRICT,
-  created_at          TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  updated_at          TIMESTAMPTZ NOT NULL DEFAULT NOW()
-);
-
-CREATE INDEX idx_po_client         ON public.purchase_orders(client_id);
-CREATE INDEX idx_po_payment_status ON public.purchase_orders(payment_status);
-CREATE INDEX idx_po_po_date        ON public.purchase_orders(po_date);
+-- Approved quotations are the canonical purchase-order record.
+-- Payments hang off quotations via po_payments.po_id (kept for column-name continuity;
+-- it now references quotations.id).
 
 CREATE TABLE public.po_payments (
   id               UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  po_id            UUID NOT NULL REFERENCES public.purchase_orders(id) ON DELETE CASCADE,
+  po_id            UUID NOT NULL REFERENCES public.quotations(id) ON DELETE CASCADE,
   amount_collected NUMERIC(15, 2) NOT NULL,
   payment_date     DATE NOT NULL DEFAULT CURRENT_DATE,
   payment_method   TEXT,
@@ -370,10 +349,6 @@ CREATE TRIGGER trg_audit_quotation_approvals
   AFTER INSERT OR UPDATE OR DELETE ON public.quotation_approvals
   FOR EACH ROW EXECUTE FUNCTION public.fn_audit_trigger();
 
-CREATE TRIGGER trg_audit_purchase_orders
-  AFTER INSERT OR UPDATE OR DELETE ON public.purchase_orders
-  FOR EACH ROW EXECUTE FUNCTION public.fn_audit_trigger();
-
 CREATE TRIGGER trg_audit_po_payments
   AFTER INSERT OR UPDATE OR DELETE ON public.po_payments
   FOR EACH ROW EXECUTE FUNCTION public.fn_audit_trigger();
@@ -393,7 +368,6 @@ CREATE TRIGGER trg_updated_at_clients             BEFORE UPDATE ON public.client
 CREATE TRIGGER trg_updated_at_client_contacts     BEFORE UPDATE ON public.client_contacts     FOR EACH ROW EXECUTE FUNCTION public.fn_set_updated_at();
 CREATE TRIGGER trg_updated_at_quotations          BEFORE UPDATE ON public.quotations          FOR EACH ROW EXECUTE FUNCTION public.fn_set_updated_at();
 CREATE TRIGGER trg_updated_at_quotation_approvals BEFORE UPDATE ON public.quotation_approvals FOR EACH ROW EXECUTE FUNCTION public.fn_set_updated_at();
-CREATE TRIGGER trg_updated_at_purchase_orders     BEFORE UPDATE ON public.purchase_orders     FOR EACH ROW EXECUTE FUNCTION public.fn_set_updated_at();
 CREATE TRIGGER trg_updated_at_po_payments         BEFORE UPDATE ON public.po_payments         FOR EACH ROW EXECUTE FUNCTION public.fn_set_updated_at();
 CREATE TRIGGER trg_updated_at_revenue_targets     BEFORE UPDATE ON public.revenue_targets     FOR EACH ROW EXECUTE FUNCTION public.fn_set_updated_at();
 
@@ -402,82 +376,64 @@ CREATE TRIGGER trg_updated_at_revenue_targets     BEFORE UPDATE ON public.revenu
 -- SECTION 8: DASHBOARD HELPER VIEWS & FUNCTIONS
 -- ============================================================
 
-CREATE OR REPLACE VIEW public.vw_po_summary AS
-SELECT
-  po.id,
-  po.po_number,
-  c.company_name,
-  c.sector,
-  po.po_amount          AS closed_sale,
-  po.recognized_amount  AS recognized_sale,
-  po.margin_amount,
-  po.margin_percent,
-  po.payment_status,
-  po.po_date,
-  EXTRACT(YEAR  FROM po.po_date)::INTEGER AS year,
-  EXTRACT(MONTH FROM po.po_date)::INTEGER AS month,
-  CEIL(EXTRACT(MONTH FROM po.po_date) / 3.0)::INTEGER AS quarter
-FROM public.purchase_orders po
-JOIN public.clients c ON c.id = po.client_id;
-
-CREATE OR REPLACE FUNCTION public.fn_refresh_po_payment_totals(target_po_id UUID)
+CREATE OR REPLACE FUNCTION public.fn_refresh_quotation_payment_totals(target_quotation_id UUID)
 RETURNS VOID
 LANGUAGE plpgsql
 SECURITY DEFINER
 SET search_path = public
 AS $$
 DECLARE
-  v_po_amount NUMERIC(15, 2);
+  v_amount NUMERIC(15, 2);
   v_collected_total NUMERIC(15, 2);
 BEGIN
-  IF target_po_id IS NULL THEN RETURN; END IF;
+  IF target_quotation_id IS NULL THEN RETURN; END IF;
 
-  SELECT po_amount INTO v_po_amount
-  FROM public.purchase_orders WHERE id = target_po_id FOR UPDATE;
+  SELECT amount INTO v_amount
+  FROM public.quotations WHERE id = target_quotation_id FOR UPDATE;
 
   IF NOT FOUND THEN RETURN; END IF;
 
   SELECT COALESCE(SUM(amount_collected), 0) INTO v_collected_total
-  FROM public.po_payments WHERE po_id = target_po_id;
+  FROM public.po_payments WHERE po_id = target_quotation_id;
 
-  IF v_collected_total > v_po_amount THEN
+  IF v_collected_total > v_amount THEN
     RAISE EXCEPTION
-      'Collected amount (%.2f) exceeds PO amount (%.2f) for PO %',
-      v_collected_total, v_po_amount, target_po_id
+      'Collected amount (%.2f) exceeds quotation amount (%.2f) for quotation %',
+      v_collected_total, v_amount, target_quotation_id
       USING ERRCODE = '23514';
   END IF;
 
-  UPDATE public.purchase_orders
+  UPDATE public.quotations
   SET recognized_amount = v_collected_total,
       payment_status = CASE
-        WHEN v_collected_total = 0          THEN 'unpaid'::payment_status_enum
-        WHEN v_collected_total < v_po_amount THEN 'partial'::payment_status_enum
+        WHEN v_collected_total = 0         THEN 'unpaid'::payment_status_enum
+        WHEN v_collected_total < v_amount  THEN 'partial'::payment_status_enum
         ELSE 'paid'::payment_status_enum
       END,
       updated_at = NOW()
-  WHERE id = target_po_id;
+  WHERE id = target_quotation_id;
 END;
 $$;
 
-CREATE OR REPLACE FUNCTION public.fn_sync_po_totals_from_payments()
+CREATE OR REPLACE FUNCTION public.fn_sync_quotation_totals_from_payments()
 RETURNS TRIGGER
 LANGUAGE plpgsql
 SECURITY DEFINER
 SET search_path = public
 AS $$
 BEGIN
-  PERFORM public.fn_refresh_po_payment_totals(COALESCE(NEW.po_id, OLD.po_id));
+  PERFORM public.fn_refresh_quotation_payment_totals(COALESCE(NEW.po_id, OLD.po_id));
   IF TG_OP = 'UPDATE' AND NEW.po_id IS DISTINCT FROM OLD.po_id THEN
-    PERFORM public.fn_refresh_po_payment_totals(OLD.po_id);
+    PERFORM public.fn_refresh_quotation_payment_totals(OLD.po_id);
   END IF;
   RETURN COALESCE(NEW, OLD);
 END;
 $$;
 
-DROP TRIGGER IF EXISTS trg_sync_po_totals_from_payments ON public.po_payments;
-CREATE TRIGGER trg_sync_po_totals_from_payments
+DROP TRIGGER IF EXISTS trg_sync_quotation_totals_from_payments ON public.po_payments;
+CREATE TRIGGER trg_sync_quotation_totals_from_payments
 AFTER INSERT OR UPDATE OR DELETE ON public.po_payments
-FOR EACH ROW EXECUTE FUNCTION public.fn_sync_po_totals_from_payments();
+FOR EACH ROW EXECUTE FUNCTION public.fn_sync_quotation_totals_from_payments();
 
 CREATE OR REPLACE FUNCTION public.fn_sync_quotation_status_from_approvals()
 RETURNS TRIGGER
@@ -524,6 +480,18 @@ BEGIN
       WHERE qa.quotation_id = qid AND qa.status = 'pending'
     ) THEN 'approved'::approval_status_enum
     ELSE 'pending'::approval_status_enum
+  END,
+  approved_at = CASE
+    WHEN q.approved_at IS NOT NULL THEN q.approved_at
+    WHEN EXISTS (
+      SELECT 1 FROM public.quotation_approvals qa
+      WHERE qa.quotation_id = qid AND qa.status = 'approved'
+    )
+    AND NOT EXISTS (
+      SELECT 1 FROM public.quotation_approvals qa
+      WHERE qa.quotation_id = qid AND qa.status IN ('pending', 'rejected')
+    ) THEN NOW()
+    ELSE q.approved_at
   END,
   updated_at = NOW()
   WHERE q.id = qid;
@@ -875,31 +843,6 @@ CREATE POLICY "sales_quotation_approvals_approver_update_own"
   USING (approver_id = auth.uid())
   WITH CHECK (approver_id = auth.uid());
 
--- Purchase orders: Sales full access
-CREATE POLICY "sales_purchase_orders_sales_all"
-  ON public.purchase_orders FOR ALL
-  USING (
-    EXISTS (
-      SELECT 1 FROM public.profiles p
-      WHERE p.id = auth.uid() AND p.department = 'sales' AND p.is_active = TRUE
-    )
-  )
-  WITH CHECK (
-    EXISTS (
-      SELECT 1 FROM public.profiles p
-      WHERE p.id = auth.uid() AND p.department = 'sales' AND p.is_active = TRUE
-    )
-  );
-
-CREATE POLICY "executive_purchase_orders_viewer_read"
-  ON public.purchase_orders FOR SELECT
-  USING (
-    EXISTS (
-      SELECT 1 FROM public.profiles p
-      WHERE p.id = auth.uid() AND p.is_executive_viewer = TRUE AND p.is_active = TRUE
-    )
-  );
-
 -- PO payments: Sales full access
 CREATE POLICY "sales_po_payments_sales_all"
   ON public.po_payments FOR ALL
@@ -920,9 +863,8 @@ CREATE POLICY "sales_po_payments_sales_all"
 -- ============================================================
 -- END OF SCHEMA
 -- ============================================================
--- Tables: 9 (profiles, audit_logs, clients, client_contacts,
---            quotations, quotation_approvals, purchase_orders,
---            po_payments, revenue_targets)
--- Views:  1 (vw_po_summary)
+-- Tables: 8 (profiles, audit_logs, clients, client_contacts,
+--            quotations, quotation_approvals, po_payments, revenue_targets)
 -- Modules: Auth/Profiles, Sales, Executive Dashboard
+-- Approved quotations serve as the canonical purchase-order record.
 -- ============================================================

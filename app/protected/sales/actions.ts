@@ -13,16 +13,10 @@ import {
 } from "@/lib/sales/clients";
 import {
   approveQuotationApproval,
-  createQuotationDraft,
-  parseQuotationAmount,
   rejectQuotationApproval,
   submitQuotationForApproval,
 } from "@/lib/sales/quotations";
-import {
-  addPoPayment,
-  createPurchaseOrder,
-  parsePoAmount,
-} from "@/lib/sales/purchase-orders";
+import { addPoPayment, parsePoAmount } from "@/lib/sales/purchase-orders";
 
 export type SalesActionResult = {
   ok: boolean;
@@ -144,29 +138,6 @@ export async function setPrimaryContactAction(formData: FormData): Promise<Sales
   }
 }
 
-export async function createQuotationDraftAction(formData: FormData): Promise<SalesActionResult> {
-  try {
-    const clientId = getRequiredString(formData, "clientId");
-    const subject = getRequiredString(formData, "subject");
-    const amount = parseQuotationAmount(formData.get("amount"));
-    const costRaw = String(formData.get("cost") ?? "").trim();
-    const cost = costRaw ? Number(costRaw) : null;
-    const notes = String(formData.get("notes") ?? "").trim() || null;
-
-    await createQuotationDraft({
-      clientId,
-      subject,
-      amount,
-      cost,
-      notes,
-    });
-
-    return { ok: true, error: null };
-  } catch (error) {
-    return actionFailure(error, "Failed to create quotation draft.");
-  }
-}
-
 export async function submitQuotationAction(formData: FormData): Promise<SalesActionResult> {
   try {
     const quotationId = getRequiredString(formData, "quotationId");
@@ -196,31 +167,6 @@ export async function rejectQuotationAction(formData: FormData): Promise<SalesAc
     return { ok: true, error: null };
   } catch (error) {
     return actionFailure(error, "Failed to reject quotation.");
-  }
-}
-
-export async function createPurchaseOrderAction(formData: FormData): Promise<SalesActionResult> {
-  try {
-    const clientId = getRequiredString(formData, "clientId");
-    const subject = getRequiredString(formData, "subject");
-    const poAmount = parsePoAmount(formData.get("poAmount"));
-    const paymentTermsDays = parsePaymentNetDays(formData.get("paymentTermsDays"));
-    const costRaw = String(formData.get("cost") ?? "").trim();
-    const cost = costRaw ? Number(costRaw) : null;
-    const notes = String(formData.get("notes") ?? "").trim() || null;
-
-    await createPurchaseOrder({
-      clientId,
-      subject,
-      poAmount,
-      cost,
-      paymentTermsDays,
-      notes,
-    });
-
-    return { ok: true, error: null };
-  } catch (error) {
-    return actionFailure(error, "Failed to create purchase order.");
   }
 }
 

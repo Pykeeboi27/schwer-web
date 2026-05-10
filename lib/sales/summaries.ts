@@ -44,7 +44,11 @@ export async function getSalesSummary(): Promise<SalesSummary> {
   const [{ count: totalClients, error: clientsError }, { data: poRows, error: poError }, draft, pending, approved, rejected] =
     await Promise.all([
       supabase.from("clients").select("id", { count: "exact", head: true }).eq("is_active", true),
-      supabase.from("purchase_orders").select("po_amount, recognized_amount"),
+      supabase
+        .from("quotations")
+        .select("amount, recognized_amount")
+        .eq("status", "approved")
+        .eq("phase", "sales"),
       getQuotationCountByStatus("draft"),
       getQuotationCountByStatus("pending"),
       getQuotationCountByStatus("approved"),
@@ -57,7 +61,7 @@ export async function getSalesSummary(): Promise<SalesSummary> {
 
   const totals = (poRows ?? []).reduce(
     (acc, row) => {
-      const poAmount = Number(row.po_amount ?? 0);
+      const poAmount = Number(row.amount ?? 0);
       const recognizedAmount = Number(row.recognized_amount ?? 0);
       return {
         closed: acc.closed + poAmount,

@@ -11,7 +11,7 @@ type PurchaseOrdersTableProps = {
   payments: SalesPoPayment[];
 };
 
-type SortBy = "poDate" | "poAmount";
+type SortBy = "approvedAt" | "poAmount";
 type SortDirection = "asc" | "desc";
 
 function formatCurrency(amount: number): string {
@@ -32,7 +32,9 @@ function sortedRows(
       return first.poAmount - second.poAmount;
     }
 
-    return new Date(first.poDate).getTime() - new Date(second.poDate).getTime();
+    const firstApproved = first.approvedAt ? new Date(first.approvedAt).getTime() : 0;
+    const secondApproved = second.approvedAt ? new Date(second.approvedAt).getTime() : 0;
+    return firstApproved - secondApproved;
   });
 
   if (sortDirection === "desc") {
@@ -56,7 +58,7 @@ export function PurchaseOrdersTable({
   purchaseOrders,
   payments,
 }: PurchaseOrdersTableProps) {
-  const [sortBy, setSortBy] = useState<SortBy>("poDate");
+  const [sortBy, setSortBy] = useState<SortBy>("approvedAt");
   const [sortDirection, setSortDirection] = useState<SortDirection>("desc");
   const [selectedPurchaseOrderId, setSelectedPurchaseOrderId] =
     useState<string | null>(null);
@@ -90,11 +92,11 @@ export function PurchaseOrdersTable({
         <span className="text-muted-foreground">Sort by:</span>
         <Button
           type="button"
-          variant={sortBy === "poDate" ? "default" : "outline"}
+          variant={sortBy === "approvedAt" ? "default" : "outline"}
           size="sm"
-          onClick={() => toggleSort("poDate")}
+          onClick={() => toggleSort("approvedAt")}
         >
-          Date {sortBy === "poDate" ? (sortDirection === "asc" ? "↑" : "↓") : ""}
+          Date {sortBy === "approvedAt" ? (sortDirection === "asc" ? "↑" : "↓") : ""}
         </Button>
         <Button
           type="button"
@@ -110,7 +112,7 @@ export function PurchaseOrdersTable({
         <table className="w-full min-w-[920px] text-sm">
           <thead className="bg-muted/40 text-left">
             <tr>
-              <th className="px-3 py-2 font-medium">PO #</th>
+              <th className="px-3 py-2 font-medium">Quotation #</th>
               <th className="px-3 py-2 font-medium">Client Name</th>
               <th className="px-3 py-2 font-medium">Total Amount</th>
               <th className="px-3 py-2 font-medium">Collected Amount</th>
@@ -125,9 +127,9 @@ export function PurchaseOrdersTable({
                 <td colSpan={7} className="px-3 py-10 text-center text-muted-foreground">
                   <div className="flex flex-col items-center gap-2">
                     <FileText className="h-5 w-5" aria-hidden="true" />
-                    <p className="font-medium text-foreground">No purchase orders found.</p>
+                    <p className="font-medium text-foreground">No purchase orders yet.</p>
                     <p className="text-xs text-muted-foreground">
-                      Create a purchase order to start tracking collections.
+                      Approved quotations will appear here for collection tracking.
                     </p>
                   </div>
                 </td>
@@ -172,7 +174,9 @@ export function PurchaseOrdersTable({
                     </td>
                     <td className="px-3 py-2">{purchaseOrder.paymentStatus}</td>
                     <td className="px-3 py-2">
-                      {new Date(purchaseOrder.poDate).toLocaleDateString()}
+                      {purchaseOrder.approvedAt
+                        ? new Date(purchaseOrder.approvedAt).toLocaleDateString()
+                        : "—"}
                     </td>
                   </tr>
                 );
