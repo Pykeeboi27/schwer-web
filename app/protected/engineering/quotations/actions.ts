@@ -43,11 +43,11 @@ export async function createCostingQuotationAction(
 ): Promise<ActionResponse<{ quotationId: string }>> {
   try {
     const clientId = asRequiredString(formData.get("clientId"), "Client");
-    const subject = asRequiredString(formData.get("subject"), "Subject");
+    const subject = asRequiredString(formData.get("subject"), "Subject").toUpperCase();
     const amount = parseCostingAmount(formData.get("amount"));
     const cost = parseCostingCost(formData.get("cost"));
     const googleDriveLink = ensureValidDriveLink(formData.get("googleDriveLink"));
-    const notes = asOptionalString(formData.get("notes"));
+    const notes = asOptionalString(formData.get("notes"))?.toUpperCase() ?? null;
 
     const result = await createCostingQuotation({
       clientId,
@@ -74,11 +74,11 @@ export async function updateCostingQuotationAction(
   try {
     const quotationId = asRequiredString(formData.get("quotationId"), "Quotation");
     const clientId = asRequiredString(formData.get("clientId"), "Client");
-    const subject = asRequiredString(formData.get("subject"), "Subject");
+    const subject = asRequiredString(formData.get("subject"), "Subject").toUpperCase();
     const amount = parseCostingAmount(formData.get("amount"));
     const cost = parseCostingCost(formData.get("cost"));
     const googleDriveLink = ensureValidDriveLink(formData.get("googleDriveLink"));
-    const notes = asOptionalString(formData.get("notes"));
+    const notes = asOptionalString(formData.get("notes"))?.toUpperCase() ?? null;
 
     await updateCostingQuotation({
       quotationId,

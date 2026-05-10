@@ -145,7 +145,7 @@ export async function rejectQuotationAction(
   userRole: string,
 ): Promise<ActionResponse<{ quotationId: string; role: RequiredApproverRole }>> {
   const normalizedQuotationId = String(quotationId ?? "").trim();
-  const normalizedReason = String(reason ?? "").trim();
+  const normalizedReason = String(reason ?? "").trim().toUpperCase();
   const role = normalizeRole(userRole);
 
   if (!normalizedQuotationId) {
@@ -235,12 +235,12 @@ export async function updateSalesQuotationDetailsAction(
     const rawMargin = String(formData.get("salesMarginPercent") ?? "").trim();
     const salesMarginPercent = rawMargin === "" ? null : parseSalesMarginPercent(rawMargin);
 
-    const paymentTerms = asOptionalString(formData.get("paymentTerms"));
+    const paymentTerms = asOptionalString(formData.get("paymentTerms"))?.toUpperCase() ?? null;
 
     const rawLeadTime = String(formData.get("leadTimeDays") ?? "").trim();
     const leadTimeDays = rawLeadTime === "" ? null : parseLeadTimeDays(rawLeadTime);
 
-    const notes = asOptionalString(formData.get("notes"));
+    const notes = asOptionalString(formData.get("notes"))?.toUpperCase() ?? null;
 
     await updateSalesQuotationDetails({
       quotationId,

@@ -43,7 +43,7 @@ export async function rejectCostingQuotationAction(
   reason: string,
 ): Promise<ActionResponse<{ quotationId: string }>> {
   const normalizedId = String(quotationId ?? "").trim();
-  const normalizedReason = String(reason ?? "").trim();
+  const normalizedReason = String(reason ?? "").trim().toUpperCase();
 
   if (!normalizedId) {
     return { success: false, error: "Quotation id is required." };
