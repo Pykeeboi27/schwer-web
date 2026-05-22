@@ -11,11 +11,33 @@ import { useMemo, useState, type KeyboardEvent } from "react";
 type PurchaseOrdersTableProps = {
   purchaseOrders: SalesPurchaseOrder[];
   payments: SalesPoPayment[];
+  currentUserId: string;
+  currentUserRole: string | null;
 };
 
 type SortBy = "approvedAt" | "poAmount";
 type SortDirection = "asc" | "desc";
-type PaymentStatusFilter = "all" | SalesPurchaseOrder["paymentStatus"];
+type ApprovalFilter = "all" | SalesPurchaseOrder["status"];
+
+const APPROVAL_LABELS: Record<SalesPurchaseOrder["status"], string> = {
+  pending: "Pending Approval",
+  approved: "Approved",
+  rejected: "Rejected",
+  cancelled: "Cancelled",
+};
+
+const APPROVAL_CLASSES: Record<SalesPurchaseOrder["status"], string> = {
+  pending: "border-amber-200 bg-amber-50 text-amber-700",
+  approved: "border-green-200 bg-green-50 text-green-700",
+  rejected: "border-red-200 bg-red-50 text-red-700",
+  cancelled: "border-gray-200 bg-gray-50 text-gray-500",
+};
+
+const ALL_APPROVAL_STATUSES: SalesPurchaseOrder["status"][] = [
+  "pending",
+  "approved",
+  "rejected",
+];
 
 const PAYMENT_STATUS_LABELS: Record<SalesPurchaseOrder["paymentStatus"], string> = {
   unpaid: "Unpaid",
@@ -31,13 +53,6 @@ const PAYMENT_STATUS_CLASSES: Record<SalesPurchaseOrder["paymentStatus"], string
   overdue: "border-red-200 bg-red-50 text-red-700",
 };
 
-const ALL_PAYMENT_STATUSES: SalesPurchaseOrder["paymentStatus"][] = [
-  "unpaid",
-  "partial",
-  "paid",
-  "overdue",
-];
-
 function formatCurrency(amount: number): string {
   return new Intl.NumberFormat("en-PH", {
     style: "currency",
@@ -50,6 +65,14 @@ function PaymentStatusBadge({ status }: { status: SalesPurchaseOrder["paymentSta
   return (
     <Badge className={PAYMENT_STATUS_CLASSES[status]} variant="outline">
       {PAYMENT_STATUS_LABELS[status]}
+    </Badge>
+  );
+}
+
+function ApprovalBadge({ status }: { status: SalesPurchaseOrder["status"] }) {
+  return (
+    <Badge className={APPROVAL_CLASSES[status]} variant="outline">
+      {APPROVAL_LABELS[status]}
     </Badge>
   );
 }
@@ -79,12 +102,17 @@ function onRowKeyDown(
   }
 }
 
-export function PurchaseOrdersTable({ purchaseOrders, payments }: PurchaseOrdersTableProps) {
+export function PurchaseOrdersTable({
+  purchaseOrders,
+  payments,
+  currentUserId,
+  currentUserRole,
+}: PurchaseOrdersTableProps) {
   const [sortBy, setSortBy] = useState<SortBy>("approvedAt");
   const [sortDirection, setSortDirection] = useState<SortDirection>("desc");
   const [selectedPurchaseOrderId, setSelectedPurchaseOrderId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
-  const [paymentStatusFilter, setPaymentStatusFilter] = useState<PaymentStatusFilter>("all");
+  const [approvalFilter, setApprovalFilter] = useState<ApprovalFilter>("all");
 
   const filteredAndSorted = useMemo(() => {
     const query = searchQuery.trim().toLowerCase();
@@ -99,12 +127,12 @@ export function PurchaseOrdersTable({ purchaseOrders, payments }: PurchaseOrders
       );
     }
 
-    if (paymentStatusFilter !== "all") {
-      filtered = filtered.filter((po) => po.paymentStatus === paymentStatusFilter);
+    if (approvalFilter !== "all") {
+      filtered = filtered.filter((po) => po.status === approvalFilter);
     }
 
     return sortedRows(filtered, sortBy, sortDirection);
-  }, [purchaseOrders, searchQuery, paymentStatusFilter, sortBy, sortDirection]);
+  }, [purchaseOrders, searchQuery, approvalFilter, sortBy, sortDirection]);
 
   const selectedPurchaseOrder = useMemo(() => {
     if (!selectedPurchaseOrderId) return null;
@@ -136,21 +164,21 @@ export function PurchaseOrdersTable({ purchaseOrders, payments }: PurchaseOrders
           <span className="text-xs text-muted-foreground">Filter:</span>
           <Button
             type="button"
-            variant={paymentStatusFilter === "all" ? "default" : "outline"}
+            variant={approvalFilter === "all" ? "default" : "outline"}
             size="sm"
-            onClick={() => setPaymentStatusFilter("all")}
+            onClick={() => setApprovalFilter("all")}
           >
             All
           </Button>
-          {ALL_PAYMENT_STATUSES.map((s) => (
+          {ALL_APPROVAL_STATUSES.map((s) => (
             <Button
               key={s}
               type="button"
-              variant={paymentStatusFilter === s ? "default" : "outline"}
+              variant={approvalFilter === s ? "default" : "outline"}
               size="sm"
-              onClick={() => setPaymentStatusFilter(s)}
+              onClick={() => setApprovalFilter(s)}
             >
-              {PAYMENT_STATUS_LABELS[s]}
+              {APPROVAL_LABELS[s]}
             </Button>
           ))}
           <span className="ml-2 text-xs text-muted-foreground">Sort:</span>
@@ -182,21 +210,22 @@ export function PurchaseOrdersTable({ purchaseOrders, payments }: PurchaseOrders
               <th className="px-3 py-2 font-medium">Total Amount</th>
               <th className="px-3 py-2 font-medium">Collected Amount</th>
               <th className="px-3 py-2 font-medium">Progress</th>
-              <th className="px-3 py-2 font-medium">Status</th>
+              <th className="px-3 py-2 font-medium">Approval</th>
+              <th className="px-3 py-2 font-medium">Payment</th>
               <th className="px-3 py-2 font-medium">Date</th>
             </tr>
           </thead>
           <tbody>
             {filteredAndSorted.length === 0 ? (
               <tr>
-                <td colSpan={7} className="px-3 py-10 text-center text-muted-foreground">
+                <td colSpan={8} className="px-3 py-10 text-center text-muted-foreground">
                   <div className="flex flex-col items-center gap-2">
                     <FileText className="h-5 w-5" aria-hidden="true" />
                     <p className="font-medium text-foreground">No purchase orders found.</p>
                     <p className="text-xs text-muted-foreground">
-                      {searchQuery || paymentStatusFilter !== "all"
+                      {searchQuery || approvalFilter !== "all"
                         ? "Try adjusting your search or filter."
-                        : "Approved quotations will appear here for collection tracking."}
+                        : "Convert an approved quotation to create a purchase order."}
                     </p>
                   </div>
                 </td>
@@ -241,6 +270,9 @@ export function PurchaseOrdersTable({ purchaseOrders, payments }: PurchaseOrders
                       </div>
                     </td>
                     <td className="px-3 py-2">
+                      <ApprovalBadge status={purchaseOrder.status} />
+                    </td>
+                    <td className="px-3 py-2">
                       <PaymentStatusBadge status={purchaseOrder.paymentStatus} />
                     </td>
                     <td className="px-3 py-2">
@@ -260,6 +292,8 @@ export function PurchaseOrdersTable({ purchaseOrders, payments }: PurchaseOrders
         open={selectedPurchaseOrder !== null}
         purchaseOrder={selectedPurchaseOrder}
         payments={payments}
+        currentUserId={currentUserId}
+        currentUserRole={currentUserRole}
         onOpenChange={(open) => {
           if (!open) setSelectedPurchaseOrderId(null);
         }}

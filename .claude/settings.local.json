@@ -21,7 +21,12 @@
       "mcp__supabase__list_migrations",
       "Bash(git check-ignore *)",
       "Bash(git add *)",
-      "Bash(git commit *)"
+      "Bash(git commit *)",
+      "mcp__supabase__list_tables",
+      "Bash(node -e \"const p=require\\('./package.json'\\); console.log\\(JSON.stringify\\({...p.dependencies,...p.devDependencies},null,1\\)\\)\")",
+      "Bash(findstr /i \"chart recharts d3 victory\")",
+      "Bash(npx eslint *)",
+      "Bash(findstr /i client)"
     ]
   },
   "enableAllProjectMcpServers": true,

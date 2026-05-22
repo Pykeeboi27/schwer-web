@@ -22,6 +22,8 @@ type ClientFormValues = {
   email: string;
   phone: string;
   address: string;
+  tin: string;
+  birRegistrationLink: string;
   sector: "commercial" | "industrial" | "solar";
 };
 
@@ -32,6 +34,8 @@ function toFormValues(client: SalesClient): ClientFormValues {
     email: client.email ?? "",
     phone: client.phone ?? "",
     address: client.address ?? "",
+    tin: client.tin ?? "",
+    birRegistrationLink: client.birRegistrationLink ?? "",
     sector: client.sector,
   };
 }
@@ -54,6 +58,8 @@ export function ClientDetailsDialog({
     email: "",
     phone: "",
     address: "",
+    tin: "",
+    birRegistrationLink: "",
     sector: "commercial",
   });
 
@@ -110,6 +116,8 @@ export function ClientDetailsDialog({
     formData.set("email", formValues.email);
     formData.set("phone", formValues.phone);
     formData.set("address", formValues.address);
+    formData.set("tin", formValues.tin);
+    formData.set("birRegistrationLink", formValues.birRegistrationLink);
     formData.set("sector", formValues.sector);
     formData.set("paymentTermsDays", String(client.paymentTermsDays));
 
@@ -251,6 +259,37 @@ export function ClientDetailsDialog({
               />
             </div>
 
+            <div className="grid gap-4 md:grid-cols-2">
+              <div>
+                <Label htmlFor="client-tin">TIN</Label>
+                <Input
+                  id="client-tin"
+                  value={formValues.tin}
+                  onChange={(event) =>
+                    setFormValues((current) => ({ ...current, tin: event.target.value }))
+                  }
+                  className="mt-1"
+                  placeholder="000-000-000-000"
+                />
+              </div>
+              <div>
+                <Label htmlFor="client-bir">BIR Registration Link</Label>
+                <Input
+                  id="client-bir"
+                  type="url"
+                  value={formValues.birRegistrationLink}
+                  onChange={(event) =>
+                    setFormValues((current) => ({
+                      ...current,
+                      birRegistrationLink: event.target.value,
+                    }))
+                  }
+                  className="mt-1"
+                  placeholder="https://drive.google.com/..."
+                />
+              </div>
+            </div>
+
             {formError ? <p className="text-sm text-destructive">{formError}</p> : null}
 
             <div className="flex justify-end gap-2">
@@ -291,6 +330,27 @@ export function ClientDetailsDialog({
             <div className="grid grid-cols-[140px_1fr] gap-2">
               <dt className="text-muted-foreground">Address</dt>
               <dd>{client.address ?? "Not provided"}</dd>
+            </div>
+            <div className="grid grid-cols-[140px_1fr] gap-2">
+              <dt className="text-muted-foreground">TIN</dt>
+              <dd>{client.tin ?? "Not provided"}</dd>
+            </div>
+            <div className="grid grid-cols-[140px_1fr] gap-2">
+              <dt className="text-muted-foreground">BIR Registration</dt>
+              <dd>
+                {client.birRegistrationLink ? (
+                  <a
+                    href={client.birRegistrationLink}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-primary underline underline-offset-2 break-all"
+                  >
+                    View document
+                  </a>
+                ) : (
+                  "Not provided"
+                )}
+              </dd>
             </div>
             <div className="grid grid-cols-[140px_1fr] gap-2">
               <dt className="text-muted-foreground">Created</dt>

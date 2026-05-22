@@ -15,6 +15,8 @@ function buildClients(count: number): SalesClient[] {
     email: `client${index + 1}@example.com`,
     phone: "0917 555 1234",
     address: "Makati City",
+    tin: null,
+    birRegistrationLink: null,
     notes: null,
     isActive: true,
     createdAt: new Date(2026, 3, 5, 10, 0, 0).toISOString(),

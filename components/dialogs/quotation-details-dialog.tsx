@@ -2,6 +2,8 @@
 
 import {
   approveQuotationAction,
+  convertToPurchaseOrderAction,
+  markClientPoReceivedAction,
   rejectQuotationAction,
   submitQuotationForApprovalAction,
   updateSalesQuotationDetailsAction,
@@ -9,7 +11,10 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { NumberInput } from "@/components/ui/number-input";
+import { computeSalesPricing } from "@/lib/sales/pricing";
 import type { SalesQuotation } from "@/lib/sales/quotations";
+import { formatCurrency } from "@/lib/utils/number-format";
 import { useToast } from "@/lib/utils/toast-notification";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
@@ -22,13 +27,15 @@ type QuotationDetailsDialogProps = {
   currentUserRole: string | null;
 };
 
-function formatCurrency(amount: number): string {
-  return new Intl.NumberFormat("en-PH", {
-    style: "currency",
-    currency: "PHP",
-    maximumFractionDigits: 2,
-  }).format(amount);
-}
+const PAYMENT_TERMS_OPTIONS = [
+  "50% Down Payment, 50% Upon Delivery",
+  "15 Days",
+  "30 Days",
+  "Other",
+] as const;
+
+const textareaClassName =
+  "mt-1 flex w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50";
 
 function formatPercent(value: number | null): string {
   if (value === null) {
@@ -83,10 +90,15 @@ export function QuotationDetailsDialog({
   const { success, error } = useToast();
   const [rejectionReason, setRejectionReason] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [marginPercent, setMarginPercent] = useState("");
-  const [paymentTerms, setPaymentTerms] = useState("");
+  const [marginPercentage, setMarginPercentage] = useState("");
+  const [bankPercentage, setBankPercentage] = useState("");
+  const [sopPercentage, setSopPercentage] = useState("");
+  const [googleDriveLink, setGoogleDriveLink] = useState("");
+  const [paymentTermsSelect, setPaymentTermsSelect] = useState("");
+  const [paymentTermsCustom, setPaymentTermsCustom] = useState("");
   const [leadTimeDays, setLeadTimeDays] = useState("");
   const [notes, setNotes] = useState("");
+  const [clientPoNumber, setClientPoNumber] = useState("");
 
   const normalizedRole = useMemo(
     () => String(currentUserRole ?? "").trim().toLowerCase(),
@@ -96,6 +108,14 @@ export function QuotationDetailsDialog({
   void currentUserId;
 
   const isDraft = quotation?.status === "draft";
+  const isApproved = quotation?.status === "approved";
+  const isConverted = Boolean(quotation?.convertedPoId);
+  const isClientConfirmed = Boolean(quotation?.clientConfirmedAt);
+  // Approved + client provided their PO + not yet converted -> re-open for editing.
+  const isReopenedForPo = isApproved && isClientConfirmed && !isConverted;
+  // Approved but client PO not yet recorded -> offer the "client confirmed" step.
+  const canEnterClientPo = isApproved && !isClientConfirmed && !isConverted;
+  const isEditable = isDraft || isReopenedForPo;
 
   const canApproveReject =
     quotation?.status === "pending" &&
@@ -118,14 +138,38 @@ export function QuotationDetailsDialog({
       return;
     }
 
-    setMarginPercent(
-      quotation.salesMarginPercent === null ? "" : String(quotation.salesMarginPercent),
+    setMarginPercentage(
+      quotation.marginPercentage === null ? "" : String(quotation.marginPercentage),
     );
-    setPaymentTerms(quotation.paymentTerms ?? "");
+    setBankPercentage(
+      quotation.bankPercentage === null ? "" : String(quotation.bankPercentage),
+    );
+    setSopPercentage(
+      quotation.sopPercentage === null ? "" : String(quotation.sopPercentage),
+    );
+    setGoogleDriveLink(quotation.googleDriveLink ?? "");
+
+    // Map the stored payment terms back onto the dropdown + custom field.
+    const storedTerms = quotation.paymentTerms ?? "";
+    if (
+      storedTerms !== "" &&
+      !PAYMENT_TERMS_OPTIONS.includes(storedTerms as (typeof PAYMENT_TERMS_OPTIONS)[number])
+    ) {
+      setPaymentTermsSelect("Other");
+      setPaymentTermsCustom(quotation.paymentTermsCustom ?? storedTerms);
+    } else if (storedTerms === "Other") {
+      setPaymentTermsSelect("Other");
+      setPaymentTermsCustom(quotation.paymentTermsCustom ?? "");
+    } else {
+      setPaymentTermsSelect(storedTerms);
+      setPaymentTermsCustom("");
+    }
+
     setLeadTimeDays(
       quotation.leadTimeDays === null ? "" : String(quotation.leadTimeDays),
     );
     setNotes(quotation.notes ?? "");
+    setClientPoNumber(quotation.clientPoNumber ?? "");
   }, [quotation, open]);
 
   useEffect(() => {
@@ -151,21 +195,39 @@ export function QuotationDetailsDialog({
     return null;
   }
 
+  const directCost = quotation.cost ?? 0;
+  const pricing = computeSalesPricing({
+    directCost,
+    marginPercentage: Number(marginPercentage) || 0,
+    bankPercentage: Number(bankPercentage) || 0,
+    sopPercentage: Number(sopPercentage) || 0,
+  });
+
+  const paymentTermsResolved =
+    paymentTermsSelect === "Other" ? paymentTermsCustom.trim() : paymentTermsSelect.trim();
+
   const salesDetailsComplete =
-    marginPercent.trim() !== "" &&
-    paymentTerms.trim() !== "" &&
+    marginPercentage.trim() !== "" &&
+    paymentTermsResolved !== "" &&
     leadTimeDays.trim() !== "";
 
   const handleSaveSalesDetails = async () => {
-    const trimmedMargin = marginPercent.trim();
-    const trimmedPaymentTerms = paymentTerms.trim();
+    const trimmedMargin = marginPercentage.trim();
+    const trimmedBank = bankPercentage.trim();
+    const trimmedSop = sopPercentage.trim();
     const trimmedLeadTime = leadTimeDays.trim();
 
-    if (trimmedMargin !== "") {
-      const margin = Number(trimmedMargin);
-      if (!Number.isFinite(margin) || margin < 0 || margin > 100) {
-        error("Margin must be between 0 and 100.");
-        return;
+    for (const [label, raw] of [
+      ["Margin", trimmedMargin],
+      ["Bank", trimmedBank],
+      ["SOP", trimmedSop],
+    ] as const) {
+      if (raw !== "") {
+        const value = Number(raw);
+        if (!Number.isFinite(value) || value < 0) {
+          error(`${label} percentage must be 0 or greater.`);
+          return;
+        }
       }
     }
 
@@ -177,12 +239,21 @@ export function QuotationDetailsDialog({
       }
     }
 
+    if (paymentTermsSelect === "Other" && paymentTermsCustom.trim() === "") {
+      error("Please enter the custom payment terms.");
+      return;
+    }
+
     setIsSubmitting(true);
 
     const formData = new FormData();
     formData.set("quotationId", quotation.id);
-    formData.set("salesMarginPercent", trimmedMargin);
-    formData.set("paymentTerms", trimmedPaymentTerms);
+    formData.set("marginPercentage", trimmedMargin);
+    formData.set("bankPercentage", trimmedBank);
+    formData.set("sopPercentage", trimmedSop);
+    formData.set("googleDriveLink", googleDriveLink.trim());
+    formData.set("paymentTerms", paymentTermsSelect.trim());
+    formData.set("paymentTermsCustom", paymentTermsCustom.trim());
     formData.set("leadTimeDays", trimmedLeadTime);
     formData.set("notes", notes.trim());
 
@@ -214,6 +285,40 @@ export function QuotationDetailsDialog({
     }
 
     success("Quotation submitted for approval.");
+    handleClose();
+    router.refresh();
+    setIsSubmitting(false);
+  };
+
+  const handleMarkClientPo = async () => {
+    if (clientPoNumber.trim() === "") {
+      error("Enter the client's PO number.");
+      return;
+    }
+
+    setIsSubmitting(true);
+    const response = await markClientPoReceivedAction(quotation.id, clientPoNumber.trim());
+    if (!response.success) {
+      error(response.error ?? "Failed to record the client PO.");
+      setIsSubmitting(false);
+      return;
+    }
+
+    success("Client PO recorded. The quotation is re-opened for editing.");
+    setIsSubmitting(false);
+    router.refresh();
+  };
+
+  const handleConvertToPo = async () => {
+    setIsSubmitting(true);
+    const response = await convertToPurchaseOrderAction(quotation.id);
+    if (!response.success) {
+      error(response.error ?? "Failed to convert to purchase order.");
+      setIsSubmitting(false);
+      return;
+    }
+
+    success("Converted to a purchase order and sent for approval.");
     handleClose();
     router.refresh();
     setIsSubmitting(false);
@@ -300,15 +405,15 @@ export function QuotationDetailsDialog({
             <dd>{quotation.subject}</dd>
           </div>
           <div className="grid grid-cols-[160px_1fr] gap-2">
-            <dt className="text-muted-foreground">Amount</dt>
+            <dt className="text-muted-foreground">Direct Cost</dt>
+            <dd>{quotation.cost === null ? "—" : formatCurrency(quotation.cost)}</dd>
+          </div>
+          <div className="grid grid-cols-[160px_1fr] gap-2">
+            <dt className="text-muted-foreground">Selling Amount</dt>
             <dd>{formatCurrency(quotation.amount)}</dd>
           </div>
           <div className="grid grid-cols-[160px_1fr] gap-2">
-            <dt className="text-muted-foreground">Cost</dt>
-            <dd>{quotation.cost === null ? "-" : formatCurrency(quotation.cost)}</dd>
-          </div>
-          <div className="grid grid-cols-[160px_1fr] gap-2">
-            <dt className="text-muted-foreground">Computed Margin</dt>
+            <dt className="text-muted-foreground">Overall Margin</dt>
             <dd>{computedMarginPercent(quotation.amount, quotation.cost)}</dd>
           </div>
           <div className="grid grid-cols-[160px_1fr] gap-2">
@@ -325,28 +430,74 @@ export function QuotationDetailsDialog({
           </div>
         </dl>
 
-        {isDraft ? (
-          <div className="mt-5 space-y-3 rounded-md border bg-muted/20 p-4 text-sm">
-            <h3 className="text-base font-semibold">Sales Details</h3>
-            <p className="text-xs text-muted-foreground">
-              All three fields are required before this quotation can be submitted for approval.
-            </p>
+        {isEditable ? (
+          <div className="mt-5 space-y-4 rounded-md border bg-muted/20 p-4 text-sm">
+            <div>
+              <h3 className="text-base font-semibold">Sales Pricing</h3>
+              <p className="text-xs text-muted-foreground">
+                {isReopenedForPo
+                  ? "Re-opened after the client provided their PO. Adjust the pricing, then convert to a purchase order."
+                  : "Amounts are computed automatically from the direct cost. Margin, payment terms, and lead time are required before submitting for approval."}
+              </p>
+            </div>
 
-            <div className="grid gap-3 md:grid-cols-2">
+            <div className="grid grid-cols-[160px_1fr] items-center gap-2">
+              <Label className="text-muted-foreground">Direct Cost</Label>
+              <span className="font-medium">{formatCurrency(directCost)}</span>
+            </div>
+
+            {/* Percentage inputs with live, read-only computed amounts. */}
+            <div className="grid gap-3 sm:grid-cols-2">
               <div>
-                <Label htmlFor="sales-margin-percent">Sales Margin %</Label>
-                <Input
+                <Label htmlFor="sales-margin-percent">Margin %</Label>
+                <NumberInput
                   id="sales-margin-percent"
-                  type="number"
-                  min={0}
-                  max={100}
-                  step="0.01"
-                  value={marginPercent}
-                  onChange={(event) => setMarginPercent(event.target.value)}
+                  value={marginPercentage}
+                  onValueChange={setMarginPercentage}
                   className="mt-1"
                   placeholder="e.g. 25"
                 />
               </div>
+              <div>
+                <Label>Margin Amount</Label>
+                <Input value={formatCurrency(pricing.marginAmount)} readOnly className="mt-1 bg-muted/40" />
+              </div>
+              <div>
+                <Label htmlFor="sales-bank-percent">Bank %</Label>
+                <NumberInput
+                  id="sales-bank-percent"
+                  value={bankPercentage}
+                  onValueChange={setBankPercentage}
+                  className="mt-1"
+                  placeholder="e.g. 3"
+                />
+              </div>
+              <div>
+                <Label>Bank Amount</Label>
+                <Input value={formatCurrency(pricing.bankAmount)} readOnly className="mt-1 bg-muted/40" />
+              </div>
+              <div>
+                <Label htmlFor="sales-sop-percent">SOP %</Label>
+                <NumberInput
+                  id="sales-sop-percent"
+                  value={sopPercentage}
+                  onValueChange={setSopPercentage}
+                  className="mt-1"
+                  placeholder="e.g. 5"
+                />
+              </div>
+              <div>
+                <Label>SOP Amount</Label>
+                <Input value={formatCurrency(pricing.sopAmount)} readOnly className="mt-1 bg-muted/40" />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-[160px_1fr] items-center gap-2 border-t pt-3">
+              <Label className="font-semibold">Selling Amount</Label>
+              <span className="text-base font-semibold">{formatCurrency(pricing.sellingAmount)}</span>
+            </div>
+
+            <div className="grid gap-3 sm:grid-cols-2">
               <div>
                 <Label htmlFor="sales-lead-time">Lead Time (days)</Label>
                 <Input
@@ -360,51 +511,165 @@ export function QuotationDetailsDialog({
                   placeholder="e.g. 30"
                 />
               </div>
+              <div>
+                <Label htmlFor="sales-payment-terms">Payment Terms</Label>
+                <select
+                  id="sales-payment-terms"
+                  value={paymentTermsSelect}
+                  onChange={(event) => setPaymentTermsSelect(event.target.value)}
+                  className="mt-1 flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm"
+                >
+                  <option value="">Select payment terms</option>
+                  {PAYMENT_TERMS_OPTIONS.map((option) => (
+                    <option key={option} value={option}>
+                      {option}
+                    </option>
+                  ))}
+                </select>
+              </div>
             </div>
 
+            {paymentTermsSelect === "Other" ? (
+              <div>
+                <Label htmlFor="sales-payment-terms-custom">Custom Payment Terms</Label>
+                <textarea
+                  id="sales-payment-terms-custom"
+                  rows={2}
+                  value={paymentTermsCustom}
+                  onChange={(event) => setPaymentTermsCustom(event.target.value)}
+                  className={textareaClassName}
+                  placeholder="Describe the agreed payment terms"
+                />
+              </div>
+            ) : null}
+
             <div>
-              <Label htmlFor="sales-payment-terms">Payment Terms</Label>
+              <Label htmlFor="sales-drive-link">Google Drive Link</Label>
               <Input
-                id="sales-payment-terms"
-                value={paymentTerms}
-                onChange={(event) => setPaymentTerms(event.target.value)}
+                id="sales-drive-link"
+                type="url"
+                value={googleDriveLink}
+                onChange={(event) => setGoogleDriveLink(event.target.value)}
                 className="mt-1"
-                placeholder="e.g. Net 30"
+                placeholder="https://drive.google.com/..."
               />
             </div>
 
             <div>
-              <Label htmlFor="sales-notes">Notes</Label>
-              <Input
+              <Label htmlFor="sales-notes">Comments</Label>
+              <textarea
                 id="sales-notes"
+                rows={3}
                 value={notes}
                 onChange={(event) => setNotes(event.target.value)}
-                className="mt-1"
+                className={textareaClassName}
+                placeholder="Add any commercial notes or comments (optional)"
               />
             </div>
           </div>
         ) : (
           <dl className="mt-5 grid gap-3 rounded-md border bg-muted/20 p-4 text-sm">
             <div className="grid grid-cols-[160px_1fr] gap-2">
-              <dt className="text-muted-foreground">Sales Margin %</dt>
-              <dd>{formatPercent(quotation.salesMarginPercent)}</dd>
+              <dt className="text-muted-foreground">Margin</dt>
+              <dd>
+                {formatPercent(quotation.marginPercentage)}
+                {quotation.marginAmount !== null
+                  ? ` · ${formatCurrency(quotation.marginAmount)}`
+                  : ""}
+              </dd>
+            </div>
+            <div className="grid grid-cols-[160px_1fr] gap-2">
+              <dt className="text-muted-foreground">Bank</dt>
+              <dd>
+                {formatPercent(quotation.bankPercentage)}
+                {quotation.bankAmount !== null
+                  ? ` · ${formatCurrency(quotation.bankAmount)}`
+                  : ""}
+              </dd>
+            </div>
+            <div className="grid grid-cols-[160px_1fr] gap-2">
+              <dt className="text-muted-foreground">SOP</dt>
+              <dd>
+                {formatPercent(quotation.sopPercentage)}
+                {quotation.sopAmount !== null
+                  ? ` · ${formatCurrency(quotation.sopAmount)}`
+                  : ""}
+              </dd>
             </div>
             <div className="grid grid-cols-[160px_1fr] gap-2">
               <dt className="text-muted-foreground">Payment Terms</dt>
-              <dd>{quotation.paymentTerms ?? "—"}</dd>
+              <dd>
+                {quotation.paymentTerms === "Other"
+                  ? quotation.paymentTermsCustom ?? "Other"
+                  : quotation.paymentTerms ?? "—"}
+              </dd>
             </div>
             <div className="grid grid-cols-[160px_1fr] gap-2">
               <dt className="text-muted-foreground">Lead Time</dt>
               <dd>{formatLeadTime(quotation.leadTimeDays)}</dd>
             </div>
+            {quotation.googleDriveLink ? (
+              <div className="grid grid-cols-[160px_1fr] gap-2">
+                <dt className="text-muted-foreground">Google Drive</dt>
+                <dd>
+                  <a
+                    href={quotation.googleDriveLink}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="text-primary hover:underline"
+                  >
+                    Open link
+                  </a>
+                </dd>
+              </div>
+            ) : null}
             {quotation.notes ? (
               <div className="grid grid-cols-[160px_1fr] gap-2">
-                <dt className="text-muted-foreground">Notes</dt>
+                <dt className="text-muted-foreground">Comments</dt>
                 <dd>{quotation.notes}</dd>
               </div>
             ) : null}
           </dl>
         )}
+
+        {canEnterClientPo ? (
+          <div className="mt-5 space-y-3 rounded-md border border-blue-200 bg-blue-50/50 p-4 text-sm">
+            <div>
+              <h3 className="text-base font-semibold">Client Confirmed?</h3>
+              <p className="text-xs text-muted-foreground">
+                When the client confirms and provides their PO, record it here to re-open the
+                quotation for editing before converting it to a purchase order.
+              </p>
+            </div>
+            <div>
+              <Label htmlFor="client-po-number">Client PO Number</Label>
+              <Input
+                id="client-po-number"
+                value={clientPoNumber}
+                onChange={(event) => setClientPoNumber(event.target.value)}
+                className="mt-1"
+                placeholder="e.g. PO-2026-0142"
+              />
+            </div>
+          </div>
+        ) : null}
+
+        {isReopenedForPo ? (
+          <div className="mt-4 rounded-md border bg-muted/20 p-3 text-xs text-muted-foreground">
+            Client PO <span className="font-medium text-foreground">{quotation.clientPoNumber}</span>{" "}
+            recorded. Adjust the pricing above if needed, then convert to a purchase order.
+          </div>
+        ) : null}
+
+        {isConverted ? (
+          <div className="mt-4 rounded-md border border-green-200 bg-green-50 p-3 text-sm text-green-800">
+            Converted to a purchase order
+            {quotation.poConvertedAt
+              ? ` on ${new Date(quotation.poConvertedAt).toLocaleDateString()}`
+              : ""}
+            . Track its approval and collections in the Purchase Orders module.
+          </div>
+        ) : null}
 
         {canApproveReject ? (
           <div className="mt-4 space-y-3">
@@ -428,6 +693,26 @@ export function QuotationDetailsDialog({
                 disabled={isSubmitting || !salesDetailsComplete}
               >
                 {isSubmitting ? "Submitting..." : "Submit for Approval"}
+              </Button>
+            </>
+          ) : null}
+
+          {canEnterClientPo ? (
+            <Button onClick={handleMarkClientPo} disabled={isSubmitting}>
+              {isSubmitting ? "Saving..." : "Record Client PO"}
+            </Button>
+          ) : null}
+
+          {isReopenedForPo ? (
+            <>
+              <Button variant="outline" onClick={handleSaveSalesDetails} disabled={isSubmitting}>
+                {isSubmitting ? "Saving..." : "Save Changes"}
+              </Button>
+              <Button
+                onClick={handleConvertToPo}
+                disabled={isSubmitting || !salesDetailsComplete}
+              >
+                {isSubmitting ? "Converting..." : "Convert to Purchase Order"}
               </Button>
             </>
           ) : null}

@@ -2,8 +2,11 @@
 
 import {
   addPoPayment,
+  approvePoApproval,
   fetchPurchaseOrders,
+  findPendingPoApprovalForRole,
   parsePoAmount,
+  rejectPoApproval,
   type SalesPurchaseOrder,
 } from "@/lib/sales/purchase-orders";
 import { revalidatePath } from "next/cache";
@@ -14,11 +17,21 @@ type ActionResponse<T> = {
   error?: string;
 };
 
+type RequiredApproverRole = "sales_manager" | "owner" | "executive";
+
+function normalizeRole(role: string | undefined): RequiredApproverRole | null {
+  const normalized = String(role ?? "").trim().toLowerCase();
+  if (normalized === "sales_manager" || normalized === "owner" || normalized === "executive") {
+    return normalized;
+  }
+  return null;
+}
+
 export async function recordCollectionAction(
-  poId: string,
+  purchaseOrderId: string,
   amount: number,
 ): Promise<ActionResponse<{ poId: string }>> {
-  const normalizedPoId = String(poId ?? "").trim();
+  const normalizedPoId = String(purchaseOrderId ?? "").trim();
 
   if (!normalizedPoId) {
     return {
@@ -31,7 +44,7 @@ export async function recordCollectionAction(
     const normalizedAmount = parsePoAmount(amount);
 
     await addPoPayment({
-      poId: normalizedPoId,
+      purchaseOrderId: normalizedPoId,
       amountCollected: normalizedAmount,
     });
 
@@ -45,6 +58,81 @@ export async function recordCollectionAction(
     return {
       success: false,
       error: error instanceof Error ? error.message : "Failed to record collection.",
+    };
+  }
+}
+
+export async function approvePurchaseOrderAction(
+  poId: string,
+  userRole: string,
+): Promise<ActionResponse<{ poId: string }>> {
+  const normalizedPoId = String(poId ?? "").trim();
+  const role = normalizeRole(userRole);
+
+  if (!normalizedPoId) {
+    return { success: false, error: "Purchase order id is required." };
+  }
+  if (!role) {
+    return { success: false, error: "A valid approver role is required." };
+  }
+
+  try {
+    const pending = await findPendingPoApprovalForRole({ poId: normalizedPoId, role });
+    if (!pending) {
+      return { success: false, error: "No pending PO approval was found for your role." };
+    }
+
+    await approvePoApproval({ poId: normalizedPoId, approvalId: pending.approvalId });
+    revalidatePath("/protected/sales/purchase-orders");
+    revalidatePath("/protected/executive/approvals");
+
+    return { success: true, data: { poId: normalizedPoId } };
+  } catch (error) {
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Failed to approve purchase order.",
+    };
+  }
+}
+
+export async function rejectPurchaseOrderAction(
+  poId: string,
+  reason: string,
+  userRole: string,
+): Promise<ActionResponse<{ poId: string }>> {
+  const normalizedPoId = String(poId ?? "").trim();
+  const normalizedReason = String(reason ?? "").trim().toUpperCase();
+  const role = normalizeRole(userRole);
+
+  if (!normalizedPoId) {
+    return { success: false, error: "Purchase order id is required." };
+  }
+  if (!normalizedReason) {
+    return { success: false, error: "Rejection reason is required." };
+  }
+  if (!role) {
+    return { success: false, error: "A valid approver role is required." };
+  }
+
+  try {
+    const pending = await findPendingPoApprovalForRole({ poId: normalizedPoId, role });
+    if (!pending) {
+      return { success: false, error: "No pending PO approval was found for your role." };
+    }
+
+    await rejectPoApproval({
+      poId: normalizedPoId,
+      approvalId: pending.approvalId,
+      reason: normalizedReason,
+    });
+    revalidatePath("/protected/sales/purchase-orders");
+    revalidatePath("/protected/executive/approvals");
+
+    return { success: true, data: { poId: normalizedPoId } };
+  } catch (error) {
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Failed to reject purchase order.",
     };
   }
 }

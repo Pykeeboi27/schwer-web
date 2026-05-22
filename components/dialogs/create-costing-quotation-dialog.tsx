@@ -4,6 +4,7 @@ import { createCostingQuotationAction } from "@/app/protected/engineering/quotat
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { NumberInput } from "@/components/ui/number-input";
 import { useToast } from "@/lib/utils/toast-notification";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
@@ -21,7 +22,6 @@ type CreateCostingQuotationDialogProps = {
 type FieldErrors = {
   clientId?: string;
   subject?: string;
-  amount?: string;
   cost?: string;
   googleDriveLink?: string;
 };
@@ -82,21 +82,15 @@ export function CreateCostingQuotationDialog({ clients }: CreateCostingQuotation
 
     const clientId = String(formData.get("clientId") ?? "").trim();
     const subject = String(formData.get("subject") ?? "").trim();
-    const amountText = String(formData.get("amount") ?? "").trim();
     const costText = String(formData.get("cost") ?? "").trim();
     const driveLink = String(formData.get("googleDriveLink") ?? "").trim();
 
     if (!clientId) nextErrors.clientId = "Client is required.";
     if (!subject) nextErrors.subject = "Subject is required.";
 
-    const amount = Number(amountText);
-    if (!amountText || !Number.isFinite(amount) || amount <= 0) {
-      nextErrors.amount = "Amount must be greater than 0.";
-    }
-
     const cost = Number(costText);
     if (!costText || !Number.isFinite(cost) || cost < 0) {
-      nextErrors.cost = "Cost must be 0 or greater.";
+      nextErrors.cost = "Direct cost must be 0 or greater.";
     }
 
     if (!driveLink) {
@@ -200,32 +194,11 @@ export function CreateCostingQuotationDialog({ clients }: CreateCostingQuotation
                 ) : null}
               </div>
 
-              <div>
-                <Label htmlFor="costing-amount">Amount</Label>
-                <Input
-                  id="costing-amount"
-                  name="amount"
-                  type="number"
-                  min={0.01}
-                  step="0.01"
-                  required
-                  aria-invalid={Boolean(fieldErrors.amount)}
-                  className="mt-1"
-                  placeholder="0.00"
-                />
-                {fieldErrors.amount ? (
-                  <p className="mt-1 text-xs text-destructive">{fieldErrors.amount}</p>
-                ) : null}
-              </div>
-
-              <div>
-                <Label htmlFor="costing-cost">Cost</Label>
-                <Input
+              <div className="md:col-span-2">
+                <Label htmlFor="costing-cost">Direct Cost</Label>
+                <NumberInput
                   id="costing-cost"
                   name="cost"
-                  type="number"
-                  min={0}
-                  step="0.01"
                   required
                   aria-invalid={Boolean(fieldErrors.cost)}
                   className="mt-1"
@@ -253,12 +226,13 @@ export function CreateCostingQuotationDialog({ clients }: CreateCostingQuotation
               </div>
 
               <div className="md:col-span-2">
-                <Label htmlFor="costing-notes">Notes (optional)</Label>
-                <Input
+                <Label htmlFor="costing-notes">Comments</Label>
+                <textarea
                   id="costing-notes"
                   name="notes"
-                  className="mt-1"
-                  placeholder="Additional commercial notes"
+                  rows={3}
+                  className="mt-1 flex w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
+                  placeholder="Add any commercial notes or comments (optional)"
                 />
               </div>
 

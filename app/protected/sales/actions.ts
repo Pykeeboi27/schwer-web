@@ -172,7 +172,10 @@ export async function rejectQuotationAction(formData: FormData): Promise<SalesAc
 
 export async function addPoPaymentAction(formData: FormData): Promise<SalesActionResult> {
   try {
-    const poId = getRequiredString(formData, "poId");
+    // "purchaseOrderId" is the purchase_orders.id; "poId" kept as a fallback name.
+    const purchaseOrderId =
+      String(formData.get("purchaseOrderId") ?? "").trim() ||
+      getRequiredString(formData, "poId");
     const amountCollected = parsePoAmount(formData.get("amountCollected"));
     const paymentDate = String(formData.get("paymentDate") ?? "").trim() || null;
     const paymentMethod = String(formData.get("paymentMethod") ?? "").trim() || null;
@@ -180,7 +183,7 @@ export async function addPoPaymentAction(formData: FormData): Promise<SalesActio
     const notes = String(formData.get("notes") ?? "").trim() || null;
 
     await addPoPayment({
-      poId,
+      purchaseOrderId,
       amountCollected,
       paymentDate,
       paymentMethod,

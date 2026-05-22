@@ -196,6 +196,8 @@ CREATE TABLE public.clients (
   province            TEXT,
   country             TEXT DEFAULT 'Philippines',
   website             TEXT,
+  tin                 TEXT,
+  bir_registration_link TEXT,
   payment_terms_days  INTEGER NOT NULL DEFAULT 30,
   credit_limit        NUMERIC(15, 2),
   is_active           BOOLEAN NOT NULL DEFAULT TRUE,
@@ -235,9 +237,23 @@ CREATE TABLE public.quotations (
   sector              sector_enum NOT NULL,
   subject             TEXT NOT NULL,
   description         TEXT,
-  amount              NUMERIC(15, 2) NOT NULL,
+  -- `amount` holds the selling amount. During the costing phase it stays 0;
+  -- the sales phase sets it to the computed selling_amount.
+  amount              NUMERIC(15, 2) NOT NULL DEFAULT 0,
   cost                NUMERIC(15, 2),
-  margin_amount       NUMERIC(15, 2) GENERATED ALWAYS AS (amount - COALESCE(cost, 0)) STORED,
+  -- Input-driven sales pricing (Phase 1). *_amount fields are computed on the
+  -- frontend from `cost` (direct cost) and the corresponding percentage:
+  --   margin_amount  = cost * margin_percentage / 100
+  --   bank_amount    = cost * bank_percentage   / 100
+  --   sop_amount     = cost * sop_percentage    / 100
+  --   selling_amount = cost + margin_amount + bank_amount + sop_amount  (== amount)
+  margin_percentage   NUMERIC(6, 2),
+  margin_amount       NUMERIC(15, 2),
+  bank_percentage     NUMERIC(6, 2),
+  bank_amount         NUMERIC(15, 2),
+  sop_percentage      NUMERIC(6, 2),
+  sop_amount          NUMERIC(15, 2),
+  selling_amount      NUMERIC(15, 2),
   margin_percent      NUMERIC(6, 2) GENERATED ALWAYS AS (
                         CASE WHEN amount > 0 THEN ((amount - COALESCE(cost, 0)) / amount) * 100 ELSE 0 END
                       ) STORED,
@@ -249,6 +265,7 @@ CREATE TABLE public.quotations (
   costing_approved_at TIMESTAMPTZ,
   sales_margin_percent NUMERIC(6, 2),
   payment_terms       TEXT,
+  payment_terms_custom TEXT,
   lead_time_days      INTEGER,
   approved_at         TIMESTAMPTZ,
   recognized_amount   NUMERIC(15, 2) NOT NULL DEFAULT 0,
@@ -310,6 +327,80 @@ CREATE TABLE public.po_payments (
 );
 
 CREATE INDEX idx_po_payments_po_id ON public.po_payments(po_id);
+
+-- PO-based collections (Phase 2). New collections set purchase_order_id; the
+-- legacy po_id (-> quotations) is retained for the rows recorded before POs
+-- became separate records.
+ALTER TABLE public.po_payments
+  ADD COLUMN IF NOT EXISTS purchase_order_id UUID REFERENCES public.purchase_orders(id) ON DELETE CASCADE;
+CREATE INDEX IF NOT EXISTS idx_po_payments_purchase_order_id ON public.po_payments(purchase_order_id);
+
+
+-- ============================================================
+-- SECTION 4b: PURCHASE ORDERS (Phase 2 — separate PO records)
+-- ============================================================
+-- An approved quotation is re-opened when the client provides their PO, then
+-- explicitly converted into a purchase_orders row that runs through po_approvals
+-- (same >=3M role thresholds as quotations). See migration 0002.
+
+CREATE TABLE IF NOT EXISTS public.purchase_orders (
+  id                  UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  po_number           TEXT UNIQUE NOT NULL,
+  quotation_id        UUID REFERENCES public.quotations(id) ON DELETE SET NULL,
+  client_id           UUID NOT NULL REFERENCES public.clients(id) ON DELETE RESTRICT,
+  sector              sector_enum NOT NULL,
+  subject             TEXT NOT NULL,
+  po_amount           NUMERIC(15, 2) NOT NULL,
+  cost                NUMERIC(15, 2),
+  margin_amount       NUMERIC(15, 2),
+  margin_percent      NUMERIC(6, 2),
+  recognized_amount   NUMERIC(15, 2) NOT NULL DEFAULT 0,
+  payment_terms_days  INTEGER NOT NULL DEFAULT 30,
+  payment_status      payment_status_enum NOT NULL DEFAULT 'unpaid',
+  po_date             DATE NOT NULL DEFAULT CURRENT_DATE,
+  expected_completion DATE,
+  notes               TEXT,
+  created_by          UUID NOT NULL REFERENCES public.profiles(id) ON DELETE RESTRICT,
+  created_at          TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at          TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  -- Phase 2 additions: approval lifecycle + sales pricing snapshot.
+  status               approval_status_enum NOT NULL DEFAULT 'pending',
+  client_po_number     TEXT,
+  margin_percentage    NUMERIC(6, 2),
+  bank_percentage      NUMERIC(6, 2),
+  bank_amount          NUMERIC(15, 2),
+  sop_percentage       NUMERIC(6, 2),
+  sop_amount           NUMERIC(15, 2),
+  selling_amount       NUMERIC(15, 2),
+  payment_terms        TEXT,
+  payment_terms_custom TEXT,
+  lead_time_days       INTEGER,
+  approved_at          TIMESTAMPTZ,
+  submitted_at         TIMESTAMPTZ,
+  requires_executive_approval BOOLEAN GENERATED ALWAYS AS (po_amount >= 3000000) STORED
+);
+
+CREATE TABLE IF NOT EXISTS public.po_approvals (
+  id               UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  po_id            UUID NOT NULL REFERENCES public.purchase_orders(id) ON DELETE CASCADE,
+  approver_id      UUID NOT NULL REFERENCES public.profiles(id) ON DELETE RESTRICT,
+  approver_role    user_role_enum NOT NULL,
+  status           approval_status_enum NOT NULL DEFAULT 'pending',
+  approved_at      TIMESTAMPTZ,
+  rejection_reason TEXT,
+  notes            TEXT,
+  created_at       TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at       TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  UNIQUE (po_id, approver_id)
+);
+CREATE INDEX IF NOT EXISTS idx_po_approvals_po_id ON public.po_approvals(po_id);
+
+-- Quotation -> PO conversion bookkeeping.
+ALTER TABLE public.quotations
+  ADD COLUMN IF NOT EXISTS client_po_number    TEXT,
+  ADD COLUMN IF NOT EXISTS client_confirmed_at TIMESTAMPTZ,
+  ADD COLUMN IF NOT EXISTS converted_po_id     UUID REFERENCES public.purchase_orders(id) ON DELETE SET NULL,
+  ADD COLUMN IF NOT EXISTS po_converted_at     TIMESTAMPTZ;
 
 
 -- ============================================================

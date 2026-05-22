@@ -15,6 +15,8 @@ export type SalesClient = {
   email: string | null;
   phone: string | null;
   address: string | null;
+  tin: string | null;
+  birRegistrationLink: string | null;
   notes: string | null;
   isActive: boolean;
   createdAt: string;
@@ -115,7 +117,7 @@ export async function listClients(): Promise<SalesClient[]> {
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("clients")
-    .select("id, client_code, company_name, sector, payment_terms_days, address, notes, is_active, created_at")
+    .select("id, client_code, company_name, sector, payment_terms_days, address, tin, bir_registration_link, notes, is_active, created_at")
     .order("created_at", { ascending: false });
 
   if (error) {
@@ -153,6 +155,8 @@ export async function listClients(): Promise<SalesClient[]> {
       email,
       phone,
       address: row.address,
+      tin: row.tin ?? null,
+      birRegistrationLink: row.bir_registration_link ?? null,
       notes: row.notes,
       isActive: row.is_active,
       createdAt: row.created_at,
@@ -166,6 +170,8 @@ export async function createSalesClient(input: {
   sector: "commercial" | "industrial" | "solar";
   paymentTermsDays: number;
   address?: string | null;
+  tin?: string | null;
+  birRegistrationLink?: string | null;
   notes: string | null;
 }): Promise<void> {
   const supabase = await createClient();
@@ -175,6 +181,8 @@ export async function createSalesClient(input: {
     sector: input.sector,
     payment_terms_days: input.paymentTermsDays,
     address: input.address ?? null,
+    tin: input.tin ?? null,
+    bir_registration_link: input.birRegistrationLink ?? null,
     notes: input.notes,
   });
 
@@ -189,6 +197,8 @@ export async function updateSalesClient(input: {
   sector: "commercial" | "industrial" | "solar";
   paymentTermsDays: number;
   address?: string | null;
+  tin?: string | null;
+  birRegistrationLink?: string | null;
   notes: string | null;
 }): Promise<void> {
   const supabase = await createClient();
@@ -199,6 +209,8 @@ export async function updateSalesClient(input: {
       sector: input.sector,
       payment_terms_days: input.paymentTermsDays,
       address: input.address ?? null,
+      tin: input.tin ?? null,
+      bir_registration_link: input.birRegistrationLink ?? null,
       notes: input.notes,
     })
     .eq("id", input.id);

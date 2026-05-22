@@ -1,4 +1,7 @@
 import { getSalesSummary } from "@/lib/sales/summaries";
+import { getSalesDashboardCharts } from "@/lib/sales/dashboard-charts";
+import { SectorPerformanceChart } from "@/components/sales/sector-performance-chart";
+import { ClientDistributionChart } from "@/components/sales/client-distribution-chart";
 import { getCurrentProfile } from "@/lib/profile/get-current-profile";
 import { getSalesAccessRedirect } from "@/lib/sales/access";
 import { redirect } from "next/navigation";
@@ -19,7 +22,7 @@ export default async function SalesDashboardPage() {
     redirect(redirectPath);
   }
 
-  const summary = await getSalesSummary();
+  const [summary, charts] = await Promise.all([getSalesSummary(), getSalesDashboardCharts()]);
 
   return (
     <div className="flex flex-col gap-4">
@@ -65,6 +68,28 @@ export default async function SalesDashboardPage() {
           <div className="rounded border p-3 text-sm">
             <p className="text-muted-foreground">Rejected</p>
             <p className="mt-1 text-xl font-semibold">{summary.quotations.rejected}</p>
+          </div>
+        </div>
+      </div>
+
+      <div className="grid gap-4 lg:grid-cols-2">
+        <div className="rounded-md border bg-card p-4">
+          <h2 className="text-lg font-semibold">Sector Performance</h2>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Approved quotation value by client sector.
+          </p>
+          <div className="mt-4">
+            <SectorPerformanceChart slices={charts.sectorPerformance} />
+          </div>
+        </div>
+
+        <div className="rounded-md border bg-card p-4">
+          <h2 className="text-lg font-semibold">Client Quotation Distribution</h2>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Approved quotation value per client, highest first.
+          </p>
+          <div className="mt-4">
+            <ClientDistributionChart bars={charts.clientDistribution} />
           </div>
         </div>
       </div>

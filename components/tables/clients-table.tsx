@@ -25,6 +25,7 @@ function searchMatches(client: SalesClient, query: string): boolean {
     client.contactPerson ?? "",
     client.email ?? "",
     client.phone ?? "",
+    client.tin ?? "",
   ]
     .join(" ")
     .toLowerCase();

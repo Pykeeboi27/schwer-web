@@ -1,8 +1,10 @@
 import { ExecutiveApprovalsTable } from "@/components/executive/approvals-table";
+import { ExecutivePoApprovalsTable } from "@/components/executive/po-approvals-table";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { getExecutiveAccessRedirect } from "@/lib/executive/access";
 import { getCurrentProfile } from "@/lib/profile/get-current-profile";
 import { listPendingApprovalsForCurrentUser } from "@/lib/sales/quotations";
+import { listPendingPoApprovalsForCurrentUser } from "@/lib/sales/purchase-orders";
 import { redirect } from "next/navigation";
 
 export default async function ExecutiveApprovalsPage() {
@@ -13,8 +15,16 @@ export default async function ExecutiveApprovalsPage() {
     redirect(redirectPath);
   }
 
-  const pendingApprovals = await listPendingApprovalsForCurrentUser();
+  const [pendingApprovals, pendingPoApprovals] = await Promise.all([
+    listPendingApprovalsForCurrentUser(),
+    listPendingPoApprovalsForCurrentUser(),
+  ]);
   const executiveApprovals = pendingApprovals.filter(
+    (item) =>
+      item.amount >= 3_000_000 &&
+      (item.approverRole === "owner" || item.approverRole === "executive"),
+  );
+  const executivePoApprovals = pendingPoApprovals.filter(
     (item) =>
       item.amount >= 3_000_000 &&
       (item.approverRole === "owner" || item.approverRole === "executive"),
@@ -37,6 +47,21 @@ export default async function ExecutiveApprovalsPage() {
 
       <ExecutiveApprovalsTable
         items={executiveApprovals}
+        currentUserRole={profile?.role ?? null}
+      />
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Purchase Order Approvals</CardTitle>
+          <CardDescription>
+            High-value purchase orders converted from approved quotations that require owner or
+            executive approval.
+          </CardDescription>
+        </CardHeader>
+      </Card>
+
+      <ExecutivePoApprovalsTable
+        items={executivePoApprovals}
         currentUserRole={profile?.role ?? null}
       />
     </div>

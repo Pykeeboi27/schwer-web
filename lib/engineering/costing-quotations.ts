@@ -118,7 +118,6 @@ export async function listCostingApprovedHistory(): Promise<CostingApprovedHisto
 export async function createCostingQuotation(input: {
   clientId: string;
   subject: string;
-  amount: number;
   cost: number;
   googleDriveLink: string;
   notes?: string | null;
@@ -151,7 +150,9 @@ export async function createCostingQuotation(input: {
       client_id: input.clientId,
       sector: clientRow.sector,
       subject: input.subject,
-      amount: input.amount,
+      // amount (selling amount) is set later in the sales phase; costing only
+      // captures the direct cost.
+      amount: 0,
       cost: input.cost,
       google_drive_link: input.googleDriveLink,
       notes: input.notes ?? null,
@@ -173,7 +174,6 @@ export async function updateCostingQuotation(input: {
   quotationId: string;
   clientId: string;
   subject: string;
-  amount: number;
   cost: number;
   googleDriveLink: string;
   notes?: string | null;
@@ -226,7 +226,6 @@ export async function updateCostingQuotation(input: {
       client_id: input.clientId,
       sector: clientRow.sector,
       subject: input.subject,
-      amount: input.amount,
       cost: input.cost,
       google_drive_link: input.googleDriveLink,
       notes: input.notes ?? null,

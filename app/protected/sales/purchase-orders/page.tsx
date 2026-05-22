@@ -28,8 +28,12 @@ export default async function SalesPurchaseOrdersPage() {
 
   const purchaseOrders = response.success ? response.data ?? [] : [];
 
+  // Closed/recognized sales reflect fully-approved POs only.
   const totals = purchaseOrders.reduce(
     (accumulator, purchaseOrder) => {
+      if (purchaseOrder.status !== "approved") {
+        return accumulator;
+      }
       return {
         closed: accumulator.closed + purchaseOrder.poAmount,
         recognized: accumulator.recognized + purchaseOrder.recognizedAmount,
@@ -43,7 +47,8 @@ export default async function SalesPurchaseOrdersPage() {
       <div className="rounded-md border bg-card p-5">
         <h1 className="text-2xl font-semibold">Purchase Orders</h1>
         <p className="mt-2 text-sm text-muted-foreground">
-          Approved quotations awaiting collection. Track payments here as they come in.
+          Purchase orders converted from approved quotations. Pending POs await approval; once
+          approved, track collections here as payments come in.
         </p>
       </div>
 
@@ -60,7 +65,12 @@ export default async function SalesPurchaseOrdersPage() {
 
       <section className="rounded-md border bg-card p-5">
         {response.success ? (
-          <PurchaseOrdersTable purchaseOrders={purchaseOrders} payments={payments} />
+          <PurchaseOrdersTable
+            purchaseOrders={purchaseOrders}
+            payments={payments}
+            currentUserId={profile?.id ?? ""}
+            currentUserRole={profile?.role ?? null}
+          />
         ) : (
           <p className="text-sm text-destructive">
             {response.error ?? "Failed to load purchase orders."}

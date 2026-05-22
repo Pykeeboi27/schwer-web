@@ -164,6 +164,22 @@ export function CreateClientDialog({ onCreated }: CreateClientDialogProps) {
                 <Input id="address" name="address" className="mt-1" placeholder="City, Province" />
               </div>
 
+              <div>
+                <Label htmlFor="tin">TIN</Label>
+                <Input id="tin" name="tin" className="mt-1" placeholder="000-000-000-000" />
+              </div>
+
+              <div>
+                <Label htmlFor="birRegistrationLink">BIR Registration Link</Label>
+                <Input
+                  id="birRegistrationLink"
+                  name="birRegistrationLink"
+                  type="url"
+                  className="mt-1"
+                  placeholder="https://drive.google.com/..."
+                />
+              </div>
+
               {formError ? <p className="md:col-span-2 text-sm text-destructive">{formError}</p> : null}
 
               <div className="md:col-span-2 flex justify-end gap-2">

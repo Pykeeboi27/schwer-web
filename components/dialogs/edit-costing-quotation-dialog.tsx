@@ -4,6 +4,7 @@ import { updateCostingQuotationAction } from "@/app/protected/engineering/quotat
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { NumberInput } from "@/components/ui/number-input";
 import type { CostingQuotation } from "@/lib/engineering/costing-quotations";
 import { useToast } from "@/lib/utils/toast-notification";
 import { useRouter } from "next/navigation";
@@ -25,7 +26,6 @@ type EditCostingQuotationDialogProps = {
 type FieldErrors = {
   clientId?: string;
   subject?: string;
-  amount?: string;
   cost?: string;
   googleDriveLink?: string;
 };
@@ -91,21 +91,15 @@ export function EditCostingQuotationDialog({
     const nextErrors: FieldErrors = {};
     const clientId = String(formData.get("clientId") ?? "").trim();
     const subject = String(formData.get("subject") ?? "").trim();
-    const amountText = String(formData.get("amount") ?? "").trim();
     const costText = String(formData.get("cost") ?? "").trim();
     const driveLink = String(formData.get("googleDriveLink") ?? "").trim();
 
     if (!clientId) nextErrors.clientId = "Client is required.";
     if (!subject) nextErrors.subject = "Subject is required.";
 
-    const amount = Number(amountText);
-    if (!amountText || !Number.isFinite(amount) || amount <= 0) {
-      nextErrors.amount = "Amount must be greater than 0.";
-    }
-
     const cost = Number(costText);
     if (!costText || !Number.isFinite(cost) || cost < 0) {
-      nextErrors.cost = "Cost must be 0 or greater.";
+      nextErrors.cost = "Direct cost must be 0 or greater.";
     }
 
     if (!driveLink) {
@@ -206,32 +200,11 @@ export function EditCostingQuotationDialog({
             ) : null}
           </div>
 
-          <div>
-            <Label htmlFor="edit-costing-amount">Amount</Label>
-            <Input
-              id="edit-costing-amount"
-              name="amount"
-              type="number"
-              min={0.01}
-              step="0.01"
-              required
-              defaultValue={quotation.amount}
-              aria-invalid={Boolean(fieldErrors.amount)}
-              className="mt-1"
-            />
-            {fieldErrors.amount ? (
-              <p className="mt-1 text-xs text-destructive">{fieldErrors.amount}</p>
-            ) : null}
-          </div>
-
-          <div>
-            <Label htmlFor="edit-costing-cost">Cost</Label>
-            <Input
+          <div className="md:col-span-2">
+            <Label htmlFor="edit-costing-cost">Direct Cost</Label>
+            <NumberInput
               id="edit-costing-cost"
               name="cost"
-              type="number"
-              min={0}
-              step="0.01"
               required
               defaultValue={quotation.cost ?? ""}
               aria-invalid={Boolean(fieldErrors.cost)}
@@ -259,12 +232,14 @@ export function EditCostingQuotationDialog({
           </div>
 
           <div className="md:col-span-2">
-            <Label htmlFor="edit-costing-notes">Notes (optional)</Label>
-            <Input
+            <Label htmlFor="edit-costing-notes">Comments</Label>
+            <textarea
               id="edit-costing-notes"
               name="notes"
+              rows={3}
               defaultValue={quotation.notes ?? ""}
-              className="mt-1"
+              className="mt-1 flex w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
+              placeholder="Add any commercial notes or comments (optional)"
             />
           </div>
 

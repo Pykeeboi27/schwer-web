@@ -32,7 +32,12 @@ export function canAccessSalesRoute(
   profile: CurrentProfile | null,
   pathname: string,
 ): boolean {
-  if (pathname.startsWith("/protected/sales/quotations")) {
+  // Quotations and purchase orders are also reachable by owner/executive so they
+  // can approve high-value (>=3M) items routed to them.
+  if (
+    pathname.startsWith("/protected/sales/quotations") ||
+    pathname.startsWith("/protected/sales/purchase-orders")
+  ) {
     return canAccessSalesQuotations(profile);
   }
 

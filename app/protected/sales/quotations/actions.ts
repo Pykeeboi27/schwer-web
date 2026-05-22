@@ -5,13 +5,17 @@ import {
   fetchQuotations,
   findPendingApprovalForRole,
   parseLeadTimeDays,
-  parseSalesMarginPercent,
+  parsePercentInput,
   rejectQuotationApproval,
   submitQuotationForApproval,
   updateSalesQuotationDetails,
   type RequiredApproverRole,
   type SalesQuotation,
 } from "@/lib/sales/quotations";
+import {
+  convertQuotationToPurchaseOrder,
+  markClientPoReceived,
+} from "@/lib/sales/purchase-orders";
 import { revalidatePath } from "next/cache";
 
 type ActionResponse<T> = {
@@ -226,16 +230,81 @@ export async function fetchQuotationsAction(
   }
 }
 
+export async function markClientPoReceivedAction(
+  quotationId: string,
+  clientPoNumber: string,
+): Promise<ActionResponse<{ quotationId: string }>> {
+  const normalizedId = String(quotationId ?? "").trim();
+  const normalizedPo = String(clientPoNumber ?? "").trim().toUpperCase();
+
+  if (!normalizedId) {
+    return { success: false, error: "Quotation id is required." };
+  }
+  if (!normalizedPo) {
+    return { success: false, error: "Client PO number is required." };
+  }
+
+  try {
+    await markClientPoReceived({ quotationId: normalizedId, clientPoNumber: normalizedPo });
+    revalidatePath("/protected/sales/quotations");
+    return { success: true, data: { quotationId: normalizedId } };
+  } catch (error) {
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Failed to record the client PO.",
+    };
+  }
+}
+
+export async function convertToPurchaseOrderAction(
+  quotationId: string,
+): Promise<ActionResponse<{ purchaseOrderId: string }>> {
+  const normalizedId = String(quotationId ?? "").trim();
+
+  if (!normalizedId) {
+    return { success: false, error: "Quotation id is required." };
+  }
+
+  try {
+    const result = await convertQuotationToPurchaseOrder(normalizedId);
+    revalidatePath("/protected/sales/quotations");
+    revalidatePath("/protected/sales/purchase-orders");
+    revalidatePath("/protected/executive/approvals");
+    return { success: true, data: result };
+  } catch (error) {
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Failed to convert to purchase order.",
+    };
+  }
+}
+
 export async function updateSalesQuotationDetailsAction(
   formData: FormData,
 ): Promise<ActionResponse<{ quotationId: string }>> {
   try {
     const quotationId = asRequiredString(formData.get("quotationId"), "Quotation");
 
-    const rawMargin = String(formData.get("salesMarginPercent") ?? "").trim();
-    const salesMarginPercent = rawMargin === "" ? null : parseSalesMarginPercent(rawMargin);
+    const rawMargin = String(formData.get("marginPercentage") ?? "").trim();
+    const marginPercentage =
+      rawMargin === "" ? null : parsePercentInput(rawMargin, "Margin percentage");
 
-    const paymentTerms = asOptionalString(formData.get("paymentTerms"))?.toUpperCase() ?? null;
+    const rawBank = String(formData.get("bankPercentage") ?? "").trim();
+    const bankPercentage =
+      rawBank === "" ? null : parsePercentInput(rawBank, "Bank percentage");
+
+    const rawSop = String(formData.get("sopPercentage") ?? "").trim();
+    const sopPercentage = rawSop === "" ? null : parsePercentInput(rawSop, "SOP percentage");
+
+    const googleDriveLink = asOptionalString(formData.get("googleDriveLink"));
+
+    const paymentTermsRaw = asOptionalString(formData.get("paymentTerms"));
+    // Predefined options are stored verbatim; only the custom value is uppercased.
+    const paymentTerms = paymentTermsRaw;
+    const paymentTermsCustom =
+      paymentTermsRaw === "Other"
+        ? (asOptionalString(formData.get("paymentTermsCustom"))?.toUpperCase() ?? null)
+        : null;
 
     const rawLeadTime = String(formData.get("leadTimeDays") ?? "").trim();
     const leadTimeDays = rawLeadTime === "" ? null : parseLeadTimeDays(rawLeadTime);
@@ -244,8 +313,12 @@ export async function updateSalesQuotationDetailsAction(
 
     await updateSalesQuotationDetails({
       quotationId,
-      salesMarginPercent,
+      marginPercentage,
+      bankPercentage,
+      sopPercentage,
+      googleDriveLink,
       paymentTerms,
+      paymentTermsCustom,
       leadTimeDays,
       notes,
     });

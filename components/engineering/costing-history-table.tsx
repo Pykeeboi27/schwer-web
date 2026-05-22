@@ -36,8 +36,7 @@ export function CostingHistoryTable({ items }: CostingHistoryTableProps) {
             <th className="px-3 py-2 font-medium">Quotation</th>
             <th className="px-3 py-2 font-medium">Client</th>
             <th className="px-3 py-2 font-medium">Subject</th>
-            <th className="px-3 py-2 font-medium">Amount</th>
-            <th className="px-3 py-2 font-medium">Cost</th>
+            <th className="px-3 py-2 font-medium">Direct Cost</th>
             <th className="px-3 py-2 font-medium">Drive</th>
             <th className="px-3 py-2 font-medium">Approved At</th>
           </tr>
@@ -48,7 +47,6 @@ export function CostingHistoryTable({ items }: CostingHistoryTableProps) {
               <td className="px-3 py-2 font-mono text-xs">{item.quotationNumber}</td>
               <td className="px-3 py-2">{item.clientName}</td>
               <td className="px-3 py-2">{item.subject || "-"}</td>
-              <td className="px-3 py-2">{formatCurrency(item.amount)}</td>
               <td className="px-3 py-2">
                 {item.cost === null ? "-" : formatCurrency(item.cost)}
               </td>

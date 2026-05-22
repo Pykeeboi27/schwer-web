@@ -1,3 +1,4 @@
+import { computeSalesPricing } from "@/lib/sales/pricing";
 import { createClient } from "@/lib/supabase/server";
 
 export type RequiredApproverRole = "sales_manager" | "owner" | "executive";
@@ -18,8 +19,21 @@ export type SalesQuotation = {
   createdAt: string;
   costingApprovedAt: string | null;
   salesMarginPercent: number | null;
+  marginPercentage: number | null;
+  marginAmount: number | null;
+  bankPercentage: number | null;
+  bankAmount: number | null;
+  sopPercentage: number | null;
+  sopAmount: number | null;
+  sellingAmount: number | null;
   paymentTerms: string | null;
+  paymentTermsCustom: string | null;
   leadTimeDays: number | null;
+  clientPoNumber: string | null;
+  clientConfirmedAt: string | null;
+  convertedPoId: string | null;
+  convertedPoStatus: "draft" | "pending" | "approved" | "rejected" | "cancelled" | null;
+  poConvertedAt: string | null;
 };
 
 export type PendingApprovalItem = {
@@ -56,6 +70,10 @@ function toUniqueRoles(roles: RequiredApproverRole[]): RequiredApproverRole[] {
   return Array.from(new Set(roles));
 }
 
+function numberOrNull(value: unknown): number | null {
+  return value === null || value === undefined ? null : Number(value);
+}
+
 export function parseQuotationAmount(raw: unknown): number {
   const value = Number(raw);
 
@@ -71,6 +89,16 @@ export function parseSalesMarginPercent(raw: unknown): number {
 
   if (!Number.isFinite(value) || value < 0 || value > 100) {
     throw new Error("Margin percent must be between 0 and 100.");
+  }
+
+  return value;
+}
+
+export function parsePercentInput(raw: unknown, label: string): number {
+  const value = Number(raw);
+
+  if (!Number.isFinite(value) || value < 0) {
+    throw new Error(`${label} must be 0 or greater.`);
   }
 
   return value;
@@ -125,7 +153,7 @@ export async function listSalesQuotations(): Promise<SalesQuotation[]> {
   const { data, error } = await supabase
     .from("quotations")
     .select(
-      "id, quotation_number, client_id, subject, amount, cost, google_drive_link, notes, status, prepared_by, created_at, costing_approved_at, sales_margin_percent, payment_terms, lead_time_days, clients:client_id(company_name), quotation_approvals(approver_role, status)",
+      "id, quotation_number, client_id, subject, amount, cost, google_drive_link, notes, status, prepared_by, created_at, costing_approved_at, sales_margin_percent, margin_percentage, margin_amount, bank_percentage, bank_amount, sop_percentage, sop_amount, selling_amount, payment_terms, payment_terms_custom, lead_time_days, client_po_number, client_confirmed_at, converted_po_id, po_converted_at, clients:client_id(company_name), converted_po:converted_po_id(status), quotation_approvals(approver_role, status)",
     )
     .eq("phase", "sales")
     .order("created_at", { ascending: false });
@@ -166,19 +194,39 @@ export async function listSalesQuotations(): Promise<SalesQuotation[]> {
         row.sales_margin_percent === null || row.sales_margin_percent === undefined
           ? null
           : Number(row.sales_margin_percent),
+      marginPercentage: numberOrNull(row.margin_percentage),
+      marginAmount: numberOrNull(row.margin_amount),
+      bankPercentage: numberOrNull(row.bank_percentage),
+      bankAmount: numberOrNull(row.bank_amount),
+      sopPercentage: numberOrNull(row.sop_percentage),
+      sopAmount: numberOrNull(row.sop_amount),
+      sellingAmount: numberOrNull(row.selling_amount),
       paymentTerms: row.payment_terms ?? null,
+      paymentTermsCustom: row.payment_terms_custom ?? null,
       leadTimeDays:
         row.lead_time_days === null || row.lead_time_days === undefined
           ? null
           : Number(row.lead_time_days),
+      clientPoNumber: row.client_po_number ?? null,
+      clientConfirmedAt: row.client_confirmed_at ?? null,
+      convertedPoId: row.converted_po_id ?? null,
+      convertedPoStatus: (() => {
+        const po = Array.isArray(row.converted_po) ? row.converted_po[0] : row.converted_po;
+        return po?.status ?? null;
+      })(),
+      poConvertedAt: row.po_converted_at ?? null,
     };
   });
 }
 
 export async function updateSalesQuotationDetails(input: {
   quotationId: string;
-  salesMarginPercent: number | null;
+  marginPercentage: number | null;
+  bankPercentage: number | null;
+  sopPercentage: number | null;
+  googleDriveLink: string | null;
   paymentTerms: string | null;
+  paymentTermsCustom: string | null;
   leadTimeDays: number | null;
   notes: string | null;
 }): Promise<void> {
@@ -194,7 +242,7 @@ export async function updateSalesQuotationDetails(input: {
 
   const { data: quotationRow, error: quotationError } = await supabase
     .from("quotations")
-    .select("id, status, phase")
+    .select("id, status, phase, cost, client_confirmed_at, converted_po_id")
     .eq("id", input.quotationId)
     .single();
 
@@ -206,15 +254,42 @@ export async function updateSalesQuotationDetails(input: {
     throw new Error("This quotation is not yet in the sales phase.");
   }
 
-  if (quotationRow.status !== "draft") {
-    throw new Error("Sales details can only be edited while the quotation is a draft.");
+  // Editable while a draft, or once re-opened after the client provides their PO
+  // (approved + client_confirmed_at set) and it has not yet been converted.
+  const isReopenedForPo =
+    quotationRow.status === "approved" &&
+    quotationRow.client_confirmed_at !== null &&
+    quotationRow.converted_po_id === null;
+
+  if (quotationRow.status !== "draft" && !isReopenedForPo) {
+    throw new Error("Sales details can only be edited while the quotation is a draft or re-opened for a PO.");
   }
+
+  const directCost = Number(quotationRow.cost ?? 0);
+  const pricing = computeSalesPricing({
+    directCost,
+    marginPercentage: input.marginPercentage ?? 0,
+    bankPercentage: input.bankPercentage ?? 0,
+    sopPercentage: input.sopPercentage ?? 0,
+  });
 
   const { error: updateError } = await supabase
     .from("quotations")
     .update({
-      sales_margin_percent: input.salesMarginPercent,
+      // Keep the legacy sales_margin_percent in sync so existing approval
+      // checks and displays continue to work.
+      sales_margin_percent: input.marginPercentage,
+      margin_percentage: input.marginPercentage,
+      margin_amount: pricing.marginAmount,
+      bank_percentage: input.bankPercentage,
+      bank_amount: pricing.bankAmount,
+      sop_percentage: input.sopPercentage,
+      sop_amount: pricing.sopAmount,
+      selling_amount: pricing.sellingAmount,
+      amount: pricing.sellingAmount,
+      google_drive_link: input.googleDriveLink,
       payment_terms: input.paymentTerms,
+      payment_terms_custom: input.paymentTermsCustom,
       lead_time_days: input.leadTimeDays,
       notes: input.notes,
     })
@@ -225,7 +300,7 @@ export async function updateSalesQuotationDetails(input: {
   }
 }
 
-async function findApproversForRole(role: RequiredApproverRole): Promise<Array<{ id: string }>> {
+export async function findApproversForRole(role: RequiredApproverRole): Promise<Array<{ id: string }>> {
   const supabase = await createClient();
   const department = role === "sales_manager" ? "sales" : "executive";
   const { data, error } = await supabase

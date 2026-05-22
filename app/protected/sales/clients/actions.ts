@@ -70,6 +70,8 @@ export async function createClientAction(
     const email = asOptionalString(formData.get("email"));
     const phone = asOptionalString(formData.get("phone"));
     const address = asOptionalString(formData.get("address"));
+    const tin = asOptionalString(formData.get("tin"));
+    const birRegistrationLink = asOptionalString(formData.get("birRegistrationLink"));
     const sector = asOptionalString(formData.get("sector")) ?? "commercial";
 
     if (!code) {
@@ -112,6 +114,8 @@ export async function createClientAction(
       sector: parseSector(sector),
       paymentTermsDays: 30,
       address,
+      tin,
+      birRegistrationLink,
       notes: buildClientNotesPayload(contactPerson, email, phone),
     });
 
@@ -141,6 +145,8 @@ export async function updateClientAction(
     const email = asOptionalString(formData.get("email"));
     const phone = asOptionalString(formData.get("phone"));
     const address = asOptionalString(formData.get("address"));
+    const tin = asOptionalString(formData.get("tin"));
+    const birRegistrationLink = asOptionalString(formData.get("birRegistrationLink"));
     const sector = asOptionalString(formData.get("sector")) ?? "commercial";
 
     if (!name) {
@@ -168,6 +174,8 @@ export async function updateClientAction(
       sector: parseSector(sector),
       paymentTermsDays: parsePaymentNetDays(formData.get("paymentTermsDays") ?? 30),
       address,
+      tin,
+      birRegistrationLink,
       notes: buildClientNotesPayload(contactPerson, email, phone),
     });
 

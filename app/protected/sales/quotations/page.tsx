@@ -25,7 +25,12 @@ export default async function SalesQuotationsPage() {
   const readyForQuotation = quotations.filter(
     (quotation) => quotation.status === "draft" && quotation.costingApprovedAt !== null,
   );
-  const activeQuotations = quotations.filter((quotation) => quotation.status !== "draft");
+  const activeQuotations = quotations.filter(
+    (quotation) =>
+      quotation.status !== "draft" &&
+      // Once the converted PO is fully approved, the quotation moves to the PO module.
+      quotation.convertedPoStatus !== "approved",
+  );
 
   const pendingCount = activeQuotations.filter((quotation) => quotation.status === "pending").length;
   const approvedCount = activeQuotations.filter((quotation) => quotation.status === "approved").length;

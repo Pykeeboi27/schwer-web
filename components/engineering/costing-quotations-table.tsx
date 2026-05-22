@@ -170,8 +170,7 @@ export function CostingQuotationsTable({
               <th className="px-3 py-2 font-medium">ID</th>
               <th className="px-3 py-2 font-medium">Client</th>
               <th className="px-3 py-2 font-medium">Subject</th>
-              <th className="px-3 py-2 font-medium">Amount</th>
-              <th className="px-3 py-2 font-medium">Cost</th>
+              <th className="px-3 py-2 font-medium">Direct Cost</th>
               <th className="px-3 py-2 font-medium">Drive</th>
               <th className="px-3 py-2 font-medium">Status</th>
               <th className="px-3 py-2 font-medium">Actions</th>
@@ -180,7 +179,7 @@ export function CostingQuotationsTable({
           <tbody>
             {filtered.length === 0 ? (
               <tr>
-                <td colSpan={8} className="px-3 py-10 text-center text-muted-foreground">
+                <td colSpan={7} className="px-3 py-10 text-center text-muted-foreground">
                   <div className="flex flex-col items-center gap-2">
                     <FileText className="h-5 w-5" aria-hidden="true" />
                     <p className="font-medium text-foreground">No costing quotations found.</p>
@@ -205,7 +204,6 @@ export function CostingQuotationsTable({
                     <td className="px-3 py-2 font-mono text-xs">{q.quotationNumber}</td>
                     <td className="px-3 py-2">{q.clientName}</td>
                     <td className="px-3 py-2">{q.subject}</td>
-                    <td className="px-3 py-2">{formatCurrency(q.amount)}</td>
                     <td className="px-3 py-2">
                       {q.cost === null ? "-" : formatCurrency(q.cost)}
                     </td>

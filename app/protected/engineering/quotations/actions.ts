@@ -4,7 +4,6 @@ import {
   createCostingQuotation,
   deleteCostingQuotation,
   isHttpUrl,
-  parseCostingAmount,
   parseCostingCost,
   submitCostingForApproval,
   updateCostingQuotation,
@@ -44,7 +43,6 @@ export async function createCostingQuotationAction(
   try {
     const clientId = asRequiredString(formData.get("clientId"), "Client");
     const subject = asRequiredString(formData.get("subject"), "Subject").toUpperCase();
-    const amount = parseCostingAmount(formData.get("amount"));
     const cost = parseCostingCost(formData.get("cost"));
     const googleDriveLink = ensureValidDriveLink(formData.get("googleDriveLink"));
     const notes = asOptionalString(formData.get("notes"))?.toUpperCase() ?? null;
@@ -52,7 +50,6 @@ export async function createCostingQuotationAction(
     const result = await createCostingQuotation({
       clientId,
       subject,
-      amount,
       cost,
       googleDriveLink,
       notes,
@@ -75,7 +72,6 @@ export async function updateCostingQuotationAction(
     const quotationId = asRequiredString(formData.get("quotationId"), "Quotation");
     const clientId = asRequiredString(formData.get("clientId"), "Client");
     const subject = asRequiredString(formData.get("subject"), "Subject").toUpperCase();
-    const amount = parseCostingAmount(formData.get("amount"));
     const cost = parseCostingCost(formData.get("cost"));
     const googleDriveLink = ensureValidDriveLink(formData.get("googleDriveLink"));
     const notes = asOptionalString(formData.get("notes"))?.toUpperCase() ?? null;
@@ -84,7 +80,6 @@ export async function updateCostingQuotationAction(
       quotationId,
       clientId,
       subject,
-      amount,
       cost,
       googleDriveLink,
       notes,
