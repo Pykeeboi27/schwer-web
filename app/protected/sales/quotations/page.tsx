@@ -1,5 +1,6 @@
 import { fetchQuotationsAction } from "@/app/protected/sales/quotations/actions";
 import { QuotationsTable } from "@/components/tables/quotations-table";
+import { ReadyForPurchaseOrderTable } from "@/components/tables/ready-for-purchase-order-table";
 import { ReadyForQuotationTable } from "@/components/tables/ready-for-quotation-table";
 import { getCurrentProfile } from "@/lib/profile/get-current-profile";
 import { getSalesAccessRedirect } from "@/lib/sales/access";
@@ -25,16 +26,32 @@ export default async function SalesQuotationsPage() {
   const readyForQuotation = quotations.filter(
     (quotation) => quotation.status === "draft" && quotation.costingApprovedAt !== null,
   );
-  const activeQuotations = quotations.filter(
+
+  // Approved + client PO recorded, but not yet converted: ready to make a PO.
+  const isReadyForPurchaseOrder = (quotation: (typeof quotations)[number]) =>
+    quotation.status === "approved" &&
+    quotation.clientConfirmedAt !== null &&
+    quotation.convertedPoId === null;
+
+  const readyForPurchaseOrder = quotations.filter(isReadyForPurchaseOrder);
+
+  // Counts cover every non-draft quotation still owned by this page (before the
+  // ready-for-PO rows are split out), so the "Approved" tile keeps counting them.
+  const statsQuotations = quotations.filter(
     (quotation) =>
       quotation.status !== "draft" &&
       // Once the converted PO is fully approved, the quotation moves to the PO module.
       quotation.convertedPoStatus !== "approved",
   );
 
-  const pendingCount = activeQuotations.filter((quotation) => quotation.status === "pending").length;
-  const approvedCount = activeQuotations.filter((quotation) => quotation.status === "approved").length;
-  const rejectedCount = activeQuotations.filter((quotation) => quotation.status === "rejected").length;
+  // The main table excludes rows surfaced in the "Ready for Purchase Order" section.
+  const activeQuotations = statsQuotations.filter(
+    (quotation) => !isReadyForPurchaseOrder(quotation),
+  );
+
+  const pendingCount = statsQuotations.filter((quotation) => quotation.status === "pending").length;
+  const approvedCount = statsQuotations.filter((quotation) => quotation.status === "approved").length;
+  const rejectedCount = statsQuotations.filter((quotation) => quotation.status === "rejected").length;
 
   return (
     <div className="flex flex-col gap-4">
@@ -56,6 +73,27 @@ export default async function SalesQuotationsPage() {
           {response.success ? (
             <ReadyForQuotationTable
               quotations={readyForQuotation}
+              currentUserId={profile?.id ?? ""}
+              currentUserRole={profile?.role ?? null}
+            />
+          ) : (
+            <p className="text-sm text-destructive">
+              {response.error ?? "Failed to load quotations."}
+            </p>
+          )}
+        </section>
+      ) : null}
+
+      {isSalesDepartment ? (
+        <section className="rounded-md border bg-card p-5">
+          <h2 className="mb-1 text-lg font-semibold">Ready for Purchase Order</h2>
+          <p className="mb-4 text-sm text-muted-foreground">
+            Approved quotations with a recorded client PO. Review the pricing, then convert to a
+            purchase order.
+          </p>
+          {response.success ? (
+            <ReadyForPurchaseOrderTable
+              quotations={readyForPurchaseOrder}
               currentUserId={profile?.id ?? ""}
               currentUserRole={profile?.role ?? null}
             />

@@ -37,11 +37,11 @@ export function ClientDistributionChart({ bars, limit = 8 }: ClientDistributionC
         const width = Math.max((row.totalAmount / max) * 100, 1.5);
         return (
           <li key={row.clientId} className="space-y-1">
-            <div className="flex items-baseline justify-between gap-3">
-              <span className="truncate font-medium" title={row.clientName}>
+            <div className="flex min-w-0 items-baseline justify-between gap-3">
+              <span className="min-w-0 truncate font-medium" title={row.clientName}>
                 {row.clientName}
               </span>
-              <span className="shrink-0 text-muted-foreground">
+              <span className="shrink-0 whitespace-nowrap text-muted-foreground">
                 {formatCurrency(row.totalAmount)}
                 <span className="ml-2">
                   ({row.count} {row.count === 1 ? "quote" : "quotes"})

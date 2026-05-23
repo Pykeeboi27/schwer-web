@@ -57,23 +57,23 @@ export function SectorPerformanceChart({ slices }: SectorPerformanceChartProps) 
         })}
       </svg>
 
-      <ul className="w-full space-y-2 text-sm">
+      <ul className="w-full min-w-0 flex-1 space-y-2 text-sm">
         {slices.map((slice) => {
           const share = total > 0 ? (slice.totalAmount / total) * 100 : 0;
           return (
-            <li key={slice.sector} className="flex items-center justify-between gap-3">
-              <span className="flex items-center gap-2">
+            <li key={slice.sector} className="flex min-w-0 items-center justify-between gap-3">
+              <span className="flex min-w-0 items-center gap-2">
                 <span
-                  className="inline-block h-3 w-3 rounded-sm"
+                  className="inline-block h-3 w-3 shrink-0 rounded-sm"
                   style={{ backgroundColor: SECTOR_COLORS[slice.sector] }}
                   aria-hidden
                 />
-                <span className="font-medium">{slice.label}</span>
-                <span className="text-muted-foreground">
+                <span className="truncate font-medium">{slice.label}</span>
+                <span className="shrink-0 text-muted-foreground">
                   ({slice.count} {slice.count === 1 ? "quote" : "quotes"})
                 </span>
               </span>
-              <span className="text-right">
+              <span className="shrink-0 whitespace-nowrap text-right">
                 <span className="font-medium">{formatCurrency(slice.totalAmount)}</span>
                 <span className="ml-2 text-muted-foreground">{share.toFixed(1)}%</span>
               </span>

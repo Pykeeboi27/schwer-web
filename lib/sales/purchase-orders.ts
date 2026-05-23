@@ -271,7 +271,7 @@ export async function convertQuotationToPurchaseOrder(
       cost: q.cost,
       margin_percentage: q.margin_percentage,
       margin_amount: q.margin_amount,
-      margin_percent: q.margin_percentage,
+      // margin_percent is a GENERATED column ((po_amount - cost) / po_amount); do not insert.
       bank_percentage: q.bank_percentage,
       bank_amount: q.bank_amount,
       sop_percentage: q.sop_percentage,

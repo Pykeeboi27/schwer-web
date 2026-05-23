@@ -353,7 +353,9 @@ CREATE TABLE IF NOT EXISTS public.purchase_orders (
   po_amount           NUMERIC(15, 2) NOT NULL,
   cost                NUMERIC(15, 2),
   margin_amount       NUMERIC(15, 2),
-  margin_percent      NUMERIC(6, 2),
+  margin_percent      NUMERIC(6, 2) GENERATED ALWAYS AS (
+                        CASE WHEN po_amount > 0 THEN ((po_amount - COALESCE(cost, 0)) / po_amount) * 100 ELSE 0 END
+                      ) STORED,
   recognized_amount   NUMERIC(15, 2) NOT NULL DEFAULT 0,
   payment_terms_days  INTEGER NOT NULL DEFAULT 30,
   payment_status      payment_status_enum NOT NULL DEFAULT 'unpaid',
