@@ -55,7 +55,7 @@ export default async function SalesQuotationsPage() {
 
   return (
     <div className="flex flex-col gap-4">
-      <div className="rounded-md border bg-card p-5">
+      <div className="rounded-md border border-l-4 border-l-primary bg-card p-5 pl-5">
         <h1 className="text-2xl font-semibold">Quotations</h1>
         <p className="mt-2 text-sm text-muted-foreground">
           Quotations originate in engineering and reach this page after executive approves the
@@ -106,16 +106,16 @@ export default async function SalesQuotationsPage() {
       ) : null}
 
       <section className="grid gap-3 rounded-md border bg-card p-5 sm:grid-cols-3">
-        <div className="rounded border p-3">
-          <p className="text-xs uppercase text-muted-foreground">Pending</p>
+        <div className="rounded-lg border bg-card p-4 shadow-sm">
+          <p className="text-xs uppercase tracking-wide text-muted-foreground">Pending</p>
           <p className="mt-1 text-xl font-semibold">{pendingCount}</p>
         </div>
-        <div className="rounded border p-3">
-          <p className="text-xs uppercase text-muted-foreground">Approved</p>
+        <div className="rounded-lg border bg-card p-4 shadow-sm">
+          <p className="text-xs uppercase tracking-wide text-muted-foreground">Approved</p>
           <p className="mt-1 text-xl font-semibold">{approvedCount}</p>
         </div>
-        <div className="rounded border p-3">
-          <p className="text-xs uppercase text-muted-foreground">Rejected</p>
+        <div className="rounded-lg border bg-card p-4 shadow-sm">
+          <p className="text-xs uppercase tracking-wide text-muted-foreground">Rejected</p>
           <p className="mt-1 text-xl font-semibold">{rejectedCount}</p>
         </div>
       </section>

@@ -20,6 +20,7 @@ type SortDirection = "asc" | "desc";
 type ApprovalFilter = "all" | SalesPurchaseOrder["status"];
 
 const APPROVAL_LABELS: Record<SalesPurchaseOrder["status"], string> = {
+  draft: "Draft",
   pending: "Pending Approval",
   approved: "Approved",
   rejected: "Rejected",
@@ -27,13 +28,15 @@ const APPROVAL_LABELS: Record<SalesPurchaseOrder["status"], string> = {
 };
 
 const APPROVAL_CLASSES: Record<SalesPurchaseOrder["status"], string> = {
-  pending: "border-amber-200 bg-amber-50 text-amber-700",
-  approved: "border-green-200 bg-green-50 text-green-700",
-  rejected: "border-red-200 bg-red-50 text-red-700",
-  cancelled: "border-gray-200 bg-gray-50 text-gray-500",
+  draft: "border-slate-200 bg-slate-50 text-slate-600 dark:border-slate-700 dark:bg-slate-900/40 dark:text-slate-300",
+  pending: "border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-300",
+  approved: "border-green-200 bg-green-50 text-green-700 dark:border-green-900 dark:bg-green-950/40 dark:text-green-300",
+  rejected: "border-red-200 bg-red-50 text-red-700 dark:border-red-900 dark:bg-red-950/40 dark:text-red-300",
+  cancelled: "border-gray-200 bg-gray-50 text-gray-500 dark:border-gray-700 dark:bg-gray-900/40 dark:text-gray-400",
 };
 
 const ALL_APPROVAL_STATUSES: SalesPurchaseOrder["status"][] = [
+  "draft",
   "pending",
   "approved",
   "rejected",
@@ -47,10 +50,10 @@ const PAYMENT_STATUS_LABELS: Record<SalesPurchaseOrder["paymentStatus"], string>
 };
 
 const PAYMENT_STATUS_CLASSES: Record<SalesPurchaseOrder["paymentStatus"], string> = {
-  unpaid: "border-slate-200 bg-slate-50 text-slate-600",
-  partial: "border-amber-200 bg-amber-50 text-amber-700",
-  paid: "border-green-200 bg-green-50 text-green-700",
-  overdue: "border-red-200 bg-red-50 text-red-700",
+  unpaid: "border-slate-200 bg-slate-50 text-slate-600 dark:border-slate-700 dark:bg-slate-900/40 dark:text-slate-300",
+  partial: "border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-300",
+  paid: "border-green-200 bg-green-50 text-green-700 dark:border-green-900 dark:bg-green-950/40 dark:text-green-300",
+  overdue: "border-red-200 bg-red-50 text-red-700 dark:border-red-900 dark:bg-red-950/40 dark:text-red-300",
 };
 
 function formatCurrency(amount: number): string {

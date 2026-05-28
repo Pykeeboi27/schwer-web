@@ -7,7 +7,11 @@ import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 import { useMediaQuery } from "../../lib/utils/useMediaQuery";
 
-export function Sidebar() {
+type SidebarProps = {
+  currentUserRole?: string | null;
+};
+
+export function Sidebar({ currentUserRole }: SidebarProps) {
   const [isOpen, setIsOpen] = useState(false);
   const isMobile = useMediaQuery("(max-width: 767px)");
   const pathname = usePathname();
@@ -20,6 +24,15 @@ export function Sidebar() {
     }
   }, [pathname, isMobile]);
 
+  const salesNavItems = [
+    { href: "/protected/sales/clients", label: "Clients" },
+    { href: "/protected/sales/quotations", label: "Quotations" },
+    { href: "/protected/sales/purchase-orders", label: "Purchase Orders" },
+    ...(currentUserRole === "sales_manager"
+      ? [{ href: "/protected/sales/approvals", label: "Approvals" }]
+      : []),
+  ];
+
   const navItems = isExecutiveRoute
     ? [
         { href: "/protected/executive", label: "Dashboard" },
@@ -31,11 +44,7 @@ export function Sidebar() {
           { href: "/protected/engineering", label: "Dashboard" },
           { href: "/protected/engineering/quotations", label: "Quotations" },
         ]
-      : [
-          { href: "/protected/sales/clients", label: "Clients" },
-          { href: "/protected/sales/quotations", label: "Quotations" },
-          { href: "/protected/sales/purchase-orders", label: "Purchase Orders" },
-        ];
+      : salesNavItems;
 
   const isActive = (href: string) => pathname === href || pathname.startsWith(`${href}/`);
 

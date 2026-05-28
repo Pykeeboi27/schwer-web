@@ -5,6 +5,7 @@ import {
   convertToPurchaseOrderAction,
   markClientPoReceivedAction,
   rejectQuotationAction,
+  resubmitQuotationAction,
   submitQuotationForApprovalAction,
   updateSalesQuotationDetailsAction,
 } from "@/app/protected/sales/quotations/actions";
@@ -12,7 +13,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { NumberInput } from "@/components/ui/number-input";
-import { computeSalesPricing } from "@/lib/sales/pricing";
+import { computeSalesPricing, computeVatBreakdown } from "@/lib/sales/pricing";
 import type { SalesQuotation } from "@/lib/sales/quotations";
 import { formatCurrency } from "@/lib/utils/number-format";
 import { useToast } from "@/lib/utils/toast-notification";
@@ -76,6 +77,10 @@ function statusLabel(status: SalesQuotation["status"]): string {
     return "Rejected";
   }
 
+  if (status === "closed") {
+    return "Closed (Converted to PO)";
+  }
+
   return "Cancelled";
 }
 
@@ -94,6 +99,9 @@ export function QuotationDetailsDialog({
   const [bankPercentage, setBankPercentage] = useState("");
   const [sopPercentage, setSopPercentage] = useState("");
   const [googleDriveLink, setGoogleDriveLink] = useState("");
+  const [driveUploading, setDriveUploading] = useState(false);
+  const [driveUploadedName, setDriveUploadedName] = useState<string | null>(null);
+  const [driveNotConfigured, setDriveNotConfigured] = useState(false);
   const [paymentTermsSelect, setPaymentTermsSelect] = useState("");
   const [paymentTermsCustom, setPaymentTermsCustom] = useState("");
   const [leadTimeDays, setLeadTimeDays] = useState("");
@@ -108,6 +116,8 @@ export function QuotationDetailsDialog({
   void currentUserId;
 
   const isDraft = quotation?.status === "draft";
+  const isRejected = quotation?.status === "rejected";
+  const isClosed = quotation?.status === "closed";
   const isApproved = quotation?.status === "approved";
   const isConverted = Boolean(quotation?.convertedPoId);
   const isClientConfirmed = Boolean(quotation?.clientConfirmedAt);
@@ -131,6 +141,21 @@ export function QuotationDetailsDialog({
   const handleClose = () => {
     onOpenChange(false);
     setRejectionReason("");
+  };
+
+  const handleResubmit = async () => {
+    if (!quotation) return;
+    setIsSubmitting(true);
+    const response = await resubmitQuotationAction(quotation.id);
+    if (!response.success) {
+      error(response.error ?? "Failed to resubmit quotation.");
+      setIsSubmitting(false);
+      return;
+    }
+    success("Quotation returned to draft. You can now edit and resubmit for approval.");
+    handleClose();
+    router.refresh();
+    setIsSubmitting(false);
   };
 
   useEffect(() => {
@@ -497,6 +522,40 @@ export function QuotationDetailsDialog({
               <span className="text-base font-semibold">{formatCurrency(pricing.sellingAmount)}</span>
             </div>
 
+            {(pricing.marginAmount > 0 || pricing.bankAmount > 0 || pricing.sopAmount > 0) ? (() => {
+              const vat = computeVatBreakdown(pricing);
+              return (
+                <div className="rounded-md border bg-muted/30 p-3 text-sm space-y-1">
+                  <div className="flex justify-between text-muted-foreground">
+                    <span>Selling Amount</span>
+                    <span>{formatCurrency(pricing.sellingAmount)}</span>
+                  </div>
+                  {pricing.marginAmount > 0 ? (
+                    <div className="flex justify-between text-muted-foreground">
+                      <span>+ Margin VAT (12%)</span>
+                      <span>{formatCurrency(vat.marginVat)}</span>
+                    </div>
+                  ) : null}
+                  {pricing.bankAmount > 0 ? (
+                    <div className="flex justify-between text-muted-foreground">
+                      <span>+ Bank VAT (12%)</span>
+                      <span>{formatCurrency(vat.bankVat)}</span>
+                    </div>
+                  ) : null}
+                  {pricing.sopAmount > 0 ? (
+                    <div className="flex justify-between text-muted-foreground">
+                      <span>+ SOP VAT (12%)</span>
+                      <span>{formatCurrency(vat.sopVat)}</span>
+                    </div>
+                  ) : null}
+                  <div className="flex justify-between border-t pt-1 font-semibold">
+                    <span>Grand Total (incl. VAT)</span>
+                    <span>{formatCurrency(vat.grandTotal)}</span>
+                  </div>
+                </div>
+              );
+            })() : null}
+
             <div className="grid gap-3 sm:grid-cols-2">
               <div>
                 <Label htmlFor="sales-lead-time">Lead Time (days)</Label>
@@ -544,15 +603,65 @@ export function QuotationDetailsDialog({
             ) : null}
 
             <div>
-              <Label htmlFor="sales-drive-link">Google Drive Link</Label>
-              <Input
-                id="sales-drive-link"
-                type="url"
-                value={googleDriveLink}
-                onChange={(event) => setGoogleDriveLink(event.target.value)}
-                className="mt-1"
-                placeholder="https://drive.google.com/..."
-              />
+              <Label>Google Drive Document</Label>
+              {driveNotConfigured ? (
+                <div className="mt-1 space-y-2">
+                  <p className="text-xs text-muted-foreground">Drive upload not configured. Enter the link manually.</p>
+                  <Input
+                    id="sales-drive-link"
+                    type="url"
+                    value={googleDriveLink}
+                    onChange={(event) => setGoogleDriveLink(event.target.value)}
+                    placeholder="https://drive.google.com/..."
+                  />
+                </div>
+              ) : (
+                <div className="mt-1 space-y-2">
+                  <input
+                    type="file"
+                    accept="application/pdf,image/*"
+                    className="block w-full text-sm text-muted-foreground file:mr-3 file:rounded-md file:border file:border-input file:bg-background file:px-3 file:py-1.5 file:text-sm file:font-medium"
+                    disabled={driveUploading}
+                    onChange={async (e) => {
+                      const file = e.target.files?.[0];
+                      if (!file) return;
+                      setDriveUploading(true);
+                      setDriveUploadedName(null);
+                      try {
+                        const form = new FormData();
+                        form.append("file", file);
+                        const res = await fetch("/api/drive-upload", { method: "POST", body: form });
+                        if (res.status === 503) {
+                          setDriveNotConfigured(true);
+                          return;
+                        }
+                        if (!res.ok) throw new Error("Upload failed.");
+                        const data = await res.json() as { webViewLink: string };
+                        setGoogleDriveLink(data.webViewLink);
+                        setDriveUploadedName(file.name);
+                      } catch {
+                        error("File upload failed. Enter the Drive link manually.");
+                        setDriveNotConfigured(true);
+                      } finally {
+                        setDriveUploading(false);
+                      }
+                    }}
+                  />
+                  {driveUploading ? (
+                    <p className="text-xs text-muted-foreground">Uploading…</p>
+                  ) : null}
+                  {driveUploadedName && googleDriveLink ? (
+                    <p className="text-xs">
+                      Uploaded: <a href={googleDriveLink} target="_blank" rel="noopener noreferrer" className="text-primary underline">{driveUploadedName}</a>
+                    </p>
+                  ) : null}
+                  {!driveUploadedName && googleDriveLink ? (
+                    <p className="text-xs">
+                      Current: <a href={googleDriveLink} target="_blank" rel="noopener noreferrer" className="text-primary underline">View file</a>
+                    </p>
+                  ) : null}
+                </div>
+              )}
             </div>
 
             <div>
@@ -633,7 +742,7 @@ export function QuotationDetailsDialog({
         )}
 
         {canEnterClientPo ? (
-          <div className="mt-5 space-y-3 rounded-md border border-blue-200 bg-blue-50/50 p-4 text-sm">
+          <div className="mt-5 space-y-3 rounded-md border border-blue-200 bg-blue-50/50 p-4 text-sm dark:border-blue-900 dark:bg-blue-950/30">
             <div>
               <h3 className="text-base font-semibold">Client Confirmed?</h3>
               <p className="text-xs text-muted-foreground">
@@ -662,7 +771,7 @@ export function QuotationDetailsDialog({
         ) : null}
 
         {isConverted ? (
-          <div className="mt-4 rounded-md border border-green-200 bg-green-50 p-3 text-sm text-green-800">
+          <div className="mt-4 rounded-md border border-green-200 bg-green-50 p-3 text-sm text-green-800 dark:border-green-900 dark:bg-green-950/40 dark:text-green-300">
             Converted to a purchase order
             {quotation.poConvertedAt
               ? ` on ${new Date(quotation.poConvertedAt).toLocaleDateString()}`
@@ -726,6 +835,18 @@ export function QuotationDetailsDialog({
                 Reject
               </Button>
             </>
+          ) : null}
+
+          {isRejected ? (
+            <Button onClick={handleResubmit} disabled={isSubmitting}>
+              {isSubmitting ? "Resubmitting..." : "Resubmit for Approval"}
+            </Button>
+          ) : null}
+
+          {isClosed ? (
+            <p className="text-sm text-muted-foreground">
+              This quotation has been converted to a purchase order and is now read-only.
+            </p>
           ) : null}
         </div>
       </div>

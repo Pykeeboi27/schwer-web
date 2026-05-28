@@ -2,9 +2,17 @@ export const PERIOD_FILTERS = ["monthly", "quarterly", "ytd"] as const;
 
 export type PeriodFilter = (typeof PERIOD_FILTERS)[number];
 
+export type QuarterlyTargets = {
+  q1: number | null;
+  q2: number | null;
+  q3: number | null;
+  q4: number | null;
+};
+
 export type ExecutiveKpiSummary = {
   revenueYtdBooked: number;
   annualTarget: number | null;
+  quarterlyTargets: QuarterlyTargets;
   revenueVsTargetDelta: number | null;
   marginYtdWeightedPercent: number | null;
 };
@@ -38,10 +46,13 @@ export type ExecutivePoSummary = {
   totalMarginAmount: number;
 };
 
+import type { SalesDashboardCharts } from "@/lib/sales/dashboard-charts";
+
 export type ExecutiveDashboardData = {
   periodFilter: PeriodFilter;
   kpis: ExecutiveKpiSummary;
   revenueBreakdown: ExecutiveRevenueBreakdown;
   salesPerformance: ExecutiveSalesPerformanceRow[];
   poSummary: ExecutivePoSummary;
+  charts: SalesDashboardCharts;
 };

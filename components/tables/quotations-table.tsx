@@ -24,14 +24,16 @@ const STATUS_LABELS: Record<SalesQuotation["status"], string> = {
   approved: "Approved",
   rejected: "Rejected",
   cancelled: "Cancelled",
+  closed: "Closed",
 };
 
 const STATUS_CLASSES: Record<SalesQuotation["status"], string> = {
-  draft: "border-slate-200 bg-slate-50 text-slate-600",
-  pending: "border-amber-200 bg-amber-50 text-amber-700",
-  approved: "border-green-200 bg-green-50 text-green-700",
-  rejected: "border-red-200 bg-red-50 text-red-700",
-  cancelled: "border-gray-200 bg-gray-50 text-gray-500",
+  draft: "border-slate-200 bg-slate-50 text-slate-600 dark:border-slate-700 dark:bg-slate-900/40 dark:text-slate-300",
+  pending: "border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-300",
+  approved: "border-green-200 bg-green-50 text-green-700 dark:border-green-900 dark:bg-green-950/40 dark:text-green-300",
+  rejected: "border-red-200 bg-red-50 text-red-700 dark:border-red-900 dark:bg-red-950/40 dark:text-red-300",
+  cancelled: "border-gray-200 bg-gray-50 text-gray-500 dark:border-gray-700 dark:bg-gray-900/40 dark:text-gray-400",
+  closed: "border-blue-200 bg-blue-50 text-blue-700 dark:border-blue-900 dark:bg-blue-950/40 dark:text-blue-300",
 };
 
 const ALL_STATUSES: SalesQuotation["status"][] = [
@@ -40,6 +42,7 @@ const ALL_STATUSES: SalesQuotation["status"][] = [
   "approved",
   "rejected",
   "cancelled",
+  "closed",
 ];
 
 function formatCurrency(amount: number): string {

@@ -20,7 +20,7 @@ export default async function EngineeringDashboardPage() {
 
   return (
     <div className="flex flex-col gap-4">
-      <div className="rounded-md border bg-card p-5">
+      <div className="rounded-md border border-l-4 border-l-primary bg-card p-5 pl-5">
         <h1 className="text-2xl font-semibold">Engineering Dashboard</h1>
         <p className="mt-2 text-sm text-muted-foreground">
           Start quotations with cost data and a Google Drive link, then submit them for executive
@@ -29,16 +29,16 @@ export default async function EngineeringDashboardPage() {
       </div>
 
       <section className="grid gap-3 rounded-md border bg-card p-5 sm:grid-cols-3">
-        <div className="rounded border p-3">
-          <p className="text-xs uppercase text-muted-foreground">Drafts</p>
+        <div className="rounded-lg border bg-card p-4 shadow-sm">
+          <p className="text-xs uppercase tracking-wide text-muted-foreground">Drafts</p>
           <p className="mt-1 text-xl font-semibold">{draftCount}</p>
         </div>
-        <div className="rounded border p-3">
-          <p className="text-xs uppercase text-muted-foreground">Pending Costing Approval</p>
+        <div className="rounded-lg border bg-card p-4 shadow-sm">
+          <p className="text-xs uppercase tracking-wide text-muted-foreground">Pending Costing Approval</p>
           <p className="mt-1 text-xl font-semibold">{pendingCount}</p>
         </div>
-        <div className="rounded border p-3">
-          <p className="text-xs uppercase text-muted-foreground">Returned for Edits</p>
+        <div className="rounded-lg border bg-card p-4 shadow-sm">
+          <p className="text-xs uppercase tracking-wide text-muted-foreground">Returned for Edits</p>
           <p className="mt-1 text-xl font-semibold">{rejectedDrafts}</p>
         </div>
       </section>

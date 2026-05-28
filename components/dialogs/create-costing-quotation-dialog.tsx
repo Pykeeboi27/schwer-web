@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { NumberInput } from "@/components/ui/number-input";
+import { suggestQuotationNumber } from "@/lib/engineering/suggest-quotation-number";
 import { useToast } from "@/lib/utils/toast-notification";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
@@ -20,6 +21,7 @@ type CreateCostingQuotationDialogProps = {
 };
 
 type FieldErrors = {
+  quotationNumber?: string;
   clientId?: string;
   subject?: string;
   cost?: string;
@@ -42,6 +44,7 @@ export function CreateCostingQuotationDialog({ clients }: CreateCostingQuotation
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
+  const [quotationNumber, setQuotationNumber] = useState("");
 
   const activeClients = useMemo(
     () => clients.filter((client) => client.isActive),
@@ -55,6 +58,7 @@ export function CreateCostingQuotationDialog({ clients }: CreateCostingQuotation
     setIsSubmitting(false);
     setFormError(null);
     setFieldErrors({});
+    setQuotationNumber("");
   };
 
   useEffect(() => {
@@ -79,6 +83,10 @@ export function CreateCostingQuotationDialog({ clients }: CreateCostingQuotation
 
     const formData = new FormData(event.currentTarget);
     const nextErrors: FieldErrors = {};
+
+    const quotationNumberValue = quotationNumber.trim().toUpperCase();
+    if (!quotationNumberValue) nextErrors.quotationNumber = "Quotation ID is required.";
+    else formData.set("quotationNumber", quotationNumberValue);
 
     const clientId = String(formData.get("clientId") ?? "").trim();
     const subject = String(formData.get("subject") ?? "").trim();
@@ -158,6 +166,30 @@ export function CreateCostingQuotationDialog({ clients }: CreateCostingQuotation
             </div>
 
             <form onSubmit={handleSubmit} className="grid gap-4 md:grid-cols-2">
+              <div className="md:col-span-2">
+                <Label htmlFor="costing-quotation-number">Quotation ID</Label>
+                <div className="mt-1 flex gap-2">
+                  <Input
+                    id="costing-quotation-number"
+                    value={quotationNumber}
+                    onChange={(e) => setQuotationNumber(e.target.value.toUpperCase())}
+                    aria-invalid={Boolean(fieldErrors.quotationNumber)}
+                    className="uppercase"
+                    placeholder="QT-2026-001"
+                  />
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => setQuotationNumber(suggestQuotationNumber())}
+                  >
+                    Suggest
+                  </Button>
+                </div>
+                {fieldErrors.quotationNumber ? (
+                  <p className="mt-1 text-xs text-destructive">{fieldErrors.quotationNumber}</p>
+                ) : null}
+              </div>
+
               <div className="md:col-span-2">
                 <Label htmlFor="costing-client">Client</Label>
                 <select

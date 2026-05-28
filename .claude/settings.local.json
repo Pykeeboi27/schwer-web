@@ -26,7 +26,12 @@
       "Bash(node -e \"const p=require\\('./package.json'\\); console.log\\(JSON.stringify\\({...p.dependencies,...p.devDependencies},null,1\\)\\)\")",
       "Bash(findstr /i \"chart recharts d3 victory\")",
       "Bash(npx eslint *)",
-      "Bash(findstr /i client)"
+      "Bash(findstr /i client)",
+      "Bash(git push *)",
+      "Bash(New-Item -Path \"C:\\\\Users\\\\jiroh\\\\Desktop\\\\schwer-web\\\\lib\\\\google-drive\" -ItemType Directory -Force)",
+      "Bash(Out-Null)",
+      "Bash(New-Item -Path \"C:\\\\Users\\\\jiroh\\\\Desktop\\\\schwer-web\\\\app\\\\api\\\\drive-upload\" -ItemType Directory -Force)",
+      "PowerShell(New-Item *)"
     ]
   },
   "enableAllProjectMcpServers": true,

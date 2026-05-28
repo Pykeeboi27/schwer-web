@@ -59,18 +59,18 @@ function getDisplayStatus(q: CostingQuotation): { label: string; className: stri
   if (q.status === "draft" && q.costingRejectionReason) {
     return {
       label: "Returned for Edits",
-      className: "border-orange-200 bg-orange-50 text-orange-700",
+      className: "border-orange-200 bg-orange-50 text-orange-700 dark:border-orange-900 dark:bg-orange-950/40 dark:text-orange-300",
     };
   }
   const map: Record<CostingQuotation["status"], { label: string; className: string }> = {
-    draft: { label: "Draft", className: "border-slate-200 bg-slate-50 text-slate-600" },
+    draft: { label: "Draft", className: "border-slate-200 bg-slate-50 text-slate-600 dark:border-slate-700 dark:bg-slate-900/40 dark:text-slate-300" },
     pending: {
       label: "Pending Approval",
-      className: "border-amber-200 bg-amber-50 text-amber-700",
+      className: "border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-300",
     },
-    approved: { label: "Approved", className: "border-green-200 bg-green-50 text-green-700" },
-    rejected: { label: "Rejected", className: "border-red-200 bg-red-50 text-red-700" },
-    cancelled: { label: "Cancelled", className: "border-gray-200 bg-gray-50 text-gray-500" },
+    approved: { label: "Approved", className: "border-green-200 bg-green-50 text-green-700 dark:border-green-900 dark:bg-green-950/40 dark:text-green-300" },
+    rejected: { label: "Rejected", className: "border-red-200 bg-red-50 text-red-700 dark:border-red-900 dark:bg-red-950/40 dark:text-red-300" },
+    cancelled: { label: "Cancelled", className: "border-gray-200 bg-gray-50 text-gray-500 dark:border-gray-700 dark:bg-gray-900/40 dark:text-gray-400" },
   };
   return map[q.status];
 }

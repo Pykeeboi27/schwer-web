@@ -4,7 +4,8 @@ type WorkflowStatus =
   | "pending_owner"
   | "pending_executive"
   | "approved"
-  | "rejected";
+  | "rejected"
+  | "closed";
 
 type ApproverRole = "sales_manager" | "owner" | "executive";
 
@@ -25,7 +26,8 @@ function normalizeStatus(status: string): WorkflowStatus {
     normalized === "pending_owner" ||
     normalized === "pending_executive" ||
     normalized === "approved" ||
-    normalized === "rejected"
+    normalized === "rejected" ||
+    normalized === "closed"
   ) {
     return normalized;
   }
@@ -55,7 +57,7 @@ export function determineNextQuotationStatus(
     throw new Error("Quotation amount must be greater than 0.");
   }
 
-  if (status === "approved" || status === "rejected") {
+  if (status === "approved" || status === "rejected" || status === "closed") {
     return status;
   }
 

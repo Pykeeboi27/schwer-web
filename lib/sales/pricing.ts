@@ -1,12 +1,3 @@
-/**
- * Pure sales pricing math, safe to import from both client components and
- * server actions (no Supabase / server-only imports here).
- *
- *   margin_amount  = direct_cost * margin_percentage / 100
- *   bank_amount    = direct_cost * bank_percentage   / 100
- *   sop_amount     = direct_cost * sop_percentage    / 100
- *   selling_amount = direct_cost + margin_amount + bank_amount + sop_amount
- */
 const round2 = (n: number) => Math.round(n * 100) / 100;
 
 export type SalesPricing = {
@@ -29,4 +20,19 @@ export function computeSalesPricing(input: {
   const sellingAmount = round2(cost + marginAmount + bankAmount + sopAmount);
 
   return { marginAmount, bankAmount, sopAmount, sellingAmount };
+}
+
+export type VatBreakdown = {
+  marginVat: number;
+  bankVat: number;
+  sopVat: number;
+  grandTotal: number;
+};
+
+export function computeVatBreakdown(pricing: SalesPricing): VatBreakdown {
+  const marginVat = round2(pricing.marginAmount * 0.12);
+  const bankVat = round2(pricing.bankAmount * 0.12);
+  const sopVat = round2(pricing.sopAmount * 0.12);
+  const grandTotal = round2(pricing.sellingAmount + marginVat + bankVat + sopVat);
+  return { marginVat, bankVat, sopVat, grandTotal };
 }

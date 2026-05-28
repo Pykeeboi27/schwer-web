@@ -3,6 +3,8 @@
 import {
   approvePurchaseOrderAction,
   rejectPurchaseOrderAction,
+  resubmitPurchaseOrderAction,
+  updatePurchaseOrderReferencesAction,
 } from "@/app/protected/sales/purchase-orders/actions";
 import { RecordCollectionDialog } from "@/components/dialogs/record-collection-dialog";
 import { Badge } from "@/components/ui/badge";
@@ -24,6 +26,7 @@ type PurchaseOrderDetailsDialogProps = {
 };
 
 const APPROVAL_LABELS: Record<SalesPurchaseOrder["status"], string> = {
+  draft: "Draft",
   pending: "Pending Approval",
   approved: "Approved",
   rejected: "Rejected",
@@ -55,6 +58,8 @@ export function PurchaseOrderDetailsDialog({
   const [recordDialogOpen, setRecordDialogOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [rejectionReason, setRejectionReason] = useState("");
+  const [editClientPoNumber, setEditClientPoNumber] = useState("");
+  const [editQuotationReference, setEditQuotationReference] = useState("");
 
   void currentUserId;
   const normalizedRole = String(currentUserRole ?? "").trim().toLowerCase();
@@ -72,10 +77,45 @@ export function PurchaseOrderDetailsDialog({
     onOpenChange(false);
   };
 
+  const handleSaveReferences = async () => {
+    if (!purchaseOrder) return;
+    setIsSubmitting(true);
+    const response = await updatePurchaseOrderReferencesAction(
+      purchaseOrder.id,
+      editClientPoNumber || null,
+      editQuotationReference || null,
+    );
+    if (!response.success) {
+      error(response.error ?? "Failed to save references.");
+      setIsSubmitting(false);
+      return;
+    }
+    success("References saved.");
+    setIsSubmitting(false);
+    router.refresh();
+  };
+
+  const handleResubmit = async () => {
+    if (!purchaseOrder) return;
+    setIsSubmitting(true);
+    const response = await resubmitPurchaseOrderAction(purchaseOrder.id);
+    if (!response.success) {
+      error(response.error ?? "Failed to resubmit purchase order.");
+      setIsSubmitting(false);
+      return;
+    }
+    success("Purchase order resubmitted for approval.");
+    handleClose();
+    router.refresh();
+    setIsSubmitting(false);
+  };
+
   useEffect(() => {
     if (!open) {
       return;
     }
+    setEditClientPoNumber(purchaseOrder?.clientPoNumber ?? "");
+    setEditQuotationReference(purchaseOrder?.quotationReference ?? "");
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
         setRecordDialogOpen(false);
@@ -84,12 +124,13 @@ export function PurchaseOrderDetailsDialog({
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [open, onOpenChange]);
+  }, [open, onOpenChange, purchaseOrder?.clientPoNumber, purchaseOrder?.quotationReference]);
 
   if (!open || !purchaseOrder) {
     return null;
   }
 
+  const isDraft = purchaseOrder.status === "draft";
   const isApproved = purchaseOrder.status === "approved";
   const canApproveReject =
     purchaseOrder.status === "pending" &&
@@ -163,7 +204,33 @@ export function PurchaseOrderDetailsDialog({
             </div>
             <div className="grid grid-cols-[160px_1fr] gap-2">
               <dt className="text-muted-foreground">Client PO #</dt>
-              <dd>{purchaseOrder.clientPoNumber ?? "—"}</dd>
+              <dd>
+                {isDraft ? (
+                  <Input
+                    value={editClientPoNumber}
+                    onChange={(e) => setEditClientPoNumber(e.target.value.toUpperCase())}
+                    placeholder="Client PO number"
+                    className="h-8"
+                  />
+                ) : (
+                  purchaseOrder.clientPoNumber ?? "—"
+                )}
+              </dd>
+            </div>
+            <div className="grid grid-cols-[160px_1fr] gap-2">
+              <dt className="text-muted-foreground">Quotation Ref.</dt>
+              <dd>
+                {isDraft ? (
+                  <Input
+                    value={editQuotationReference}
+                    onChange={(e) => setEditQuotationReference(e.target.value.toUpperCase())}
+                    placeholder="Quotation reference"
+                    className="h-8"
+                  />
+                ) : (
+                  purchaseOrder.quotationReference ?? "—"
+                )}
+              </dd>
             </div>
             <div className="grid grid-cols-[160px_1fr] gap-2">
               <dt className="text-muted-foreground">Client</dt>
@@ -244,6 +311,24 @@ export function PurchaseOrderDetailsDialog({
                 </Button>
                 <Button variant="outline" onClick={handleReject} disabled={isSubmitting}>
                   Reject
+                </Button>
+              </div>
+            </div>
+          ) : null}
+
+          {isDraft ? (
+            <div className="mt-5 space-y-3 rounded-md border bg-muted/20 p-4">
+              <h3 className="text-base font-semibold">Draft — Edit &amp; Resubmit</h3>
+              <p className="text-sm text-muted-foreground">
+                This purchase order was returned to draft after rejection. Update the details above
+                then save, or submit directly for approval.
+              </p>
+              <div className="flex justify-end gap-2">
+                <Button variant="outline" onClick={handleSaveReferences} disabled={isSubmitting}>
+                  {isSubmitting ? "Saving..." : "Save Changes"}
+                </Button>
+                <Button onClick={handleResubmit} disabled={isSubmitting}>
+                  {isSubmitting ? "Submitting..." : "Submit for Approval"}
                 </Button>
               </div>
             </div>

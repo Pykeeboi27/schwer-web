@@ -7,6 +7,7 @@ import {
   parseLeadTimeDays,
   parsePercentInput,
   rejectQuotationApproval,
+  resubmitQuotationForApproval,
   submitQuotationForApproval,
   updateSalesQuotationDetails,
   type RequiredApproverRole,
@@ -275,6 +276,27 @@ export async function convertToPurchaseOrderAction(
     return {
       success: false,
       error: error instanceof Error ? error.message : "Failed to convert to purchase order.",
+    };
+  }
+}
+
+export async function resubmitQuotationAction(
+  quotationId: string,
+): Promise<ActionResponse<{ quotationId: string }>> {
+  const normalizedId = String(quotationId ?? "").trim();
+
+  if (!normalizedId) {
+    return { success: false, error: "Quotation id is required." };
+  }
+
+  try {
+    await resubmitQuotationForApproval(normalizedId);
+    revalidatePath("/protected/sales/quotations");
+    return { success: true, data: { quotationId: normalizedId } };
+  } catch (error) {
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Failed to resubmit quotation.",
     };
   }
 }

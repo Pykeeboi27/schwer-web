@@ -1,15 +1,19 @@
 export type ClientFormInput = {
   name: string;
+  contactPerson?: string | null;
   email?: string | null;
   phone?: string | null;
   address?: string | null;
+  tin?: string | null;
 };
 
 export type ClientFormErrors = {
   name?: string;
+  contactPerson?: string;
   email?: string;
   phone?: string;
   address?: string;
+  tin?: string;
 };
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -122,23 +126,33 @@ export function validateClientForm(input: ClientFormInput): {
   const errors: ClientFormErrors = {};
 
   const nameError = validateClientName(input.name);
-  if (nameError) {
-    errors.name = nameError;
+  if (nameError) errors.name = nameError;
+
+  if (!String(input.contactPerson ?? "").trim()) {
+    errors.contactPerson = "Contact person is required.";
   }
 
-  const emailError = validateClientEmail(input.email);
-  if (emailError) {
-    errors.email = emailError;
+  const emailNorm = String(input.email ?? "").trim();
+  if (!emailNorm) {
+    errors.email = "Email is required.";
+  } else {
+    const emailError = validateClientEmail(emailNorm);
+    if (emailError) errors.email = emailError;
   }
 
-  const phoneError = validateClientPhone(input.phone);
-  if (phoneError) {
-    errors.phone = phoneError;
+  const phoneNorm = String(input.phone ?? "").trim();
+  if (!phoneNorm) {
+    errors.phone = "Phone number is required.";
+  } else {
+    const phoneError = validateClientPhone(phoneNorm);
+    if (phoneError) errors.phone = phoneError;
   }
 
-  const addressError = validateClientAddress(input.address, false);
-  if (addressError) {
-    errors.address = addressError;
+  const addressError = validateClientAddress(input.address, true);
+  if (addressError) errors.address = addressError;
+
+  if (!String(input.tin ?? "").trim()) {
+    errors.tin = "TIN is required.";
   }
 
   return {

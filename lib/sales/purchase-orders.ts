@@ -7,13 +7,14 @@ import {
 import { createClient } from "@/lib/supabase/server";
 import { validatePoTotalAmount } from "@/lib/utils/form-validation";
 
-export type PurchaseOrderStatus = "pending" | "approved" | "rejected" | "cancelled";
+export type PurchaseOrderStatus = "draft" | "pending" | "approved" | "rejected" | "cancelled";
 
 export type SalesPurchaseOrder = {
   id: string;
   quotationId: string | null;
   poNumber: string;
   clientPoNumber: string | null;
+  quotationReference: string | null;
   clientId: string;
   clientName: string;
   subject: string;
@@ -116,7 +117,7 @@ export async function listPurchaseOrders(): Promise<SalesPurchaseOrder[]> {
   const { data, error } = await supabase
     .from("purchase_orders")
     .select(
-      "id, quotation_id, po_number, client_po_number, client_id, subject, po_amount, cost, margin_percentage, margin_amount, bank_amount, sop_amount, selling_amount, recognized_amount, payment_status, payment_terms, payment_terms_custom, lead_time_days, status, approved_at, created_at, clients:client_id(company_name), po_approvals(approver_role, status)",
+      "id, quotation_id, po_number, client_po_number, quotation_reference, client_id, subject, po_amount, cost, margin_percentage, margin_amount, bank_amount, sop_amount, selling_amount, recognized_amount, payment_status, payment_terms, payment_terms_custom, lead_time_days, status, approved_at, created_at, clients:client_id(company_name), po_approvals(approver_role, status)",
     )
     .order("created_at", { ascending: false });
 
@@ -141,6 +142,7 @@ export async function listPurchaseOrders(): Promise<SalesPurchaseOrder[]> {
       quotationId: row.quotation_id ?? null,
       poNumber: row.po_number,
       clientPoNumber: row.client_po_number ?? null,
+      quotationReference: (row as Record<string, unknown>).quotation_reference as string | null ?? null,
       clientId: row.client_id,
       clientName: client?.company_name ?? "Unknown client",
       subject: row.subject,
@@ -257,36 +259,55 @@ export async function convertQuotationToPurchaseOrder(
   }
 
   const poAmount = Number(q.amount);
-  const poNumber = `PO-${Date.now()}`;
 
-  const { data: po, error: poError } = await supabase
+  const year = new Date().getFullYear();
+  const { count: poCount } = await supabase
     .from("purchase_orders")
-    .insert({
-      po_number: poNumber,
-      quotation_id: q.id,
-      client_id: q.client_id,
-      sector: q.sector,
-      subject: q.subject,
-      po_amount: poAmount,
-      cost: q.cost,
-      margin_percentage: q.margin_percentage,
-      margin_amount: q.margin_amount,
-      // margin_percent is a GENERATED column ((po_amount - cost) / po_amount); do not insert.
-      bank_percentage: q.bank_percentage,
-      bank_amount: q.bank_amount,
-      sop_percentage: q.sop_percentage,
-      sop_amount: q.sop_amount,
-      selling_amount: q.selling_amount,
-      payment_terms: q.payment_terms,
-      payment_terms_custom: q.payment_terms_custom,
-      lead_time_days: q.lead_time_days,
-      client_po_number: q.client_po_number,
-      status: "pending",
-      submitted_at: new Date().toISOString(),
-      created_by: user.id,
-    })
+    .select("*", { count: "exact", head: true })
+    .like("po_number", `PO-${year}-%`);
+  const seq = String((poCount ?? 0) + 1).padStart(4, "0");
+  let poNumber = `PO-${year}-${seq}`;
+
+  const poPayload = {
+    po_number: poNumber,
+    quotation_id: q.id,
+    client_id: q.client_id,
+    sector: q.sector,
+    subject: q.subject,
+    po_amount: poAmount,
+    cost: q.cost,
+    margin_percentage: q.margin_percentage,
+    margin_amount: q.margin_amount,
+    // margin_percent is a GENERATED column; do not insert.
+    bank_percentage: q.bank_percentage,
+    bank_amount: q.bank_amount,
+    sop_percentage: q.sop_percentage,
+    sop_amount: q.sop_amount,
+    selling_amount: q.selling_amount,
+    payment_terms: q.payment_terms,
+    payment_terms_custom: q.payment_terms_custom,
+    lead_time_days: q.lead_time_days,
+    client_po_number: q.client_po_number,
+    status: "pending",
+    submitted_at: new Date().toISOString(),
+    created_by: user.id,
+  };
+
+  let { data: po, error: poError } = await supabase
+    .from("purchase_orders")
+    .insert(poPayload)
     .select("id")
     .single();
+
+  if (poError?.code === "23505") {
+    // Unique violation on po_number — retry with next sequence number.
+    poNumber = `PO-${year}-${String((poCount ?? 0) + 2).padStart(4, "0")}`;
+    ({ data: po, error: poError } = await supabase
+      .from("purchase_orders")
+      .insert({ ...poPayload, po_number: poNumber })
+      .select("id")
+      .single());
+  }
 
   if (poError || !po) {
     throw new Error(poError?.message || "Failed to create the purchase order.");
@@ -314,7 +335,11 @@ export async function convertQuotationToPurchaseOrder(
 
   const { error: linkError } = await supabase
     .from("quotations")
-    .update({ converted_po_id: po.id, po_converted_at: new Date().toISOString() })
+    .update({
+      converted_po_id: po.id,
+      po_converted_at: new Date().toISOString(),
+      status: "closed",
+    })
     .eq("id", q.id);
 
   if (linkError) {
@@ -445,7 +470,7 @@ export async function rejectPoApproval(input: {
   reason: string;
 }): Promise<void> {
   const supabase = await createClient();
-  const { error } = await supabase
+  const { error: approvalError } = await supabase
     .from("po_approvals")
     .update({
       status: "rejected",
@@ -454,11 +479,71 @@ export async function rejectPoApproval(input: {
     })
     .eq("id", input.approvalId);
 
-  if (error) {
-    throw new Error(error.message || "Failed to reject purchase order.");
+  if (approvalError) {
+    throw new Error(approvalError.message || "Failed to reject purchase order.");
   }
 
-  await refreshPurchaseOrderStatus(input.poId);
+  // Return PO to draft so the submitter can edit and resubmit.
+  const { error: poError } = await supabase
+    .from("purchase_orders")
+    .update({ status: "draft" })
+    .eq("id", input.poId);
+
+  if (poError) {
+    throw new Error(poError.message || "Failed to update purchase order status.");
+  }
+}
+
+export async function resubmitPurchaseOrderForApproval(poId: string): Promise<void> {
+  const supabase = await createClient();
+
+  const { data: po, error: fetchError } = await supabase
+    .from("purchase_orders")
+    .select("id, status, po_amount")
+    .eq("id", poId)
+    .single();
+
+  if (fetchError || !po) {
+    throw new Error("Purchase order was not found.");
+  }
+
+  if (po.status !== "draft") {
+    throw new Error("Only draft purchase orders can be resubmitted.");
+  }
+
+  const { error: poError } = await supabase
+    .from("purchase_orders")
+    .update({ status: "pending", submitted_at: new Date().toISOString() })
+    .eq("id", poId);
+
+  if (poError) {
+    throw new Error(poError.message || "Failed to resubmit purchase order.");
+  }
+
+  // Clear previous approval rows and create fresh ones.
+  await supabase.from("po_approvals").delete().eq("po_id", poId);
+
+  const roles = requiredApproverRolesForAmount(Number(po.po_amount));
+  const rows: Array<{
+    po_id: string;
+    approver_id: string;
+    approver_role: RequiredApproverRole;
+    status: "pending";
+  }> = [];
+
+  for (const role of roles) {
+    const approvers = await findApproversForRole(role);
+    for (const approver of approvers) {
+      rows.push({ po_id: poId, approver_id: approver.id, approver_role: role, status: "pending" });
+    }
+  }
+
+  if (rows.length > 0) {
+    const { error: approvalError } = await supabase.from("po_approvals").insert(rows);
+    if (approvalError) {
+      throw new Error(approvalError.message || "Failed to create PO approval assignments.");
+    }
+  }
 }
 
 export async function listPoPayments(purchaseOrderId?: string): Promise<SalesPoPayment[]> {

@@ -41,6 +41,7 @@ export async function createCostingQuotationAction(
   formData: FormData,
 ): Promise<ActionResponse<{ quotationId: string }>> {
   try {
+    const quotationNumber = asRequiredString(formData.get("quotationNumber"), "Quotation ID").toUpperCase();
     const clientId = asRequiredString(formData.get("clientId"), "Client");
     const subject = asRequiredString(formData.get("subject"), "Subject").toUpperCase();
     const cost = parseCostingCost(formData.get("cost"));
@@ -48,6 +49,7 @@ export async function createCostingQuotationAction(
     const notes = asOptionalString(formData.get("notes"))?.toUpperCase() ?? null;
 
     const result = await createCostingQuotation({
+      quotationNumber,
       clientId,
       subject,
       cost,
@@ -70,6 +72,7 @@ export async function updateCostingQuotationAction(
 ): Promise<ActionResponse<{ quotationId: string }>> {
   try {
     const quotationId = asRequiredString(formData.get("quotationId"), "Quotation");
+    const quotationNumber = asOptionalString(formData.get("quotationNumber"))?.toUpperCase() ?? undefined;
     const clientId = asRequiredString(formData.get("clientId"), "Client");
     const subject = asRequiredString(formData.get("subject"), "Subject").toUpperCase();
     const cost = parseCostingCost(formData.get("cost"));
@@ -78,6 +81,7 @@ export async function updateCostingQuotationAction(
 
     await updateCostingQuotation({
       quotationId,
+      quotationNumber,
       clientId,
       subject,
       cost,

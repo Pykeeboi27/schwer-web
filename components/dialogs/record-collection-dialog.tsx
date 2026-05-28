@@ -162,6 +162,7 @@ export function RecordCollectionDialog({
               type="number"
               min={0.01}
               step="0.01"
+              inputMode="decimal"
               value={amount}
               onChange={(event) => {
                 const nextAmount = event.target.value;

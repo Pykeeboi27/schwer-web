@@ -17,13 +17,13 @@ export default async function SalesClientsPage() {
 
   return (
     <div className="flex flex-col gap-4">
-      <div className="rounded-md border bg-card p-5">
+      <div className="rounded-md border border-l-4 border-l-primary bg-card p-5 pl-5">
         <h1 className="text-2xl font-semibold">Clients</h1>
         <p className="mt-2 text-sm text-muted-foreground">
           Manage client profiles, generate unique codes, and open full details from the table.
         </p>
         <div className="mt-4">
-          <CreateClientDialog />
+          <CreateClientDialog existingNames={clients.map((c) => c.companyName)} />
         </div>
       </div>
 

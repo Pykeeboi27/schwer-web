@@ -27,6 +27,8 @@ export type CostingQuotation = {
   createdAt: string;
 };
 
+export { suggestQuotationNumber } from "@/lib/engineering/suggest-quotation-number";
+
 export function parseCostingAmount(raw: unknown): number {
   const value = Number(raw);
   if (!Number.isFinite(value) || value <= 0) {
@@ -116,6 +118,7 @@ export async function listCostingApprovedHistory(): Promise<CostingApprovedHisto
 }
 
 export async function createCostingQuotation(input: {
+  quotationNumber: string;
   clientId: string;
   subject: string;
   cost: number;
@@ -142,11 +145,10 @@ export async function createCostingQuotation(input: {
     throw new Error("Selected client was not found.");
   }
 
-  const quotationNumber = `QT-${Date.now()}`;
   const { data, error } = await supabase
     .from("quotations")
     .insert({
-      quotation_number: quotationNumber,
+      quotation_number: input.quotationNumber,
       client_id: input.clientId,
       sector: clientRow.sector,
       subject: input.subject,
@@ -164,6 +166,9 @@ export async function createCostingQuotation(input: {
     .single();
 
   if (error || !data) {
+    if (error?.code === "23505") {
+      throw new Error("Quotation ID already exists. Please choose a different one.");
+    }
     throw new Error(error?.message || "Failed to create costing quotation.");
   }
 
@@ -172,6 +177,7 @@ export async function createCostingQuotation(input: {
 
 export async function updateCostingQuotation(input: {
   quotationId: string;
+  quotationNumber?: string;
   clientId: string;
   subject: string;
   cost: number;
@@ -220,20 +226,29 @@ export async function updateCostingQuotation(input: {
     throw new Error("Selected client was not found.");
   }
 
+  const updatePayload: Record<string, unknown> = {
+    client_id: input.clientId,
+    sector: clientRow.sector,
+    subject: input.subject,
+    cost: input.cost,
+    google_drive_link: input.googleDriveLink,
+    notes: input.notes ?? null,
+    costing_rejection_reason: null,
+  };
+
+  if (input.quotationNumber) {
+    updatePayload.quotation_number = input.quotationNumber;
+  }
+
   const { error: updateError } = await supabase
     .from("quotations")
-    .update({
-      client_id: input.clientId,
-      sector: clientRow.sector,
-      subject: input.subject,
-      cost: input.cost,
-      google_drive_link: input.googleDriveLink,
-      notes: input.notes ?? null,
-      costing_rejection_reason: null,
-    })
+    .update(updatePayload)
     .eq("id", input.quotationId);
 
   if (updateError) {
+    if (updateError.code === "23505") {
+      throw new Error("Quotation ID already exists. Please choose a different one.");
+    }
     throw new Error(updateError.message || "Failed to update costing quotation.");
   }
 }

@@ -54,6 +54,9 @@ describe("clients utilities", () => {
         name: "ACME Corp",
         email: "sales@acme.com",
         phone: "0917 555 1234",
+        contactPerson: "JUAN DELA CRUZ",
+        address: "123 MAIN ST, MANILA",
+        tin: "123-456-789-00000",
       }).valid,
     ).toBe(true);
 

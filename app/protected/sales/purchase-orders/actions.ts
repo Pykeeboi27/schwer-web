@@ -7,8 +7,10 @@ import {
   findPendingPoApprovalForRole,
   parsePoAmount,
   rejectPoApproval,
+  resubmitPurchaseOrderForApproval,
   type SalesPurchaseOrder,
 } from "@/lib/sales/purchase-orders";
+import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
 
 type ActionResponse<T> = {
@@ -133,6 +135,57 @@ export async function rejectPurchaseOrderAction(
     return {
       success: false,
       error: error instanceof Error ? error.message : "Failed to reject purchase order.",
+    };
+  }
+}
+
+export async function resubmitPurchaseOrderAction(
+  poId: string,
+): Promise<ActionResponse<{ poId: string }>> {
+  const normalizedId = String(poId ?? "").trim();
+  if (!normalizedId) {
+    return { success: false, error: "Purchase order id is required." };
+  }
+  try {
+    await resubmitPurchaseOrderForApproval(normalizedId);
+    revalidatePath("/protected/sales/purchase-orders");
+    revalidatePath("/protected/executive/approvals");
+    return { success: true, data: { poId: normalizedId } };
+  } catch (error) {
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Failed to resubmit purchase order.",
+    };
+  }
+}
+
+export async function updatePurchaseOrderReferencesAction(
+  poId: string,
+  clientPoNumber: string | null,
+  quotationReference: string | null,
+): Promise<ActionResponse<{ poId: string }>> {
+  const normalizedId = String(poId ?? "").trim();
+  if (!normalizedId) {
+    return { success: false, error: "Purchase order id is required." };
+  }
+  try {
+    const supabase = await createClient();
+    const { error } = await supabase
+      .from("purchase_orders")
+      .update({
+        client_po_number: clientPoNumber ? clientPoNumber.toUpperCase() : null,
+        quotation_reference: quotationReference ? quotationReference.toUpperCase() : null,
+      })
+      .eq("id", normalizedId);
+
+    if (error) throw new Error(error.message);
+
+    revalidatePath("/protected/sales/purchase-orders");
+    return { success: true, data: { poId: normalizedId } };
+  } catch (error) {
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Failed to update purchase order references.",
     };
   }
 }

@@ -55,9 +55,9 @@ export function ToastViewport() {
             key={toast.id}
             className={cn(
               "flex items-start gap-2 rounded-md border px-3 py-2 text-sm shadow-sm",
-              isSuccess && "border-emerald-300 bg-emerald-50 text-emerald-900",
-              isError && "border-red-300 bg-red-50 text-red-900",
-              toast.variant === "info" && "border-blue-300 bg-blue-50 text-blue-900",
+              isSuccess && "border-emerald-300 bg-emerald-50 text-emerald-900 dark:border-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300",
+              isError && "border-red-300 bg-red-50 text-red-900 dark:border-red-700 dark:bg-red-950/40 dark:text-red-300",
+              toast.variant === "info" && "border-blue-300 bg-blue-50 text-blue-900 dark:border-blue-700 dark:bg-blue-950/40 dark:text-blue-300",
             )}
             role={isError ? "alert" : "status"}
           >

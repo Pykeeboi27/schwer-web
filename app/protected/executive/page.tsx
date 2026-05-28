@@ -1,4 +1,7 @@
+import { ClientDistributionChart } from "@/components/sales/client-distribution-chart";
+import { SectorPerformanceChart } from "@/components/sales/sector-performance-chart";
 import { ExecutiveEmptyState } from "@/components/executive/empty-state";
+import { RevenueTrendChart } from "@/components/executive/revenue-trend-chart";
 import { TargetEditorForm } from "@/components/executive/target-editor-form";
 import {
   Card,
@@ -24,7 +27,6 @@ function parsePeriodFilter(period: string | undefined): PeriodFilter {
   if (period && PERIOD_FILTERS.includes(period as PeriodFilter)) {
     return period as PeriodFilter;
   }
-
   return "ytd";
 }
 
@@ -79,14 +81,28 @@ export default async function ExecutiveDashboardPage({
       : monthBreakdownRows.some((entry) => entry.bookedRevenue > 0);
   const hasSalesPerformanceData = dashboard.salesPerformance.length > 0;
 
+  const trendData =
+    selectedPeriod === "quarterly"
+      ? quarterBreakdownRows.map((e) => ({ label: `Q${e.quarter}`, value: e.bookedRevenue }))
+      : monthBreakdownRows.map((e) => {
+          const MONTH_LABELS = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+          return { label: MONTH_LABELS[e.month - 1] ?? String(e.month), value: e.bookedRevenue };
+        });
+
+  const annualTarget = dashboard.kpis.annualTarget;
+  const revenueYtd = dashboard.kpis.revenueYtdBooked;
+  const targetPct =
+    annualTarget && annualTarget > 0
+      ? Math.min(Math.round((revenueYtd / annualTarget) * 100), 100)
+      : null;
+
   return (
     <div className="flex flex-col gap-4">
       <Card>
         <CardHeader>
           <CardTitle>Executive Dashboard</CardTitle>
           <CardDescription>
-            Company-wide KPI snapshot for leadership. Interactive period filters and target editing
-            controls are implemented in story tasks.
+            Company-wide KPI snapshot for the selected period.
           </CardDescription>
         </CardHeader>
       </Card>
@@ -101,7 +117,6 @@ export default async function ExecutiveDashboardPage({
         <CardContent className="flex flex-wrap gap-2" aria-label="Executive period filters">
           {PERIOD_FILTERS.map((periodFilter) => {
             const isSelected = periodFilter === selectedPeriod;
-
             return (
               <Link
                 key={periodFilter}
@@ -125,23 +140,40 @@ export default async function ExecutiveDashboardPage({
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         <Card>
           <CardHeader className="pb-2">
-            <CardDescription>Revenue YTD (Booked)</CardDescription>
-            <CardTitle className="text-2xl">{formatCurrency(dashboard.kpis.revenueYtdBooked)}</CardTitle>
+            <CardDescription className="uppercase tracking-wide text-xs">
+              Revenue YTD (Booked)
+            </CardDescription>
+            <CardTitle className="text-2xl">{formatCurrency(revenueYtd)}</CardTitle>
           </CardHeader>
+          {targetPct !== null && annualTarget !== null ? (
+            <CardContent className="pt-0">
+              <div className="mt-1 h-2 w-full overflow-hidden rounded-full bg-muted">
+                <div
+                  className="h-full rounded-full bg-primary"
+                  style={{ width: `${targetPct}%` }}
+                />
+              </div>
+              <p className="mt-1 text-xs text-muted-foreground">
+                {formatCurrency(revenueYtd)} / {formatCurrency(annualTarget)} ({targetPct}%)
+              </p>
+            </CardContent>
+          ) : null}
         </Card>
+
         <Card>
           <CardHeader className="pb-2">
-            <CardDescription>Annual Target</CardDescription>
+            <CardDescription className="uppercase tracking-wide text-xs">Annual Target</CardDescription>
             <CardTitle className="text-2xl">
-              {dashboard.kpis.annualTarget === null
-                ? "Not set"
-                : formatCurrency(dashboard.kpis.annualTarget)}
+              {annualTarget === null ? "Not set" : formatCurrency(annualTarget)}
             </CardTitle>
           </CardHeader>
         </Card>
+
         <Card>
           <CardHeader className="pb-2">
-            <CardDescription>Average Overall Margin (YTD)</CardDescription>
+            <CardDescription className="uppercase tracking-wide text-xs">
+              Average Overall Margin (YTD)
+            </CardDescription>
             <CardTitle className="text-2xl">
               {dashboard.kpis.marginYtdWeightedPercent === null
                 ? "N/A"
@@ -164,29 +196,7 @@ export default async function ExecutiveDashboardPage({
         </CardHeader>
         <CardContent>
           {hasBreakdownData ? (
-            <div className="space-y-2">
-              {selectedPeriod === "quarterly" ? (
-                quarterBreakdownRows.map((entry) => (
-                  <div
-                    key={entry.quarter}
-                    className="flex items-center justify-between rounded-md border px-3 py-2 text-sm"
-                  >
-                    <span>Q{entry.quarter}</span>
-                    <span className="font-medium">{formatCurrency(entry.bookedRevenue)}</span>
-                  </div>
-                ))
-              ) : (
-                monthBreakdownRows.map((entry) => (
-                  <div
-                    key={entry.month}
-                    className="flex items-center justify-between rounded-md border px-3 py-2 text-sm"
-                  >
-                    <span>Month {entry.month}</span>
-                    <span className="font-medium">{formatCurrency(entry.bookedRevenue)}</span>
-                  </div>
-                ))
-              )}
-            </div>
+            <RevenueTrendChart data={trendData} />
           ) : (
             <ExecutiveEmptyState
               title="No breakdown data yet"
@@ -226,8 +236,31 @@ export default async function ExecutiveDashboardPage({
             <TargetEditorForm
               year={currentYear}
               initialTarget={dashboard.kpis.annualTarget}
+              initialQuarterlyTargets={dashboard.kpis.quarterlyTargets}
               canEdit={canEditTarget}
             />
+          </CardContent>
+        </Card>
+      </div>
+
+      <div className="grid gap-4 lg:grid-cols-2">
+        <Card>
+          <CardHeader>
+            <CardTitle>Sector Performance</CardTitle>
+            <CardDescription>Approved quotations by sector.</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <SectorPerformanceChart slices={dashboard.charts.sectorPerformance} />
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Client Distribution</CardTitle>
+            <CardDescription>Top clients by approved quotation value.</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <ClientDistributionChart bars={dashboard.charts.clientDistribution} />
           </CardContent>
         </Card>
       </div>
@@ -255,7 +288,7 @@ export default async function ExecutiveDashboardPage({
           ) : (
             <ExecutiveEmptyState
               title="No sales performance data yet"
-              description="Owner ranking will appear after sales performance aggregation is implemented."
+              description="Owner ranking will appear once purchase orders are approved."
             />
           )}
         </CardContent>

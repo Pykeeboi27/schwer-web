@@ -13,7 +13,7 @@ export type SalesQuotation = {
   cost: number | null;
   googleDriveLink: string | null;
   notes: string | null;
-  status: "draft" | "pending" | "approved" | "rejected" | "cancelled";
+  status: "draft" | "pending" | "approved" | "rejected" | "cancelled" | "closed";
   preparedBy: string;
   pendingApprovalRoles: RequiredApproverRole[];
   createdAt: string;
@@ -505,5 +505,32 @@ export async function rejectQuotationApproval(input: {
 
   if (error) {
     throw new Error(error.message || "Failed to reject quotation.");
+  }
+}
+
+export async function resubmitQuotationForApproval(quotationId: string): Promise<void> {
+  const supabase = await createClient();
+
+  const { data: row, error: fetchError } = await supabase
+    .from("quotations")
+    .select("id, status, created_by")
+    .eq("id", quotationId)
+    .single();
+
+  if (fetchError || !row) {
+    throw new Error("Quotation not found.");
+  }
+
+  if (row.status !== "rejected") {
+    throw new Error("Only rejected quotations can be resubmitted.");
+  }
+
+  const { error: updateError } = await supabase
+    .from("quotations")
+    .update({ status: "draft", rejection_reason: null })
+    .eq("id", quotationId);
+
+  if (updateError) {
+    throw new Error(updateError.message || "Failed to resubmit quotation.");
   }
 }

@@ -1,11 +1,14 @@
 "use client";
 
+"use client";
+
 import { updateCostingQuotationAction } from "@/app/protected/engineering/quotations/actions";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { NumberInput } from "@/components/ui/number-input";
 import type { CostingQuotation } from "@/lib/engineering/costing-quotations";
+import { suggestQuotationNumber } from "@/lib/engineering/suggest-quotation-number";
 import { useToast } from "@/lib/utils/toast-notification";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
@@ -24,6 +27,7 @@ type EditCostingQuotationDialogProps = {
 };
 
 type FieldErrors = {
+  quotationNumber?: string;
   clientId?: string;
   subject?: string;
   cost?: string;
@@ -50,6 +54,7 @@ export function EditCostingQuotationDialog({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
+  const [quotationNumber, setQuotationNumber] = useState(quotation?.quotationNumber ?? "");
 
   const dialogTitleId = useMemo(() => "edit-costing-quotation-dialog-title", []);
 
@@ -65,6 +70,7 @@ export function EditCostingQuotationDialog({
       setFieldErrors({});
       return;
     }
+    setQuotationNumber(quotation?.quotationNumber ?? "");
 
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
@@ -74,7 +80,7 @@ export function EditCostingQuotationDialog({
 
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [open, onOpenChange]);
+  }, [open, onOpenChange, quotation?.quotationNumber]);
 
   if (!open || !quotation) {
     return null;
@@ -89,6 +95,10 @@ export function EditCostingQuotationDialog({
     formData.set("quotationId", quotation.id);
 
     const nextErrors: FieldErrors = {};
+    const quotationNumberValue = quotationNumber.trim().toUpperCase();
+    if (!quotationNumberValue) nextErrors.quotationNumber = "Quotation ID is required.";
+    else formData.set("quotationNumber", quotationNumberValue);
+
     const clientId = String(formData.get("clientId") ?? "").trim();
     const subject = String(formData.get("subject") ?? "").trim();
     const costText = String(formData.get("cost") ?? "").trim();
@@ -146,9 +156,6 @@ export function EditCostingQuotationDialog({
             <h2 id={dialogTitleId} className="text-xl font-semibold">
               Edit Costing Quotation
             </h2>
-            <p className="text-sm text-muted-foreground">
-              Quotation {quotation.quotationNumber}
-            </p>
           </div>
           <Button variant="ghost" onClick={() => onOpenChange(false)} aria-label="Close dialog">
             Close
@@ -163,6 +170,30 @@ export function EditCostingQuotationDialog({
         ) : null}
 
         <form onSubmit={handleSubmit} className="grid gap-4 md:grid-cols-2">
+          <div className="md:col-span-2">
+            <Label htmlFor="edit-costing-quotation-number">Quotation ID</Label>
+            <div className="mt-1 flex gap-2">
+              <Input
+                id="edit-costing-quotation-number"
+                value={quotationNumber}
+                onChange={(e) => setQuotationNumber(e.target.value.toUpperCase())}
+                aria-invalid={Boolean(fieldErrors.quotationNumber)}
+                className="uppercase"
+                placeholder="QT-2026-001"
+              />
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setQuotationNumber(suggestQuotationNumber())}
+              >
+                Suggest
+              </Button>
+            </div>
+            {fieldErrors.quotationNumber ? (
+              <p className="mt-1 text-xs text-destructive">{fieldErrors.quotationNumber}</p>
+            ) : null}
+          </div>
+
           <div className="md:col-span-2">
             <Label htmlFor="edit-costing-client">Client</Label>
             <select

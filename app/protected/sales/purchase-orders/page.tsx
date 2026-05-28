@@ -44,7 +44,7 @@ export default async function SalesPurchaseOrdersPage() {
 
   return (
     <div className="flex flex-col gap-4">
-      <div className="rounded-md border bg-card p-5">
+      <div className="rounded-md border border-l-4 border-l-primary bg-card p-5 pl-5">
         <h1 className="text-2xl font-semibold">Purchase Orders</h1>
         <p className="mt-2 text-sm text-muted-foreground">
           Purchase orders converted from approved quotations. Pending POs await approval; once
@@ -53,12 +53,12 @@ export default async function SalesPurchaseOrdersPage() {
       </div>
 
       <section className="grid gap-3 rounded-md border bg-card p-5 sm:grid-cols-2">
-        <div className="rounded border p-3">
-          <p className="text-xs uppercase text-muted-foreground">Closed Sales</p>
+        <div className="rounded-lg border bg-card p-4 shadow-sm">
+          <p className="text-xs uppercase tracking-wide text-muted-foreground">Closed Sales</p>
           <p className="mt-1 text-xl font-semibold">{formatCurrency(totals.closed)}</p>
         </div>
-        <div className="rounded border p-3">
-          <p className="text-xs uppercase text-muted-foreground">Recognized Sales</p>
+        <div className="rounded-lg border bg-card p-4 shadow-sm">
+          <p className="text-xs uppercase tracking-wide text-muted-foreground">Recognized Sales</p>
           <p className="mt-1 text-xl font-semibold">{formatCurrency(totals.recognized)}</p>
         </div>
       </section>

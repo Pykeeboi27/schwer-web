@@ -15,6 +15,8 @@ import type {
   PeriodFilter,
 } from "@/lib/executive/types";
 import type { CurrentProfile } from "@/lib/profile/get-current-profile";
+import { getSalesDashboardCharts } from "@/lib/sales/dashboard-charts";
+import { getQuarterlyTargets } from "@/lib/executive/targets";
 import { createClient } from "@/lib/supabase/server";
 
 export type PurchaseOrderMetricRow = {
@@ -37,6 +39,7 @@ export type ExecutiveDashboardQueryOptions = {
 export const EMPTY_EXECUTIVE_KPIS: ExecutiveKpiSummary = {
   revenueYtdBooked: 0,
   annualTarget: null,
+  quarterlyTargets: { q1: null, q2: null, q3: null, q4: null },
   revenueVsTargetDelta: null,
   marginYtdWeightedPercent: null,
 };
@@ -172,12 +175,14 @@ export function summarizeRevenueAndMargin(rows: PurchaseOrderMetricRow[]): {
 export function buildKpiSummaryFromRows(
   rows: PurchaseOrderMetricRow[],
   annualTarget: number | null,
+  quarterlyTargets?: { q1: number | null; q2: number | null; q3: number | null; q4: number | null },
 ): ExecutiveKpiSummary {
   const totals = summarizeRevenueAndMargin(rows);
 
   return {
     revenueYtdBooked: totals.bookedRevenue,
     annualTarget,
+    quarterlyTargets: quarterlyTargets ?? { q1: null, q2: null, q3: null, q4: null },
     revenueVsTargetDelta:
       annualTarget === null ? null : totals.bookedRevenue - annualTarget,
     marginYtdWeightedPercent: totals.weightedMarginPercent,
@@ -304,15 +309,17 @@ export async function getExecutiveKpiSummary(
   const referenceDate = options.referenceDate ?? new Date();
   const ytdRange = getPeriodDateRange("ytd", referenceDate);
 
-  const [ytdRows, annualTarget] = await Promise.all([
+  const year = getCurrentYear(referenceDate);
+  const [ytdRows, annualTarget, quarterlyTargets] = await Promise.all([
     executiveDashboardQueries.fetchPurchaseOrderRows({
       startDate: ytdRange.startDate,
       endDate: ytdRange.endDate,
     }),
-    executiveDashboardQueries.fetchAnnualTarget(getCurrentYear(referenceDate)),
+    executiveDashboardQueries.fetchAnnualTarget(year),
+    getQuarterlyTargets(year),
   ]);
 
-  return buildKpiSummaryFromRows(ytdRows, annualTarget);
+  return buildKpiSummaryFromRows(ytdRows, annualTarget, quarterlyTargets);
 }
 
 export async function getExecutiveRevenueBreakdown(
@@ -382,11 +389,12 @@ export async function getExecutiveDashboardData(
 ): Promise<ExecutiveDashboardData> {
   assertViewerAccess(options.viewer);
 
-  const [kpis, revenueBreakdown, poSummary, salesPerformance] = await Promise.all([
+  const [kpis, revenueBreakdown, poSummary, salesPerformance, charts] = await Promise.all([
     getExecutiveKpiSummary(options),
     getExecutiveRevenueBreakdown(periodFilter, options),
     getExecutivePoSummary(periodFilter, options),
     getExecutiveSalesPerformance(periodFilter, options),
+    getSalesDashboardCharts(),
   ]);
 
   return {
@@ -395,5 +403,6 @@ export async function getExecutiveDashboardData(
     revenueBreakdown,
     poSummary,
     salesPerformance,
+    charts,
   };
 }
