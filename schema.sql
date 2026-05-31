@@ -662,7 +662,9 @@ CREATE POLICY "revenue_targets_exec_only"
   USING (
     EXISTS (
       SELECT 1 FROM public.profiles p
-      WHERE p.id = auth.uid() AND p.is_executive_viewer = TRUE AND p.is_active = TRUE
+      WHERE p.id = auth.uid()
+        AND p.is_active = TRUE
+        AND (p.is_executive_viewer = TRUE OR p.role IN ('owner','executive'))
     )
   );
 

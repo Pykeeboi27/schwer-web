@@ -104,3 +104,14 @@ export function buildQuarterBuckets(year: number): Array<{ quarter: number; labe
     year,
   }));
 }
+
+export function getWeekOfMonth(day: number): 1 | 2 | 3 | 4 {
+  if (day <= 7) return 1;
+  if (day <= 14) return 2;
+  if (day <= 21) return 3;
+  return 4;
+}
+
+export function buildWeekBuckets(): Array<{ week: 1 | 2 | 3 | 4; label: string }> {
+  return ([1, 2, 3, 4] as const).map((week) => ({ week, label: `Wk ${week}` }));
+}

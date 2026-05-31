@@ -6,6 +6,7 @@ import { usePathname } from "next/navigation";
 
 const EXECUTIVE_TABS = [
   { href: "/protected/executive", label: "Dashboard" },
+  { href: "/protected/executive/sales", label: "Sales" },
   { href: "/protected/executive/approvals", label: "Approvals" },
   { href: "/protected/executive/costing-approvals", label: "Costing Approval" },
 ];

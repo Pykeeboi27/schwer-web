@@ -27,10 +27,16 @@ export type QuarterlyRevenuePoint = {
   bookedRevenue: number;
 };
 
+export type WeeklyRevenuePoint = {
+  week: 1 | 2 | 3 | 4;
+  bookedRevenue: number;
+};
+
 export type ExecutiveRevenueBreakdown = {
   monthlyRevenue: MonthlyRevenuePoint[];
   quarterlyRevenue: QuarterlyRevenuePoint[];
   ytdRevenueByMonth: MonthlyRevenuePoint[];
+  weeklyRevenue: WeeklyRevenuePoint[];
 };
 
 export type ExecutiveSalesPerformanceRow = {

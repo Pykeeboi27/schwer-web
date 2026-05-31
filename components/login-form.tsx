@@ -74,8 +74,8 @@ export function LoginForm({
         </CardHeader>
         <CardContent>
           <form action={formAction}>
-            <div className="flex flex-col gap-6">
-              <div className="grid gap-2">
+            <div className="flex flex-col gap-5">
+              <div className="grid gap-1.5">
                 <Label htmlFor="email">Email</Label>
                 <Input
                   id="email"
@@ -85,44 +85,65 @@ export function LoginForm({
                   required
                 />
               </div>
-              <div className="grid gap-2">
-                <div className="flex items-center">
+
+              <div className="grid gap-1.5">
+                <div className="flex items-center justify-between">
                   <Label htmlFor="password">Password</Label>
                   <Link
                     href="/auth/forgot-password"
-                    className="ml-auto inline-block text-sm underline-offset-4 hover:underline"
+                    className="text-xs text-muted-foreground underline-offset-4 transition-colors hover:text-foreground hover:underline"
                   >
-                    Forgot your password?
+                    Forgot password?
                   </Link>
                 </div>
-                <Input
-                  id="password"
-                  name="password"
-                  type={isPasswordVisible ? "text" : "password"}
-                  required
-                />
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => setIsPasswordVisible((prev) => !prev)}
-                  aria-label={isPasswordVisible ? "Hide password" : "Show password"}
-                >
-                  {isPasswordVisible ? <EyeOff size={16} /> : <Eye size={16} />}
-                </Button>
+                <div className="relative">
+                  <Input
+                    id="password"
+                    name="password"
+                    type={isPasswordVisible ? "text" : "password"}
+                    required
+                    className="pr-10"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setIsPasswordVisible((prev) => !prev)}
+                    aria-label={isPasswordVisible ? "Hide password" : "Show password"}
+                    className="absolute inset-y-0 right-0 flex items-center px-3 text-muted-foreground transition-colors hover:text-foreground"
+                  >
+                    {isPasswordVisible ? <EyeOff size={16} /> : <Eye size={16} />}
+                  </button>
+                </div>
               </div>
-              {errorMessage && <p className="text-sm text-red-500">{errorMessage}</p>}
-              <Button type="submit" className="w-full font-semibold" disabled={isPending}>
-                {isPending ? "Logging in..." : "Login"}
+
+              {errorMessage && (
+                <div className="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
+                  {errorMessage}
+                </div>
+              )}
+
+              <Button
+                type="submit"
+                className="w-full font-semibold transition-all hover:bg-primary/90"
+                disabled={isPending}
+              >
+                {isPending ? "Logging in…" : "Login"}
               </Button>
-              <Button type="button" variant="outline" className="w-full" asChild>
+
+              <Button
+                type="button"
+                variant="outline"
+                className="w-full transition-colors hover:bg-muted"
+                asChild
+              >
                 <Link href="/auth/oauth/google">Continue with Google</Link>
               </Button>
             </div>
-            <div className="mt-4 text-center text-sm">
+
+            <div className="mt-5 text-center text-sm text-muted-foreground">
               Don&apos;t have an account?{" "}
               <Link
                 href="/auth/sign-up"
-                className="underline underline-offset-4"
+                className="font-medium text-foreground underline-offset-4 hover:underline"
               >
                 Sign up
               </Link>

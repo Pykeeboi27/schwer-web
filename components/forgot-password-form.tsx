@@ -31,7 +31,6 @@ export function ForgotPasswordForm({
     setError(null);
 
     try {
-      // The url which will be included in the email. This URL needs to be configured in your redirect URLs in the Supabase dashboard at https://supabase.com/dashboard/project/_/auth/url-configuration
       const { error } = await supabase.auth.resetPasswordForEmail(email, {
         redirectTo: `${window.location.origin}/auth/update-password`,
       });
@@ -47,31 +46,38 @@ export function ForgotPasswordForm({
   return (
     <div className={cn("flex flex-col gap-6", className)} {...props}>
       {success ? (
-        <Card>
+        <Card className="border-primary/20 bg-background/85 shadow-2xl backdrop-blur-sm">
           <CardHeader>
-            <CardTitle className="text-2xl">Check Your Email</CardTitle>
+            <CardTitle className="text-2xl tracking-tight">Check your email</CardTitle>
             <CardDescription>Password reset instructions sent</CardDescription>
           </CardHeader>
           <CardContent>
             <p className="text-sm text-muted-foreground">
-              If you registered using your email and password, you will receive
-              a password reset email.
+              If you registered using your email and password, you will receive a
+              password reset email shortly.
             </p>
+            <div className="mt-5 text-center text-sm text-muted-foreground">
+              <Link
+                href="/auth/login"
+                className="font-medium text-foreground underline-offset-4 hover:underline"
+              >
+                Back to login
+              </Link>
+            </div>
           </CardContent>
         </Card>
       ) : (
-        <Card>
+        <Card className="border-primary/20 bg-background/85 shadow-2xl backdrop-blur-sm">
           <CardHeader>
-            <CardTitle className="text-2xl">Reset Your Password</CardTitle>
+            <CardTitle className="text-2xl tracking-tight">Reset password</CardTitle>
             <CardDescription>
-              Type in your email and we&apos;ll send you a link to reset your
-              password
+              Enter your email and we&apos;ll send you a reset link
             </CardDescription>
           </CardHeader>
           <CardContent>
             <form onSubmit={handleForgotPassword}>
-              <div className="flex flex-col gap-6">
-                <div className="grid gap-2">
+              <div className="flex flex-col gap-5">
+                <div className="grid gap-1.5">
                   <Label htmlFor="email">Email</Label>
                   <Input
                     id="email"
@@ -82,16 +88,27 @@ export function ForgotPasswordForm({
                     onChange={(e) => setEmail(e.target.value)}
                   />
                 </div>
-                {error && <p className="text-sm text-red-500">{error}</p>}
-                <Button type="submit" className="w-full" disabled={isLoading}>
-                  {isLoading ? "Sending..." : "Send reset email"}
+
+                {error && (
+                  <div className="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
+                    {error}
+                  </div>
+                )}
+
+                <Button
+                  type="submit"
+                  className="w-full font-semibold transition-all hover:bg-primary/90"
+                  disabled={isLoading}
+                >
+                  {isLoading ? "Sending…" : "Send reset email"}
                 </Button>
               </div>
-              <div className="mt-4 text-center text-sm">
-                Already have an account?{" "}
+
+              <div className="mt-5 text-center text-sm text-muted-foreground">
+                Remembered it?{" "}
                 <Link
                   href="/auth/login"
-                  className="underline underline-offset-4"
+                  className="font-medium text-foreground underline-offset-4 hover:underline"
                 >
                   Login
                 </Link>

@@ -53,8 +53,8 @@ export function SignUpForm({
         </CardHeader>
         <CardContent>
           <form action={formAction}>
-            <div className="flex flex-col gap-6">
-              <div className="grid gap-2">
+            <div className="flex flex-col gap-5">
+              <div className="grid gap-1.5">
                 <Label htmlFor="email">Email</Label>
                 <Input
                   id="email"
@@ -64,14 +64,15 @@ export function SignUpForm({
                   required
                 />
               </div>
-              <div className="grid gap-2">
+
+              <div className="grid gap-1.5">
                 <Label htmlFor="department">Department</Label>
                 <select
                   id="department"
                   name="department"
                   required
                   defaultValue=""
-                  className="h-9 rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                  className="h-9 rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
                 >
                   <option value="" disabled>
                     Select department
@@ -83,56 +84,74 @@ export function SignUpForm({
                   ))}
                 </select>
               </div>
-              <div className="grid gap-2">
-                <div className="flex items-center">
-                  <Label htmlFor="password">Password</Label>
+
+              <div className="grid gap-1.5">
+                <Label htmlFor="password">Password</Label>
+                <div className="relative">
+                  <Input
+                    id="password"
+                    name="password"
+                    type={isPasswordVisible ? "text" : "password"}
+                    required
+                    className="pr-10"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setIsPasswordVisible((prev) => !prev)}
+                    aria-label={isPasswordVisible ? "Hide password" : "Show password"}
+                    className="absolute inset-y-0 right-0 flex items-center px-3 text-muted-foreground transition-colors hover:text-foreground"
+                  >
+                    {isPasswordVisible ? <EyeOff size={16} /> : <Eye size={16} />}
+                  </button>
                 </div>
-                <Input
-                  id="password"
-                  name="password"
-                  type={isPasswordVisible ? "text" : "password"}
-                  required
-                />
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => setIsPasswordVisible((prev) => !prev)}
-                  aria-label={isPasswordVisible ? "Hide password" : "Show password"}
-                >
-                  {isPasswordVisible ? <EyeOff size={16} /> : <Eye size={16} />}
-                </Button>
               </div>
-              <div className="grid gap-2">
-                <div className="flex items-center">
-                  <Label htmlFor="repeat-password">Repeat Password</Label>
+
+              <div className="grid gap-1.5">
+                <Label htmlFor="repeat-password">Repeat password</Label>
+                <div className="relative">
+                  <Input
+                    id="repeat-password"
+                    name="repeatPassword"
+                    type={isRepeatPasswordVisible ? "text" : "password"}
+                    required
+                    className="pr-10"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setIsRepeatPasswordVisible((prev) => !prev)}
+                    aria-label={
+                      isRepeatPasswordVisible
+                        ? "Hide repeat password"
+                        : "Show repeat password"
+                    }
+                    className="absolute inset-y-0 right-0 flex items-center px-3 text-muted-foreground transition-colors hover:text-foreground"
+                  >
+                    {isRepeatPasswordVisible ? <EyeOff size={16} /> : <Eye size={16} />}
+                  </button>
                 </div>
-                <Input
-                  id="repeat-password"
-                  name="repeatPassword"
-                  type={isRepeatPasswordVisible ? "text" : "password"}
-                  required
-                />
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => setIsRepeatPasswordVisible((prev) => !prev)}
-                  aria-label={
-                    isRepeatPasswordVisible
-                      ? "Hide repeat password"
-                      : "Show repeat password"
-                  }
-                >
-                  {isRepeatPasswordVisible ? <EyeOff size={16} /> : <Eye size={16} />}
-                </Button>
               </div>
-              {state.error && <p className="text-sm text-red-500">{state.error}</p>}
-              <Button type="submit" className="w-full font-semibold" disabled={isPending}>
-                {isPending ? "Creating an account..." : "Sign up"}
+
+              {state.error && (
+                <div className="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
+                  {state.error}
+                </div>
+              )}
+
+              <Button
+                type="submit"
+                className="w-full font-semibold transition-all hover:bg-primary/90"
+                disabled={isPending}
+              >
+                {isPending ? "Creating account…" : "Sign up"}
               </Button>
             </div>
-            <div className="mt-4 text-center text-sm">
+
+            <div className="mt-5 text-center text-sm text-muted-foreground">
               Already have an account?{" "}
-              <Link href="/auth/login" className="underline underline-offset-4">
+              <Link
+                href="/auth/login"
+                className="font-medium text-foreground underline-offset-4 hover:underline"
+              >
                 Login
               </Link>
             </div>

@@ -3,19 +3,8 @@
 import { isTargetEditor } from "@/lib/executive/access";
 import { upsertAnnualTarget, upsertQuarterlyTarget } from "@/lib/executive/targets";
 import { getCurrentProfile } from "@/lib/profile/get-current-profile";
+import type { UpdateAnnualTargetState } from "./target-state";
 import { revalidatePath } from "next/cache";
-
-export type UpdateAnnualTargetState = {
-  success: boolean;
-  error: string | null;
-  message: string | null;
-};
-
-export const INITIAL_UPDATE_TARGET_STATE: UpdateAnnualTargetState = {
-  success: false,
-  error: null,
-  message: null,
-};
 
 export async function updateAnnualTargetAction(
   _prevState: UpdateAnnualTargetState,

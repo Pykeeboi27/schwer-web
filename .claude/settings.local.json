@@ -31,7 +31,9 @@
       "Bash(New-Item -Path \"C:\\\\Users\\\\jiroh\\\\Desktop\\\\schwer-web\\\\lib\\\\google-drive\" -ItemType Directory -Force)",
       "Bash(Out-Null)",
       "Bash(New-Item -Path \"C:\\\\Users\\\\jiroh\\\\Desktop\\\\schwer-web\\\\app\\\\api\\\\drive-upload\" -ItemType Directory -Force)",
-      "PowerShell(New-Item *)"
+      "PowerShell(New-Item *)",
+      "Bash(Remove-Item *)",
+      "mcp__supabase__get_logs"
     ]
   },
   "enableAllProjectMcpServers": true,

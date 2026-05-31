@@ -2,9 +2,11 @@ import { isExecutiveDashboardViewer } from "@/lib/executive/access";
 import {
   buildMonthBuckets,
   buildQuarterBuckets,
+  buildWeekBuckets,
   getCurrentYear,
   getPeriodDateRange,
   getQuarterFromMonth,
+  getWeekOfMonth,
 } from "@/lib/executive/period";
 import type {
   ExecutiveDashboardData,
@@ -13,6 +15,7 @@ import type {
   ExecutiveRevenueBreakdown,
   ExecutiveSalesPerformanceRow,
   PeriodFilter,
+  WeeklyRevenuePoint,
 } from "@/lib/executive/types";
 import type { CurrentProfile } from "@/lib/profile/get-current-profile";
 import { getSalesDashboardCharts } from "@/lib/sales/dashboard-charts";
@@ -54,6 +57,7 @@ export const EMPTY_EXECUTIVE_REVENUE_BREAKDOWN: ExecutiveRevenueBreakdown = {
   monthlyRevenue: [],
   quarterlyRevenue: [],
   ytdRevenueByMonth: [],
+  weeklyRevenue: [],
 };
 
 function toNumber(value: number | string | null | undefined): number {
@@ -80,6 +84,19 @@ function getMonthFromPoDate(dateValue: string | null): number | null {
   }
 
   return month;
+}
+
+function getDayFromPoDate(dateValue: string | null): number | null {
+  if (!dateValue || dateValue.length < 10) {
+    return null;
+  }
+
+  const day = Number(dateValue.slice(8, 10));
+  if (!Number.isInteger(day) || day < 1 || day > 31) {
+    return null;
+  }
+
+  return day;
 }
 
 export const executiveDashboardQueries = {
@@ -195,10 +212,12 @@ export function buildRevenueBreakdownFromRows(
   referenceDate: Date,
 ): ExecutiveRevenueBreakdown {
   const currentYear = getCurrentYear(referenceDate);
+  const currentMonth = referenceDate.getMonth() + 1;
 
   const monthlyMap = new Map<number, number>();
   const quarterlyMap = new Map<number, number>();
   const ytdMonthlyMap = new Map<number, number>();
+  const weeklyMap = new Map<1 | 2 | 3 | 4, number>();
 
   for (const row of rowsForYear) {
     const month = getMonthFromPoDate(row.po_date);
@@ -211,6 +230,14 @@ export function buildRevenueBreakdownFromRows(
 
     const quarter = getQuarterFromMonth(month);
     quarterlyMap.set(quarter, (quarterlyMap.get(quarter) ?? 0) + amount);
+
+    if (month === currentMonth) {
+      const day = getDayFromPoDate(row.po_date);
+      if (day) {
+        const week = getWeekOfMonth(day);
+        weeklyMap.set(week, (weeklyMap.get(week) ?? 0) + amount);
+      }
+    }
   }
 
   for (const row of rowsForYtd) {
@@ -222,6 +249,11 @@ export function buildRevenueBreakdownFromRows(
     const amount = toNumber(row.po_amount);
     ytdMonthlyMap.set(month, (ytdMonthlyMap.get(month) ?? 0) + amount);
   }
+
+  const weeklyRevenue: WeeklyRevenuePoint[] = buildWeekBuckets().map((bucket) => ({
+    week: bucket.week,
+    bookedRevenue: weeklyMap.get(bucket.week) ?? 0,
+  }));
 
   return {
     monthlyRevenue: buildMonthBuckets(currentYear).map((bucket) => ({
@@ -236,6 +268,7 @@ export function buildRevenueBreakdownFromRows(
       month: bucket.month,
       bookedRevenue: ytdMonthlyMap.get(bucket.month) ?? 0,
     })),
+    weeklyRevenue,
   };
 }
 
