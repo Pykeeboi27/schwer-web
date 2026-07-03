@@ -35,7 +35,7 @@ describe("SignUpForm", () => {
 
     const passwordInput = screen.getByLabelText("Password") as HTMLInputElement;
     const repeatPasswordInput = screen.getByLabelText(
-      "Repeat Password",
+      "Repeat password",
     ) as HTMLInputElement;
 
     const showPasswordButton = screen.getByRole("button", {
