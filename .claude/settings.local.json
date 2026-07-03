@@ -33,7 +33,13 @@
       "Bash(New-Item -Path \"C:\\\\Users\\\\jiroh\\\\Desktop\\\\schwer-web\\\\app\\\\api\\\\drive-upload\" -ItemType Directory -Force)",
       "PowerShell(New-Item *)",
       "Bash(Remove-Item *)",
-      "mcp__supabase__get_logs"
+      "mcp__supabase__get_logs",
+      "Bash(docker compose *)",
+      "Bash(docker stop sleepy_moore *)",
+      "Bash(docker port *)",
+      "Bash(curl -s -o /dev/null -w \"landing: %{http_code}\\\\n\" http://localhost:3000/)",
+      "Bash(curl -s -o /dev/null -w \"login: %{http_code}\\\\n\" http://localhost:3000/auth/login)",
+      "Bash(curl -s http://localhost:3000/auth/login)"
     ]
   },
   "enableAllProjectMcpServers": true,
