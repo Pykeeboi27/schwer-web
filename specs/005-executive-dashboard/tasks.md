@@ -11,10 +11,10 @@
 
 **Purpose**: Prepare the repo structure for the feature and ensure the new route can be worked on safely.
 
-- [X] T001 Create feature module folders `lib/executive/` and `app/protected/executive/`
-- [X] T002 [P] Add baseline types for this feature in `lib/executive/types.ts` (periodFilter union + DTOs from contracts)
-- [X] T003 [P] Add formatting helpers in `lib/executive/format.ts` (currency + percent formatting) and reuse existing patterns
-- [X] T004 [P] Add period helpers in `lib/executive/period.ts` (month/quarter bucketing utilities used by breakdown queries)
+- [x] T001 Create feature module folders `lib/executive/` and `app/protected/executive/`
+- [x] T002 [P] Add baseline types for this feature in `lib/executive/types.ts` (periodFilter union + DTOs from contracts)
+- [x] T003 [P] Add formatting helpers in `lib/executive/format.ts` (currency + percent formatting) and reuse existing patterns
+- [x] T004 [P] Add period helpers in `lib/executive/period.ts` (month/quarter bucketing utilities used by breakdown queries)
 
 ---
 
@@ -22,12 +22,12 @@
 
 **Purpose**: Core infrastructure that MUST be complete before ANY user story can be implemented.
 
-- [X] T005 Implement Viewer and Target Editor access checks in lib/executive/access.ts (use CurrentProfile, isActive, isExecutiveViewer, and role-based editor checks)
-- [X] T006 Implement route gating shell in `app/protected/executive/page.tsx` (server-side redirect like `app/protected/sales/page.tsx`)
-- [X] T007 Add data-layer skeleton in `lib/executive/dashboard.ts` (typed functions, no UI concerns)
-- [X] T008 [P] Add reusable empty-state UI helper in `components/executive/empty-state.tsx`
-- [X] T009 Wire initial page shell UI in `app/protected/executive/page.tsx` (title + description, placeholder sections)
-- [X] T045 Add RLS SELECT policy for public.purchase_orders in schema.sql to allow active Executive Dashboard Viewers (profiles.is_executive_viewer = TRUE and is_active = TRUE) to read rows for Executive Dashboard aggregates (read-only; no write permissions).
+- [x] T005 Implement Viewer and Target Editor access checks in lib/executive/access.ts (use CurrentProfile, isActive, isExecutiveViewer, and role-based editor checks)
+- [x] T006 Implement route gating shell in `app/protected/executive/page.tsx` (server-side redirect like `app/protected/sales/page.tsx`)
+- [x] T007 Add data-layer skeleton in `lib/executive/dashboard.ts` (typed functions, no UI concerns)
+- [x] T008 [P] Add reusable empty-state UI helper in `components/executive/empty-state.tsx`
+- [x] T009 Wire initial page shell UI in `app/protected/executive/page.tsx` (title + description, placeholder sections)
+- [x] T045 Add RLS SELECT policy for public.purchase_orders in schema.sql to allow active Executive Dashboard Viewers (profiles.is_executive_viewer = TRUE and is_active = TRUE) to read rows for Executive Dashboard aggregates (read-only; no write permissions).
 
 **Checkpoint**: Foundation ready — proceed with user stories.
 
@@ -41,21 +41,21 @@
 
 ### Tests for User Story 1 (Required) ⚠️
 
-- [X] T010 [P] [US1] Unit test period helpers in `tests/unit/executive/period.test.ts`
-- [X] T011 [P] [US1] Unit test KPI calculations (weighted margin %, YTD sums) in `tests/unit/executive/metrics.test.ts`
-- [X] T012 [P] [US1] Integration test dashboard aggregates for each filter and verify non-Viewers cannot read Executive Dashboard aggregates in tests/integration/executive-dashboard-kpis.test.ts
-- [X] T013 [P] [US1] E2E smoke test for Executive Dashboard Viewer load + filter switch and verify non-Viewers are blocked/redirected in tests/e2e/executive-dashboard.spec.ts
+- [x] T010 [P] [US1] Unit test period helpers in `tests/unit/executive/period.test.ts`
+- [x] T011 [P] [US1] Unit test KPI calculations (weighted margin %, YTD sums) in `tests/unit/executive/metrics.test.ts`
+- [x] T012 [P] [US1] Integration test dashboard aggregates for each filter and verify non-Viewers cannot read Executive Dashboard aggregates in tests/integration/executive-dashboard-kpis.test.ts
+- [x] T013 [P] [US1] E2E smoke test for Executive Dashboard Viewer load + filter switch and verify non-Viewers are blocked/redirected in tests/e2e/executive-dashboard.spec.ts
 
 ### Implementation for User Story 1
 
-- [X] T014 [US1] Implement YTD KPI query functions in `lib/executive/dashboard.ts` (YTD booked revenue, annual target, weighted YTD margin %)
-- [X] T015 [US1] Implement revenue breakdown queries in `lib/executive/dashboard.ts` (monthly + quarterly booked revenue for current year); when periodFilter = ytd, return ytdRevenueByMonth as monthly-by-month booked revenue for the current year (same values as monthly; different field name per contract).
-- [X] T016 [US1] Implement PO totals + margin summary in `lib/executive/dashboard.ts` for selected period
-- [X] T017 [US1] Add period filter UI control in `app/protected/executive/page.tsx` (monthly/quarterly/ytd)
-- [X] T018 [US1] Render KPI cards in `app/protected/executive/page.tsx` using existing `components/ui/card.tsx`
-- [X] T019 [US1] Render revenue breakdown section in `app/protected/executive/page.tsx` (simple table/list, no new chart libs)
-- [X] T020 [US1] Render PO totals + margin summary section in `app/protected/executive/page.tsx`
-- [X] T021 [US1] Add empty/loading/error states in `app/protected/executive/page.tsx` and `components/executive/empty-state.tsx`
+- [x] T014 [US1] Implement YTD KPI query functions in `lib/executive/dashboard.ts` (YTD booked revenue, annual target, weighted YTD margin %)
+- [x] T015 [US1] Implement revenue breakdown queries in `lib/executive/dashboard.ts` (monthly + quarterly booked revenue for current year); when periodFilter = ytd, return ytdRevenueByMonth as monthly-by-month booked revenue for the current year (same values as monthly; different field name per contract).
+- [x] T016 [US1] Implement PO totals + margin summary in `lib/executive/dashboard.ts` for selected period
+- [x] T017 [US1] Add period filter UI control in `app/protected/executive/page.tsx` (monthly/quarterly/ytd)
+- [x] T018 [US1] Render KPI cards in `app/protected/executive/page.tsx` using existing `components/ui/card.tsx`
+- [x] T019 [US1] Render revenue breakdown section in `app/protected/executive/page.tsx` (simple table/list, no new chart libs)
+- [x] T020 [US1] Render PO totals + margin summary section in `app/protected/executive/page.tsx`
+- [x] T021 [US1] Add empty/loading/error states in `app/protected/executive/page.tsx` and `components/executive/empty-state.tsx`
 
 **Checkpoint**: US1 is demoable as an MVP.
 
@@ -69,19 +69,19 @@
 
 ### Tests for User Story 2 (Required) ⚠️
 
-- [X] T022 [P] [US2] Unit test target input validation in `tests/unit/executive/targets-validation.test.ts`
-- [X] T023 [P] [US2] Integration test target read/write helpers and audit log entry creation in tests/integration/executive-targets.test.ts
-- [X] T024 [P] [US2] E2E test Target Editor target update flow in `tests/e2e/executive-dashboard-target.spec.ts`
+- [x] T022 [P] [US2] Unit test target input validation in `tests/unit/executive/targets-validation.test.ts`
+- [x] T023 [P] [US2] Integration test target read/write helpers and audit log entry creation in tests/integration/executive-targets.test.ts
+- [x] T024 [P] [US2] E2E test Target Editor target update flow in `tests/e2e/executive-dashboard-target.spec.ts`
 
 ### Implementation for User Story 2
 
-- [X] T025 [US2] Add RLS policies for public.revenue_targets INSERT/UPDATE in schema.sql (Target Editors only: profiles.role IN ('owner','executive') AND profiles.is_active = TRUE) and attach an audit trigger to revenue_targets so successful changes are recorded in public.audit_logs
-- [X] T026 [US2] Add data helper to read annual target in `lib/executive/targets.ts` (overall target: `month IS NULL` and `sector IS NULL`)
-- [X] T027 [US2] Add data helper to upsert annual target in `lib/executive/targets.ts` (validates non-negative numeric)
-- [X] T028 [US2] Add server action for updating target in `app/protected/executive/actions.ts` (no client-side service-role usage)
-- [X] T029 [US2] Add “Edit yearly target” UI (input + save button) in `app/protected/executive/page.tsx`
-- [X] T030 [US2] Hide/disable target editing UI for non-Target Editors in `app/protected/executive/page.tsx`
-- [X] T031 [US2] Add success/error toasts for target updates via `lib/utils/toast-notification.ts`
+- [x] T025 [US2] Add RLS policies for public.revenue_targets INSERT/UPDATE in schema.sql (Target Editors only: profiles.role IN ('owner','executive') AND profiles.is_active = TRUE) and attach an audit trigger to revenue_targets so successful changes are recorded in public.audit_logs
+- [x] T026 [US2] Add data helper to read annual target in `lib/executive/targets.ts` (overall target: `month IS NULL` and `sector IS NULL`)
+- [x] T027 [US2] Add data helper to upsert annual target in `lib/executive/targets.ts` (validates non-negative numeric)
+- [x] T028 [US2] Add server action for updating target in `app/protected/executive/actions.ts` (no client-side service-role usage)
+- [x] T029 [US2] Add “Edit yearly target” UI (input + save button) in `app/protected/executive/page.tsx`
+- [x] T030 [US2] Hide/disable target editing UI for non-Target Editors in `app/protected/executive/page.tsx`
+- [x] T031 [US2] Add success/error toasts for target updates via `lib/utils/toast-notification.ts`
 
 **Checkpoint**: Target editing works and is access-controlled.
 
@@ -95,17 +95,17 @@
 
 ### Tests for User Story 3 (Required) ⚠️
 
-- [X] T032 [P] [US3] Unit test ranking/tie-breaking helpers in `tests/unit/executive/sales-performance.test.ts`
-- [X] T033 [P] [US3] Integration test sales performance aggregation for each filter in `tests/integration/executive-sales-performance.test.ts`
-- [X] T034 [P] [US3] E2E test sales performance section updates with filters in `tests/e2e/executive-dashboard-performance.spec.ts`
+- [x] T032 [P] [US3] Unit test ranking/tie-breaking helpers in `tests/unit/executive/sales-performance.test.ts`
+- [x] T033 [P] [US3] Integration test sales performance aggregation for each filter in `tests/integration/executive-sales-performance.test.ts`
+- [x] T034 [P] [US3] E2E test sales performance section updates with filters in `tests/e2e/executive-dashboard-performance.spec.ts`
 
 ### Implementation for User Story 3
 
-- [X] T035 [US3] Implement sales performance aggregation in `lib/executive/dashboard.ts` (group by `purchase_orders.created_by`, sums, order desc)
-- [X] T036 [US3] Resolve PO owner names via `public.profiles` in `lib/executive/dashboard.ts` (handle missing names)
-- [X] T037 [US3] Render sales performance table in `app/protected/executive/page.tsx`
-- [X] T038 [US3] Ensure sales performance section responds to the same period filter in `app/protected/executive/page.tsx`
-- [X] T039 [US3] Add empty-state behavior for sales performance in `components/executive/empty-state.tsx`
+- [x] T035 [US3] Implement sales performance aggregation in `lib/executive/dashboard.ts` (group by `purchase_orders.created_by`, sums, order desc)
+- [x] T036 [US3] Resolve PO owner names via `public.profiles` in `lib/executive/dashboard.ts` (handle missing names)
+- [x] T037 [US3] Render sales performance table in `app/protected/executive/page.tsx`
+- [x] T038 [US3] Ensure sales performance section responds to the same period filter in `app/protected/executive/page.tsx`
+- [x] T039 [US3] Add empty-state behavior for sales performance in `components/executive/empty-state.tsx`
 
 **Checkpoint**: All executive dashboard sections are implemented.
 
@@ -115,10 +115,10 @@
 
 **Purpose**: Hardening, consistency, and performance.
 
-- [X] T040 [P] Add lightweight skeleton/loading placeholders in `components/ui/skeleton.tsx` usage on `app/protected/executive/page.tsx`
-- [X] T041 Accessibility pass for filter and forms in `app/protected/executive/page.tsx` (labels, focus order, ARIA where needed)
-- [X] T042 Performance pass: ensure queries are aggregated and return minimal columns in `lib/executive/dashboard.ts`
-- [X] T043 Update feature documentation references in `README.md` (add note about `/protected/executive` and access requirements)
+- [x] T040 [P] Add lightweight skeleton/loading placeholders in `components/ui/skeleton.tsx` usage on `app/protected/executive/page.tsx`
+- [x] T041 Accessibility pass for filter and forms in `app/protected/executive/page.tsx` (labels, focus order, ARIA where needed)
+- [x] T042 Performance pass: ensure queries are aggregated and return minimal columns in `lib/executive/dashboard.ts`
+- [x] T043 Update feature documentation references in `README.md` (add note about `/protected/executive` and access requirements)
 - [ ] T044 Validate the full flow using [quickstart.md](./quickstart.md)
 
 ---

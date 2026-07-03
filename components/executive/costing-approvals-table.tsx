@@ -25,7 +25,9 @@ function formatCurrency(amount: number): string {
   }).format(amount);
 }
 
-export function ExecutiveCostingApprovalsTable({ items }: ExecutiveCostingApprovalsTableProps) {
+export function ExecutiveCostingApprovalsTable({
+  items,
+}: ExecutiveCostingApprovalsTableProps) {
   const router = useRouter();
   const { success, error } = useToast();
   const [busyId, setBusyId] = useState<string | null>(null);
@@ -144,7 +146,11 @@ export function ExecutiveCostingApprovalsTable({ items }: ExecutiveCostingApprov
                 </td>
                 <td className="px-3 py-2">
                   <div className="flex flex-wrap gap-2">
-                    <Button size="sm" onClick={() => handleApprove(item)} disabled={isBusy}>
+                    <Button
+                      size="sm"
+                      onClick={() => handleApprove(item)}
+                      disabled={isBusy}
+                    >
                       {isBusy ? "Saving..." : "Approve"}
                     </Button>
                     <Button

@@ -49,12 +49,13 @@ export default function Home() {
           <span className="text-sm font-medium text-primary">Schwer ERP Portal</span>
 
           <h1 className="mt-4 max-w-3xl text-4xl font-semibold leading-tight tracking-tight sm:text-5xl md:text-6xl">
-            Schwer Online<br className="hidden sm:block" /> Management
+            Schwer Online
+            <br className="hidden sm:block" /> Management
           </h1>
 
           <p className="mt-5 max-w-xl text-base leading-relaxed text-muted-foreground sm:text-lg">
-            Centralize operations for HR, Sales, Accounting, Engineering, and
-            Purchasing in one secure system.
+            Centralize operations for HR, Sales, Accounting, Engineering, and Purchasing
+            in one secure system.
           </p>
 
           <div className="mt-8 flex flex-wrap gap-3">
@@ -76,7 +77,11 @@ export default function Home() {
           <div className="mt-16 grid w-full gap-4 sm:grid-cols-3">
             {FEATURES.map(({ icon: Icon, title, description }) => (
               <div key={title} className="rounded-lg border bg-card p-5">
-                <Icon className="mb-3 h-5 w-5 text-primary" aria-hidden="true" size={20} />
+                <Icon
+                  className="mb-3 h-5 w-5 text-primary"
+                  aria-hidden="true"
+                  size={20}
+                />
                 <h2 className="text-sm font-semibold">{title}</h2>
                 <p className="mt-1.5 text-sm leading-relaxed text-muted-foreground">
                   {description}

@@ -63,7 +63,10 @@ export function SectorPerformanceChart({ slices }: SectorPerformanceChartProps) 
         {slices.map((slice) => {
           const share = total > 0 ? (slice.totalAmount / total) * 100 : 0;
           return (
-            <li key={slice.sector} className="flex min-w-0 items-center justify-between gap-3">
+            <li
+              key={slice.sector}
+              className="flex min-w-0 items-center justify-between gap-3"
+            >
               <span className="flex min-w-0 items-center gap-2">
                 <span
                   className="inline-block h-3 w-3 shrink-0 rounded-sm"

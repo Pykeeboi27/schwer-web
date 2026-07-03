@@ -48,9 +48,7 @@ export function UpdatePasswordForm({
       <Card>
         <CardHeader>
           <CardTitle className="text-xl">Set new password</CardTitle>
-          <CardDescription>
-            Choose a strong password for your account
-          </CardDescription>
+          <CardDescription>Choose a strong password for your account</CardDescription>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleUpdatePassword}>

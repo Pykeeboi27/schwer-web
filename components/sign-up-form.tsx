@@ -1,9 +1,6 @@
 "use client";
 
-import {
-  signUpAction,
-  type SignUpActionState,
-} from "@/app/auth/sign-up/actions";
+import { signUpAction, type SignUpActionState } from "@/app/auth/sign-up/actions";
 import { DEPARTMENTS } from "@/lib/profile/departments";
 import { fieldClassName } from "@/components/patterns";
 import { cn } from "@/lib/utils";

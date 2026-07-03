@@ -12,7 +12,10 @@ import { redirect } from "next/navigation";
 
 export default async function EngineeringQuotationsPage() {
   const profile = await getCurrentProfile();
-  const redirectPath = getEngineeringAccessRedirect(profile, "/protected/engineering/quotations");
+  const redirectPath = getEngineeringAccessRedirect(
+    profile,
+    "/protected/engineering/quotations",
+  );
 
   if (redirectPath) {
     redirect(redirectPath);
@@ -31,8 +34,8 @@ export default async function EngineeringQuotationsPage() {
       <div className="rounded-md border bg-card p-5">
         <h1 className="text-2xl font-semibold">Costing Quotations</h1>
         <p className="mt-2 text-sm text-muted-foreground">
-          Create and manage quotations during the costing phase. Submit for executive approval once
-          cost and Drive link are in place.
+          Create and manage quotations during the costing phase. Submit for executive
+          approval once cost and Drive link are in place.
         </p>
         {isCostingEngineer ? (
           <div className="mt-4">
@@ -62,7 +65,8 @@ export default async function EngineeringQuotationsPage() {
       <section className="rounded-md border bg-card p-5">
         <h2 className="mb-3 text-lg font-semibold">Approved History</h2>
         <p className="mb-4 text-sm text-muted-foreground">
-          Costing quotations that have been approved by the executive and handed over to Sales.
+          Costing quotations that have been approved by the executive and handed over to
+          Sales.
         </p>
         <CostingHistoryTable items={history} />
       </section>

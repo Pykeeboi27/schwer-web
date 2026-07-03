@@ -35,7 +35,7 @@ Implementation must comply with the Constitution’s Technology & Styling Constr
 
 ## Constitution Check
 
-*GATE: Must pass before Phase 0 research. Re-check after Phase 1 design.*
+_GATE: Must pass before Phase 0 research. Re-check after Phase 1 design._
 
 - Fixed stack honored (Next.js + TypeScript + Tailwind + Lucide + Supabase)
 - Approved UI primitives only (shadcn/ui + Radix allowed)
@@ -61,6 +61,7 @@ specs/001-auth-dept-redirect/
 ```
 
 ### Source Code (repository root)
+
 ```text
 app/
 ├── auth/

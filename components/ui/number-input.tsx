@@ -26,7 +26,10 @@ type NumberInputProps = Omit<
  * (via `value` + `onValueChange`).
  */
 export const NumberInput = React.forwardRef<HTMLInputElement, NumberInputProps>(
-  ({ name, value, defaultValue, onValueChange, inputMode = "decimal", ...props }, ref) => {
+  (
+    { name, value, defaultValue, onValueChange, inputMode = "decimal", ...props },
+    ref,
+  ) => {
     const isControlled = value !== undefined;
     const [internalRaw, setInternalRaw] = React.useState(
       defaultValue === undefined ? "" : stripCommas(String(defaultValue)),

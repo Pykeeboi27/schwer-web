@@ -64,7 +64,9 @@ export function CostingHistoryTable({ items }: CostingHistoryTableProps) {
                   "-"
                 )}
               </td>
-              <td className="px-3 py-2 text-muted-foreground">{formatDate(item.approvedAt)}</td>
+              <td className="px-3 py-2 text-muted-foreground">
+                {formatDate(item.approvedAt)}
+              </td>
             </tr>
           ))}
         </tbody>

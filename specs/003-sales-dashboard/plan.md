@@ -34,7 +34,7 @@ This feature MUST align to the existing Sales schema defined in `schema.sql` (cl
 
 ## Constitution Check
 
-*GATE: Must pass before Phase 0 research. Re-check after Phase 1 design.*
+_GATE: Must pass before Phase 0 research. Re-check after Phase 1 design._
 
 - Fixed stack honored (Next.js + TypeScript + Tailwind + Lucide + Supabase)
 - Approved UI primitives only (existing shadcn/ui components)
@@ -97,26 +97,32 @@ No constitution violations anticipated.
 ### Phase A — Schema alignment + RLS (schema-first)
 
 1. Confirm the Sales tables in `schema.sql` exist in Supabase:
-  - `public.clients`, `public.client_contacts`
-  - `public.quotations`, `public.quotation_approvals`
-  - `public.purchase_orders`, `public.po_payments`
-  - helper view: `public.vw_po_summary`
+
+- `public.clients`, `public.client_contacts`
+- `public.quotations`, `public.quotation_approvals`
+- `public.purchase_orders`, `public.po_payments`
+- helper view: `public.vw_po_summary`
+
 2. Add/adjust RLS policies in `schema.sql` for the Sales module (at minimum):
-  - Sales department can SELECT/INSERT/UPDATE on clients, client_contacts, quotations, purchase_orders, po_payments.
-  - Approvers (sales_manager/owner/executive) can SELECT quotations awaiting their approval and UPDATE their own `quotation_approvals` row.
-  - Sales creators can read their own quotations and see approval statuses.
-  - Ensure Sales cannot update approval decision fields; only approver_id can approve/reject (DB-enforced).
+
+- Sales department can SELECT/INSERT/UPDATE on clients, client_contacts, quotations, purchase_orders, po_payments.
+- Approvers (sales_manager/owner/executive) can SELECT quotations awaiting their approval and UPDATE their own `quotation_approvals` row.
+- Sales creators can read their own quotations and see approval statuses.
+- Ensure Sales cannot update approval decision fields; only approver_id can approve/reject (DB-enforced).
+
 3. Add a DB trigger/function to keep `purchase_orders.recognized_amount` consistent with `po_payments`:
-  - On INSERT/UPDATE/DELETE of `po_payments`, recompute recognized_amount as SUM(amount_collected) for that PO.
-  - Enforce recognized_amount never exceeds po_amount.
+
+- On INSERT/UPDATE/DELETE of `po_payments`, recompute recognized_amount as SUM(amount_collected) for that PO.
+- Enforce recognized_amount never exceeds po_amount.
 
 ### Phase B — Sales access gating + navigation skeleton
 
 1. Add Sales route group at `/protected/sales` with a shared layout containing the sidebar tabs.
 2. Enforce access:
-  - Sales department users can access `/protected/sales/*`.
-  - Owner/Executive users can access `/protected/sales/quotations` for approvals assigned to them.
-  - Other non-sales users are redirected to their own `/protected/[department]` dashboard.
+
+- Sales department users can access `/protected/sales/*`.
+- Owner/Executive users can access `/protected/sales/quotations` for approvals assigned to them.
+- Other non-sales users are redirected to their own `/protected/[department]` dashboard.
 
 ### Phase C — Client Details tab
 
@@ -128,56 +134,75 @@ No constitution violations anticipated.
 ### Phase D — Quotation Approval tab
 
 1. Create quotation flow backed by `public.quotations`.
-  - Derive/store `sector` from the selected client (to match `schema.sql`).
+
+- Derive/store `sector` from the selected client (to match `schema.sql`).
+
 2. On submission, generate required `public.quotation_approvals` rows:
-  - Always require `sales_manager` role.
-  - If `amount >= 3,000,000`, also require `owner` and `executive` roles.
-  - Assignment rule: Sales assigns exactly one approver user per required role by inserting one quotation_approvals row per required role (sales_manager, owner, executive) on submission.
-  - Reassignment rule (draft only): If an assignment needs correction while the quotation is still Draft, Sales deletes the pending approval row and inserts a new one.
+
+- Always require `sales_manager` role.
+- If `amount >= 3,000,000`, also require `owner` and `executive` roles.
+- Assignment rule: Sales assigns exactly one approver user per required role by inserting one quotation_approvals row per required role (sales_manager, owner, executive) on submission.
+- Reassignment rule (draft only): If an assignment needs correction while the quotation is still Draft, Sales deletes the pending approval row and inserts a new one.
+
 3. Provide approver views:
-  - Sales managers see pending approvals needing sales_manager.
-  - Owners/executives see pending approvals needing their role.
+
+- Sales managers see pending approvals needing sales_manager.
+- Owners/executives see pending approvals needing their role.
+
 4. Quotation status aggregation:
-  - If any required role rejects → quotation becomes rejected.
-  - If all required roles approved → quotation becomes approved.
-  - Otherwise → pending.
-  - Implementation uses a DB trigger/function to update quotations.status when quotation_approvals change (supports owner/executive approvals under RLS).
+
+- If any required role rejects → quotation becomes rejected.
+- If all required roles approved → quotation becomes approved.
+- Otherwise → pending.
+- Implementation uses a DB trigger/function to update quotations.status when quotation_approvals change (supports owner/executive approvals under RLS).
 
 ### Phase E — Purchase Orders tab
 
 1. Create PO flow backed by `public.purchase_orders`:
-  - Client is required by schema.
-  - `sector` derived from client.
-  - Margin is DB-computed from `po_amount` and `cost` (generated columns).
+
+- Client is required by schema.
+- `sector` derived from client.
+- Margin is DB-computed from `po_amount` and `cost` (generated columns).
+
 2. Add PO payments flow backed by `public.po_payments`.
-  - DB trigger keeps `purchase_orders.recognized_amount` updated.
+
+- DB trigger keeps `purchase_orders.recognized_amount` updated.
+
 3. Sales summary definitions:
-  - Closed Sale total = SUM(`purchase_orders.po_amount`)
-  - Recognized Sale total = SUM(`purchase_orders.recognized_amount`)
-  - Note: v1 does not model a separate “closed sale” flag in schema.sql; a logged PO contributes to Closed Sale by definition.
+
+- Closed Sale total = SUM(`purchase_orders.po_amount`)
+- Recognized Sale total = SUM(`purchase_orders.recognized_amount`)
+- Note: v1 does not model a separate “closed sale” flag in schema.sql; a logged PO contributes to Closed Sale by definition.
 
 ### Phase F — Sales dashboard summary
 
 1. Provide a summary view at `/protected/sales` that aggregates:
-  - total clients
-  - quotations by status
-  - closed sale and recognized sale totals
+
+- total clients
+- quotations by status
+- closed sale and recognized sale totals
+
 2. Use server-side queries for initial render; avoid N+1 queries.
 
 ### Phase G — Tests
 
 1. Unit:
-  - approval routing logic (<3M vs ≥3M)
-  - status aggregation logic (pending/approved/rejected)
+
+- approval routing logic (<3M vs ≥3M)
+- status aggregation logic (pending/approved/rejected)
+
 2. Integration:
-  - server actions for client create/update/inactivate
-  - quotation submission creates appropriate approvals
-  - PO payment updates recognized totals (or validates the trigger behavior where feasible)
+
+- server actions for client create/update/inactivate
+- quotation submission creates appropriate approvals
+- PO payment updates recognized totals (or validates the trigger behavior where feasible)
+
 3. E2E:
-  - sales user can navigate Sales tabs
-  - create a client
-  - submit a quotation and approve it with manager/owner/executive roles
-  - log a PO and a payment; see recognized totals update
+
+- sales user can navigate Sales tabs
+- create a client
+- submit a quotation and approve it with manager/owner/executive roles
+- log a PO and a payment; see recognized totals update
 
 ## Post-Design Constitution Check (Re-evaluation)
 

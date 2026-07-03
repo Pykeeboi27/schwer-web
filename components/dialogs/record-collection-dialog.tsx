@@ -135,7 +135,11 @@ export function RecordCollectionDialog({
               Add a payment against this purchase order.
             </p>
           </div>
-          <Button variant="ghost" onClick={handleClose} aria-label="Close record collection dialog">
+          <Button
+            variant="ghost"
+            onClick={handleClose}
+            aria-label="Close record collection dialog"
+          >
             Close
           </Button>
         </div>
@@ -145,7 +149,8 @@ export function RecordCollectionDialog({
             Total Amount: <strong>{formatCurrency(purchaseOrder.poAmount)}</strong>
           </p>
           <p>
-            Collected Amount: <strong>{formatCurrency(purchaseOrder.recognizedAmount)}</strong>
+            Collected Amount:{" "}
+            <strong>{formatCurrency(purchaseOrder.recognizedAmount)}</strong>
           </p>
           <p>
             Remaining Balance: <strong>{formatCurrency(remainingBalance)}</strong>
@@ -168,7 +173,10 @@ export function RecordCollectionDialog({
                 const nextAmount = event.target.value;
                 setAmount(nextAmount);
                 if (amountError || formError) {
-                  const nextError = validateCollectionAmount(nextAmount, remainingBalance);
+                  const nextError = validateCollectionAmount(
+                    nextAmount,
+                    remainingBalance,
+                  );
                   setAmountError(nextError);
                   if (!nextError) {
                     setFormError(null);

@@ -30,7 +30,9 @@ export function EmptyState({
         className,
       )}
     >
-      {Icon ? <Icon className="h-5 w-5 text-muted-foreground" aria-hidden="true" /> : null}
+      {Icon ? (
+        <Icon className="h-5 w-5 text-muted-foreground" aria-hidden="true" />
+      ) : null}
       <p className="text-sm font-medium text-foreground">{title}</p>
       {description ? (
         <p className="text-xs text-muted-foreground">{description}</p>

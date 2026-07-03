@@ -84,12 +84,31 @@ export default async function ExecutiveSalesDashboardPage({
 
   const hasSalesPerformanceData = dashboard.salesPerformance.length > 0;
 
-  const MONTH_LABELS = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+  const MONTH_LABELS = [
+    "Jan",
+    "Feb",
+    "Mar",
+    "Apr",
+    "May",
+    "Jun",
+    "Jul",
+    "Aug",
+    "Sep",
+    "Oct",
+    "Nov",
+    "Dec",
+  ];
   const trendData =
     selectedPeriod === "quarterly"
-      ? quarterBreakdownRows.map((e) => ({ label: `Q${e.quarter}`, value: e.bookedRevenue }))
+      ? quarterBreakdownRows.map((e) => ({
+          label: `Q${e.quarter}`,
+          value: e.bookedRevenue,
+        }))
       : selectedPeriod === "monthly"
-        ? weekBreakdownRows.map((e) => ({ label: `Wk ${e.week}`, value: e.bookedRevenue }))
+        ? weekBreakdownRows.map((e) => ({
+            label: `Wk ${e.week}`,
+            value: e.bookedRevenue,
+          }))
         : ytdBreakdownRows.map((e) => ({
             label: MONTH_LABELS[e.month - 1] ?? String(e.month),
             value: e.bookedRevenue,
@@ -106,7 +125,10 @@ export default async function ExecutiveSalesDashboardPage({
       </div>
 
       {/* Period filter — segmented control */}
-      <div className="flex items-center gap-0 rounded-lg border bg-card overflow-hidden self-start" aria-label="Period filter">
+      <div
+        className="flex items-center gap-0 rounded-lg border bg-card overflow-hidden self-start"
+        aria-label="Period filter"
+      >
         {PERIOD_FILTERS.map((periodFilter, idx) => {
           const isSelected = periodFilter === selectedPeriod;
           return (
@@ -241,7 +263,9 @@ export default async function ExecutiveSalesDashboardPage({
                       {index + 1}
                     </span>
                     <span className="font-medium truncate">{row.ownerName}</span>
-                    <span className="text-right tabular-nums">{formatCurrency(row.bookedRevenue)}</span>
+                    <span className="text-right tabular-nums">
+                      {formatCurrency(row.bookedRevenue)}
+                    </span>
                     <span className="text-right tabular-nums text-muted-foreground">
                       {formatCurrency(row.marginAmount)}
                     </span>

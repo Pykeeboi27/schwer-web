@@ -37,7 +37,13 @@ async function DepartmentPageContent({ params }: DepartmentPageProps) {
 
 export default function DepartmentPage({ params }: DepartmentPageProps) {
   return (
-    <Suspense fallback={<div className="flex-1 w-full text-sm text-muted-foreground">Loading dashboard...</div>}>
+    <Suspense
+      fallback={
+        <div className="flex-1 w-full text-sm text-muted-foreground">
+          Loading dashboard...
+        </div>
+      }
+    >
       <DepartmentPageContent params={params} />
     </Suspense>
   );

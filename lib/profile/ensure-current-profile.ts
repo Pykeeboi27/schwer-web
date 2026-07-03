@@ -72,17 +72,15 @@ export async function ensureCurrentProfile(): Promise<CurrentProfile | null> {
     throw new EnsureCurrentProfileError();
   }
 
-  const { error: upsertError } = await supabase
-    .from("profiles")
-    .upsert(
-      {
-        id: user.id,
-        email: user.email,
-      },
-      {
-        onConflict: "id",
-      },
-    );
+  const { error: upsertError } = await supabase.from("profiles").upsert(
+    {
+      id: user.id,
+      email: user.email,
+    },
+    {
+      onConflict: "id",
+    },
+  );
 
   if (upsertError) {
     throw new EnsureCurrentProfileError();

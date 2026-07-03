@@ -53,8 +53,8 @@ export function ForgotPasswordForm({
           </CardHeader>
           <CardContent>
             <p className="text-sm text-muted-foreground">
-              If you registered using your email and password, you will receive a
-              password reset email shortly.
+              If you registered using your email and password, you will receive a password
+              reset email shortly.
             </p>
             <div className="mt-5 text-center text-sm text-muted-foreground">
               <Link

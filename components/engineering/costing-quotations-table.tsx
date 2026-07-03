@@ -221,7 +221,9 @@ export function CostingQuotationsTable({
                     </td>
                     <td className="px-3 py-2">
                       {isPending ? (
-                        <span className="text-xs text-muted-foreground">Awaiting executive</span>
+                        <span className="text-xs text-muted-foreground">
+                          Awaiting executive
+                        </span>
                       ) : isEditable ? (
                         <div className="flex flex-wrap gap-2">
                           <Button
@@ -232,7 +234,11 @@ export function CostingQuotationsTable({
                           >
                             Edit
                           </Button>
-                          <Button size="sm" onClick={() => handleSubmit(q)} disabled={isBusy}>
+                          <Button
+                            size="sm"
+                            onClick={() => handleSubmit(q)}
+                            disabled={isBusy}
+                          >
                             {isBusy ? "Saving..." : "Submit for Approval"}
                           </Button>
                           <Button

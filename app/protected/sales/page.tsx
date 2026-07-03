@@ -23,7 +23,10 @@ export default async function SalesDashboardPage() {
     redirect(redirectPath);
   }
 
-  const [summary, charts] = await Promise.all([getSalesSummary(), getSalesDashboardCharts()]);
+  const [summary, charts] = await Promise.all([
+    getSalesSummary(),
+    getSalesDashboardCharts(),
+  ]);
 
   return (
     <div className="flex flex-col gap-6">

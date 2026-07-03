@@ -39,7 +39,9 @@ function isHttpUrl(value: string): boolean {
   }
 }
 
-export function CreateCostingQuotationDialog({ clients }: CreateCostingQuotationDialogProps) {
+export function CreateCostingQuotationDialog({
+  clients,
+}: CreateCostingQuotationDialogProps) {
   const router = useRouter();
   const { success, error } = useToast();
   const [open, setOpen] = useState(false);
@@ -158,8 +160,8 @@ export function CreateCostingQuotationDialog({ clients }: CreateCostingQuotation
                   Start Costing Quotation
                 </h2>
                 <p className="text-sm text-muted-foreground">
-                  Set the cost and attach a Google Drive link before submitting for executive
-                  approval.
+                  Set the cost and attach a Google Drive link before submitting for
+                  executive approval.
                 </p>
               </div>
               <Button variant="ghost" onClick={closeDialog} aria-label="Close dialog">
@@ -188,7 +190,9 @@ export function CreateCostingQuotationDialog({ clients }: CreateCostingQuotation
                   </Button>
                 </div>
                 {fieldErrors.quotationNumber ? (
-                  <p className="mt-1 text-xs text-destructive">{fieldErrors.quotationNumber}</p>
+                  <p className="mt-1 text-xs text-destructive">
+                    {fieldErrors.quotationNumber}
+                  </p>
                 ) : null}
               </div>
 
@@ -255,7 +259,9 @@ export function CreateCostingQuotationDialog({ clients }: CreateCostingQuotation
                   placeholder="https://drive.google.com/..."
                 />
                 {fieldErrors.googleDriveLink ? (
-                  <p className="mt-1 text-xs text-destructive">{fieldErrors.googleDriveLink}</p>
+                  <p className="mt-1 text-xs text-destructive">
+                    {fieldErrors.googleDriveLink}
+                  </p>
                 ) : null}
               </div>
 

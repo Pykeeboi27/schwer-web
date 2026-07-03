@@ -16,9 +16,7 @@ describe("sales PO payment validation", () => {
   });
 
   it("rejects over-collection", () => {
-    expect(() => assertCollectionDoesNotExceedPo(1000, 1200)).toThrow(
-      /cannot exceed/i,
-    );
+    expect(() => assertCollectionDoesNotExceedPo(1000, 1200)).toThrow(/cannot exceed/i);
   });
 
   it("allows collection up to PO amount", () => {

@@ -14,11 +14,13 @@ Fix three production-blocking areas while staying within the constitution’s st
 - Apply Schwer branding: product name “Schwer Online Management” and constitution-defined primary/secondary colors via existing design tokens.
 
 Implementation approach (from research):
+
 - Reconcile Supabase schema drift so the `auth.users` → `public.profiles` trigger is present and correct.
 - Add an application-level “ensure profile exists” fallback (idempotent) that runs on post-auth entry points.
 - Keep post-auth routing centralized on the server (`getPostAuthRedirectPath`), and ensure it converges in <= 2 redirects.
 
 Supporting docs:
+
 - Research: `./research.md`
 - Data model: `./data-model.md`
 - Route contracts: `./contracts/routes.md`
@@ -49,7 +51,7 @@ Supporting docs:
 
 ## Constitution Check
 
-*GATE: Must pass before Phase 0 research. Re-check after Phase 1 design.*
+_GATE: Must pass before Phase 0 research. Re-check after Phase 1 design._
 
 - Fixed stack honored (Next.js + TypeScript + Tailwind + Lucide + Supabase)
 - Brand colors enforced via tokens only (no ad-hoc colors)
@@ -74,6 +76,7 @@ specs/002-auth-fixes/
 ```
 
 ### Source Code (repository root)
+
 <!--
   ACTION REQUIRED: Replace the placeholder tree below with the concrete layout
   for this feature. Delete unused options and expand the chosen structure with
@@ -130,39 +133,49 @@ No constitution violations anticipated for this feature.
 ### Phase A — Diagnose + Reconcile Schema Drift
 
 1. Confirm the running Supabase DB matches `schema.sql` for the auth→profile creation flow:
-  - Trigger on `auth.users` that calls `public.fn_handle_new_auth_user()`.
-  - `public.profiles` table exists and has expected columns.
-  - RLS enabled and policies present.
+
+- Trigger on `auth.users` that calls `public.fn_handle_new_auth_user()`.
+- `public.profiles` table exists and has expected columns.
+- RLS enabled and policies present.
+
 2. If drift exists, apply the missing SQL (or re-apply the relevant section) so DB behavior matches `schema.sql`.
 
 ### Phase B — Application-level “Ensure Profile Exists” Fallback
 
 1. Add a server-side helper that:
-  - Reads the authenticated user.
-  - Fetches profile.
-  - If missing, creates the minimal profile row idempotently, then re-fetches.
+
+- Reads the authenticated user.
+- Fetches profile.
+- If missing, creates the minimal profile row idempotently, then re-fetches.
+
 2. Run this helper on post-auth entry points that currently depend on profile existence:
-  - `/auth/confirm` (OAuth + OTP confirmation)
-  - `/protected` redirector
-  - `/auth/choose-department` gate
+
+- `/auth/confirm` (OAuth + OTP confirmation)
+- `/protected` redirector
+- `/auth/choose-department` gate
 
 ### Phase C — Fix Redirect Convergence
 
 1. Ensure the redirect graph converges in <= 2 redirects for these cases:
-  - Logged-in user with profile + department → dashboard.
-  - Logged-in user with profile but no department → choose-department.
-  - Logged-in user missing profile → profile created → choose-department (or dashboard if department present).
+
+- Logged-in user with profile + department → dashboard.
+- Logged-in user with profile but no department → choose-department.
+- Logged-in user missing profile → profile created → choose-department (or dashboard if department present).
+
 2. Preserve “return to intended destination” when applicable, but never at the expense of stability. Implement this via a redirectTo value captured on unauth → login redirect; onboarding (/auth/choose-department) takes precedence, then returns to redirectTo after onboarding completes.
 
 ### Phase D — Landing Page + Branding + Theme
 
 1. Update `/` to a public landing page with Login and Sign up CTAs.
 2. Update visible app name to “Schwer Online Management”:
-  - Document title/metadata
-  - Header/navbar labels
+
+- Document title/metadata
+- Header/navbar labels
+
 3. Update theme tokens using the constitution palette by adjusting existing CSS variables:
-  - Primary: `#f07b26`
-  - Secondary: `#d4620f`
+
+- Primary: `#f07b26`
+- Secondary: `#d4620f`
 
 ### Phase E — Tests
 
@@ -173,6 +186,7 @@ No constitution violations anticipated for this feature.
 ## Post-Design Constitution Check (Re-evaluation)
 
 PASS (expected). The design and planned implementation:
+
 - Uses only the approved stack (Next.js + TypeScript + Tailwind + Supabase + Lucide).
 - Applies branding via existing tokens/CSS variables (no new ad-hoc colors).
 - Keeps auth and routing decisions server-side and consistent with Supabase SSR session rules.

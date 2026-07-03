@@ -61,7 +61,9 @@ export async function validateClientCodeUniqueness(code: string): Promise<boolea
 }
 
 export function parseSector(raw: unknown): "commercial" | "industrial" | "solar" {
-  const value = String(raw ?? "").trim().toLowerCase();
+  const value = String(raw ?? "")
+    .trim()
+    .toLowerCase();
 
   if (value !== "commercial" && value !== "industrial" && value !== "solar") {
     throw new Error("Sector must be one of: commercial, industrial, solar.");
@@ -117,7 +119,9 @@ export async function listClients(): Promise<SalesClient[]> {
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("clients")
-    .select("id, client_code, company_name, sector, payment_terms_days, address, tin, bir_registration_link, notes, is_active, created_at")
+    .select(
+      "id, client_code, company_name, sector, payment_terms_days, address, tin, bir_registration_link, notes, is_active, created_at",
+    )
     .order("created_at", { ascending: false });
 
   if (error) {
@@ -232,7 +236,9 @@ export async function inactivateSalesClient(clientId: string): Promise<void> {
   }
 }
 
-export async function listClientContacts(clientId?: string): Promise<SalesClientContact[]> {
+export async function listClientContacts(
+  clientId?: string,
+): Promise<SalesClientContact[]> {
   const supabase = await createClient();
   let query = supabase
     .from("client_contacts")

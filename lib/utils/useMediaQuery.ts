@@ -1,6 +1,6 @@
-'use client';
+"use client";
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect } from "react";
 
 /**
  * Custom hook to detect media query matches and handle responsive breakpoints
@@ -11,7 +11,7 @@ export function useMediaQuery(query: string): boolean {
 
   useEffect(() => {
     // Check if window is available (client-side only)
-    if (typeof window === 'undefined') {
+    if (typeof window === "undefined") {
       return;
     }
 
@@ -24,11 +24,11 @@ export function useMediaQuery(query: string): boolean {
     };
 
     // Add event listener for media query changes
-    mediaQuery.addEventListener('change', handleChange);
+    mediaQuery.addEventListener("change", handleChange);
 
     // Cleanup listener on unmount
     return () => {
-      mediaQuery.removeEventListener('change', handleChange);
+      mediaQuery.removeEventListener("change", handleChange);
     };
   }, [query]);
 

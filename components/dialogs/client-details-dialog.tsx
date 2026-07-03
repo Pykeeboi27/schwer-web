@@ -154,7 +154,9 @@ export function ClientDetailsDialog({
               Client Details
             </h2>
             <p className="text-sm text-muted-foreground">
-              {isEditing ? "Update client information and save your changes." : "Read-only profile information."}
+              {isEditing
+                ? "Update client information and save your changes."
+                : "Read-only profile information."}
             </p>
           </div>
           <div className="flex items-center gap-2">
@@ -163,7 +165,11 @@ export function ClientDetailsDialog({
                 Edit Client
               </Button>
             ) : null}
-            <Button variant="ghost" onClick={() => onOpenChange(false)} aria-label="Close client details dialog">
+            <Button
+              variant="ghost"
+              onClick={() => onOpenChange(false)}
+              aria-label="Close client details dialog"
+            >
               Close
             </Button>
           </div>
@@ -173,7 +179,12 @@ export function ClientDetailsDialog({
           <form onSubmit={handleSave} className="grid gap-4">
             <div>
               <Label htmlFor="client-code">Code</Label>
-              <Input id="client-code" value={client.clientCode} readOnly className="mt-1" />
+              <Input
+                id="client-code"
+                value={client.clientCode}
+                readOnly
+                className="mt-1"
+              />
             </div>
 
             <div>
@@ -186,7 +197,9 @@ export function ClientDetailsDialog({
                 }
                 className="mt-1"
               />
-              {fieldErrors.name ? <p className="mt-1 text-xs text-destructive">{fieldErrors.name}</p> : null}
+              {fieldErrors.name ? (
+                <p className="mt-1 text-xs text-destructive">{fieldErrors.name}</p>
+              ) : null}
             </div>
 
             <div className="grid gap-4 md:grid-cols-2">
@@ -196,7 +209,10 @@ export function ClientDetailsDialog({
                   id="client-contact-person"
                   value={formValues.contactPerson}
                   onChange={(event) =>
-                    setFormValues((current) => ({ ...current, contactPerson: event.target.value }))
+                    setFormValues((current) => ({
+                      ...current,
+                      contactPerson: event.target.value,
+                    }))
                   }
                   className="mt-1"
                 />
@@ -229,11 +245,16 @@ export function ClientDetailsDialog({
                   type="email"
                   value={formValues.email}
                   onChange={(event) =>
-                    setFormValues((current) => ({ ...current, email: event.target.value }))
+                    setFormValues((current) => ({
+                      ...current,
+                      email: event.target.value,
+                    }))
                   }
                   className="mt-1"
                 />
-                {fieldErrors.email ? <p className="mt-1 text-xs text-destructive">{fieldErrors.email}</p> : null}
+                {fieldErrors.email ? (
+                  <p className="mt-1 text-xs text-destructive">{fieldErrors.email}</p>
+                ) : null}
               </div>
               <div>
                 <Label htmlFor="client-phone">Phone</Label>
@@ -241,11 +262,16 @@ export function ClientDetailsDialog({
                   id="client-phone"
                   value={formValues.phone}
                   onChange={(event) =>
-                    setFormValues((current) => ({ ...current, phone: event.target.value }))
+                    setFormValues((current) => ({
+                      ...current,
+                      phone: event.target.value,
+                    }))
                   }
                   className="mt-1"
                 />
-                {fieldErrors.phone ? <p className="mt-1 text-xs text-destructive">{fieldErrors.phone}</p> : null}
+                {fieldErrors.phone ? (
+                  <p className="mt-1 text-xs text-destructive">{fieldErrors.phone}</p>
+                ) : null}
               </div>
             </div>
 
@@ -255,7 +281,10 @@ export function ClientDetailsDialog({
                 id="client-address"
                 value={formValues.address}
                 onChange={(event) =>
-                  setFormValues((current) => ({ ...current, address: event.target.value }))
+                  setFormValues((current) => ({
+                    ...current,
+                    address: event.target.value,
+                  }))
                 }
                 className="mt-1"
               />

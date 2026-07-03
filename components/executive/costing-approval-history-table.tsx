@@ -59,7 +59,9 @@ export function CostingApprovalHistoryTable({ items }: CostingApprovalHistoryTab
               <td className="px-3 py-2 text-xs text-muted-foreground">
                 {item.rejectionReason ?? "-"}
               </td>
-              <td className="px-3 py-2 text-muted-foreground">{formatDate(item.resolvedAt)}</td>
+              <td className="px-3 py-2 text-muted-foreground">
+                {formatDate(item.resolvedAt)}
+              </td>
             </tr>
           ))}
         </tbody>

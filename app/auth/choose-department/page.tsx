@@ -32,9 +32,7 @@ type ChooseDepartmentPageProps = {
   searchParams?: Promise<{ error?: string; redirectTo?: string }>;
 };
 
-async function ChooseDepartmentContent({
-  searchParams,
-}: ChooseDepartmentPageProps) {
+async function ChooseDepartmentContent({ searchParams }: ChooseDepartmentPageProps) {
   const resolvedSearchParams = searchParams ? await searchParams : undefined;
   const errorMessage = resolvedSearchParams?.error ?? null;
   const redirectTo = resolvedSearchParams?.redirectTo;
@@ -156,9 +154,7 @@ async function ChooseDepartmentContent({
             </select>
           </div>
 
-          {errorMessage && (
-            <p className="text-sm text-destructive">{errorMessage}</p>
-          )}
+          {errorMessage && <p className="text-sm text-destructive">{errorMessage}</p>}
 
           <Button type="submit" className="w-full">
             Continue

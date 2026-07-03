@@ -26,8 +26,14 @@ const SECTOR_LABELS: Record<SectorPerformanceSlice["sector"], string> = {
 };
 
 function toSector(value: unknown): SectorPerformanceSlice["sector"] | null {
-  const normalized = String(value ?? "").trim().toLowerCase();
-  if (normalized === "commercial" || normalized === "industrial" || normalized === "solar") {
+  const normalized = String(value ?? "")
+    .trim()
+    .toLowerCase();
+  if (
+    normalized === "commercial" ||
+    normalized === "industrial" ||
+    normalized === "solar"
+  ) {
     return normalized;
   }
   return null;

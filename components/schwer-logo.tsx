@@ -17,9 +17,30 @@ export function SchwerLogo({ className }: SchwerLogoProps) {
       <rect x="8" y="18" width="88" height="116" rx="6" fill="hsl(var(--primary))" />
       <rect x="8" y="146" width="88" height="116" rx="6" fill="hsl(var(--primary))" />
 
-      <rect x="108" y="18" width="88" height="244" rx="6" fill="hsl(var(--muted-foreground))" />
-      <rect x="208" y="18" width="88" height="244" rx="6" fill="hsl(var(--muted-foreground))" />
-      <rect x="308" y="18" width="88" height="244" rx="6" fill="hsl(var(--muted-foreground))" />
+      <rect
+        x="108"
+        y="18"
+        width="88"
+        height="244"
+        rx="6"
+        fill="hsl(var(--muted-foreground))"
+      />
+      <rect
+        x="208"
+        y="18"
+        width="88"
+        height="244"
+        rx="6"
+        fill="hsl(var(--muted-foreground))"
+      />
+      <rect
+        x="308"
+        y="18"
+        width="88"
+        height="244"
+        rx="6"
+        fill="hsl(var(--muted-foreground))"
+      />
     </svg>
   );
 }

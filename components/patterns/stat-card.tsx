@@ -44,7 +44,10 @@ export function StatProgress({ percent, caption }: StatProgressProps) {
   return (
     <div>
       <div className="h-2 w-full overflow-hidden rounded-full bg-muted">
-        <div className="h-full rounded-full bg-primary" style={{ width: `${clamped}%` }} />
+        <div
+          className="h-full rounded-full bg-primary"
+          style={{ width: `${clamped}%` }}
+        />
       </div>
       {caption ? <p className="mt-1.5 text-xs text-muted-foreground">{caption}</p> : null}
     </div>

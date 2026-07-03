@@ -1,0 +1,13 @@
+# Dependencies & build output
+node_modules
+.next
+out
+build
+dist
+
+# Coverage & reports
+coverage
+
+# Generated / tooling-managed files
+next-env.d.ts
+package-lock.json

@@ -186,9 +186,13 @@ export function QuotationsTable({
                   tabIndex={0}
                   aria-label={`View quotation ${quotation.quotationNumber}`}
                   onClick={() => setSelectedQuotation(quotation)}
-                  onKeyDown={(event) => onRowKeyDown(event, () => setSelectedQuotation(quotation))}
+                  onKeyDown={(event) =>
+                    onRowKeyDown(event, () => setSelectedQuotation(quotation))
+                  }
                 >
-                  <td className="px-3 py-2 font-mono text-xs">{quotation.quotationNumber}</td>
+                  <td className="px-3 py-2 font-mono text-xs">
+                    {quotation.quotationNumber}
+                  </td>
                   <td className="px-3 py-2">{quotation.clientName}</td>
                   <td className="px-3 py-2">{formatCurrency(quotation.amount)}</td>
                   <td className="px-3 py-2">

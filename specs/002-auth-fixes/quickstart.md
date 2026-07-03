@@ -1,11 +1,12 @@
 # Quickstart: Auth Fixes
 
-**Feature**: 002-auth-fixes  
+**Feature**: 002-auth-fixes
 **Date**: 2026-04-03
 
 ## Goal
 
 Verify that:
+
 - Login no longer causes a redirect loop.
 - A profile record exists for new users (email/password and OAuth).
 - Users without a department are routed to `/auth/choose-department`.
@@ -18,25 +19,28 @@ Verify that:
 
 ## Run locally
 
-1) Install deps
+1. Install deps
 
 - `npm install`
 
-2) Start the dev server
+2. Start the dev server
 
 - `npm run dev`
 
 ## Manual verification (happy paths)
 
 ### 1) Logged-out user
+
 - Visit `/` → see landing page with Login + Sign up buttons.
 - Visit `/protected` or `/protected/hr` while logged out → redirected to `/auth/login?redirectTo=...`.
 
 ### 2) Email/password sign-up creates profile
+
 - Sign up a new user.
 - After completion, confirm a `profiles` row exists for that user in Supabase (and no duplicates).
 
 ### 3) Login does not loop
+
 - Log out.
 - Log in with a known user.
 - Expected:
@@ -45,10 +49,12 @@ Verify that:
   - No ping-pong redirects between `/auth/login` and `/protected`.
 
 ### 4) Department selection
+
 - For a user without department, choose one.
 - Verify redirect to `redirectTo` when present, otherwise `/protected/{department}`.
 
 ### 5) Branding + theme
+
 - Confirm the visible app name is “Schwer Online Management” (header and document title).
 - Confirm primary/secondary accents follow the constitution palette and no new custom colors are introduced.
 
@@ -58,12 +64,14 @@ Verify that:
   - `npm test`
 
 Current status:
+
 - `npm test` passes for this feature branch.
 
 - E2E:
   - `npm run test:e2e`
 
 Current status:
+
 - Pending local E2E environment credentials.
 
 ## Troubleshooting

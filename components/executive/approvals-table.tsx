@@ -34,7 +34,9 @@ export function ExecutiveApprovalsTable({
   const [isSubmittingId, setIsSubmittingId] = useState<string | null>(null);
   const [reasons, setReasons] = useState<Record<string, string>>({});
 
-  const normalizedRole = String(currentUserRole ?? "").trim().toLowerCase();
+  const normalizedRole = String(currentUserRole ?? "")
+    .trim()
+    .toLowerCase();
   const canApprove = normalizedRole === "owner" || normalizedRole === "executive";
 
   const handleApprove = async (item: PendingApprovalItem) => {
@@ -72,7 +74,11 @@ export function ExecutiveApprovalsTable({
 
     setIsSubmittingId(item.approvalId);
 
-    const response = await rejectQuotationAction(item.quotationId, reason, normalizedRole);
+    const response = await rejectQuotationAction(
+      item.quotationId,
+      reason,
+      normalizedRole,
+    );
 
     if (!response.success) {
       error(response.error ?? "Failed to reject quotation.");
@@ -115,7 +121,9 @@ export function ExecutiveApprovalsTable({
                 <td className="px-3 py-2 font-mono text-xs">{item.quotationNumber}</td>
                 <td className="px-3 py-2">{item.subject || "-"}</td>
                 <td className="px-3 py-2">{formatCurrency(item.amount)}</td>
-                <td className="px-3 py-2 capitalize">{item.approverRole.replaceAll("_", " ")}</td>
+                <td className="px-3 py-2 capitalize">
+                  {item.approverRole.replaceAll("_", " ")}
+                </td>
                 <td className="px-3 py-2">
                   <Input
                     value={reasons[item.approvalId] ?? ""}
@@ -132,7 +140,11 @@ export function ExecutiveApprovalsTable({
                 </td>
                 <td className="px-3 py-2">
                   <div className="flex gap-2">
-                    <Button size="sm" onClick={() => handleApprove(item)} disabled={isBusy || !canApprove}>
+                    <Button
+                      size="sm"
+                      onClick={() => handleApprove(item)}
+                      disabled={isBusy || !canApprove}
+                    >
                       {isBusy ? "Saving..." : "Approve"}
                     </Button>
                     <Button

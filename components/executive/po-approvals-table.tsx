@@ -27,7 +27,9 @@ export function ExecutivePoApprovalsTable({
   const [isSubmittingId, setIsSubmittingId] = useState<string | null>(null);
   const [reasons, setReasons] = useState<Record<string, string>>({});
 
-  const normalizedRole = String(currentUserRole ?? "").trim().toLowerCase();
+  const normalizedRole = String(currentUserRole ?? "")
+    .trim()
+    .toLowerCase();
   const canApprove = normalizedRole === "owner" || normalizedRole === "executive";
 
   const handleApprove = async (item: PendingPoApprovalItem) => {
@@ -98,7 +100,9 @@ export function ExecutivePoApprovalsTable({
                 <td className="px-3 py-2 font-mono text-xs">{item.poNumber}</td>
                 <td className="px-3 py-2">{item.subject || "-"}</td>
                 <td className="px-3 py-2">{formatCurrency(item.amount)}</td>
-                <td className="px-3 py-2 capitalize">{item.approverRole.replaceAll("_", " ")}</td>
+                <td className="px-3 py-2 capitalize">
+                  {item.approverRole.replaceAll("_", " ")}
+                </td>
                 <td className="px-3 py-2">
                   <Input
                     value={reasons[item.approvalId] ?? ""}
@@ -115,7 +119,11 @@ export function ExecutivePoApprovalsTable({
                 </td>
                 <td className="px-3 py-2">
                   <div className="flex gap-2">
-                    <Button size="sm" onClick={() => handleApprove(item)} disabled={isBusy || !canApprove}>
+                    <Button
+                      size="sm"
+                      onClick={() => handleApprove(item)}
+                      disabled={isBusy || !canApprove}
+                    >
                       {isBusy ? "Saving..." : "Approve"}
                     </Button>
                     <Button

@@ -41,7 +41,10 @@ export async function createCostingQuotationAction(
   formData: FormData,
 ): Promise<ActionResponse<{ quotationId: string }>> {
   try {
-    const quotationNumber = asRequiredString(formData.get("quotationNumber"), "Quotation ID").toUpperCase();
+    const quotationNumber = asRequiredString(
+      formData.get("quotationNumber"),
+      "Quotation ID",
+    ).toUpperCase();
     const clientId = asRequiredString(formData.get("clientId"), "Client");
     const subject = asRequiredString(formData.get("subject"), "Subject").toUpperCase();
     const cost = parseCostingCost(formData.get("cost"));
@@ -62,7 +65,8 @@ export async function createCostingQuotationAction(
   } catch (error) {
     return {
       success: false,
-      error: error instanceof Error ? error.message : "Failed to create costing quotation.",
+      error:
+        error instanceof Error ? error.message : "Failed to create costing quotation.",
     };
   }
 }
@@ -72,7 +76,8 @@ export async function updateCostingQuotationAction(
 ): Promise<ActionResponse<{ quotationId: string }>> {
   try {
     const quotationId = asRequiredString(formData.get("quotationId"), "Quotation");
-    const quotationNumber = asOptionalString(formData.get("quotationNumber"))?.toUpperCase() ?? undefined;
+    const quotationNumber =
+      asOptionalString(formData.get("quotationNumber"))?.toUpperCase() ?? undefined;
     const clientId = asRequiredString(formData.get("clientId"), "Client");
     const subject = asRequiredString(formData.get("subject"), "Subject").toUpperCase();
     const cost = parseCostingCost(formData.get("cost"));
@@ -94,7 +99,8 @@ export async function updateCostingQuotationAction(
   } catch (error) {
     return {
       success: false,
-      error: error instanceof Error ? error.message : "Failed to update costing quotation.",
+      error:
+        error instanceof Error ? error.message : "Failed to update costing quotation.",
     };
   }
 }
@@ -115,7 +121,8 @@ export async function submitCostingForApprovalAction(
   } catch (error) {
     return {
       success: false,
-      error: error instanceof Error ? error.message : "Failed to submit for costing approval.",
+      error:
+        error instanceof Error ? error.message : "Failed to submit for costing approval.",
     };
   }
 }
@@ -135,7 +142,8 @@ export async function deleteCostingQuotationAction(
   } catch (error) {
     return {
       success: false,
-      error: error instanceof Error ? error.message : "Failed to delete costing quotation.",
+      error:
+        error instanceof Error ? error.message : "Failed to delete costing quotation.",
     };
   }
 }

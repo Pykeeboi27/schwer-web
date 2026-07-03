@@ -8,6 +8,8 @@ describe("validateDepartmentSelection", () => {
   });
 
   it("returns error for invalid department", () => {
-    expect(validateDepartmentSelection("marketing")).toContain("Department must be one of");
+    expect(validateDepartmentSelection("marketing")).toContain(
+      "Department must be one of",
+    );
   });
 });

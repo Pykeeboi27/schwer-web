@@ -10,7 +10,8 @@ The sales dashboard requires a comprehensive UI/UX redesign to improve usability
 ## Technical Context
 
 **Language/Version**: TypeScript (Next.js App Router / React)
-**Primary Dependencies**: 
+**Primary Dependencies**:
+
 - Next.js 14+ (App Router - SSR for protected routes)
 - React 18+
 - TypeScript 5+
@@ -30,24 +31,28 @@ The sales dashboard requires a comprehensive UI/UX redesign to improve usability
 ### Technical Decisions
 
 **Layout Architecture**:
+
 - Sidebar: Persistent on desktop (≥768px, Tailwind `md:` breakpoint), hamburger menu on mobile (<768px) using responsive Tailwind classes. Note: 1024px is the optimal display width for full dashboard content; 768px is the responsive breakpoint for sidebar layout switching.
 - Responsive state managed via a custom `useMediaQuery` hook or Radix Dialog slot states
 - Content area: Flex layout with sidebar + main content; main content scrolls independently
 - Mobile: Fixed header bar with hamburger toggle, sidebar overlays with blur backdrop
 
 **Data Management**:
+
 - Server components for data fetching (Supabase queries); client components for interactivity
 - Client-side form state via React hooks (`useState`); async submission via server actions
 - Real-time table updates: Trigger table refresh after form submissions (create, approve, reject, record collection)
 - Polling: Conservative approach; no WebSocket for this release (as per user clarification)
 
 **Client Code Generation**:
+
 - Format: C[6 random digits] (e.g., C734829)
 - Generation: Client-side on "Generate Code" button click
 - Uniqueness check: Query existing codes before submission; if conflict detected, regenerate or alert user
 - Storage: Persisted to Supabase on form submission; database constraint ensures uniqueness
 
 **Approval Workflow State Machine**:
+
 ```
 Draft (pending)
 ├─ [Submit for Approval]
@@ -60,12 +65,14 @@ Draft (pending)
 ```
 
 **Collection Validation**:
+
 - On record collection: validate that `collected_amount + new_collection <= total_amount`
 - If validation fails: show toast error "Collection amount exceeds available balance"
 - Accumulation: Update `collected_amount = collected_amount + new_collection` via Supabase update
 - Concurrency: Supabase transactions handle simultaneous writes; use versioning/optimistic locking if needed
 
 **Notification Pattern**:
+
 - Toast notifications (Shadcn/ui or custom `useToast`) for success/error feedback
 - No email notifications (user clarification)
 - Transient messages: auto-dismiss after 3-5 seconds
@@ -74,12 +81,12 @@ Draft (pending)
 
 **GATE: Must pass before Phase 0 research. Re-check after Phase 1 design.**
 
-| Principle | Status | Notes |
-|-----------|--------|-------|
-| **I. Schema-First Database** | ✅ PASS | New tables (quotation states, collections, approval chain) will be documented in `schema.sql`; RLS policies included. |
-| **II. Supabase Auth + RLS** | ✅ PASS | Auth via Supabase; all sensitive data (quotations, approvals, collections) protected by RLS policies based on department and role. |
-| **III. Design Tokens + UI** | ✅ PASS | Tailwind CSS + Shadcn/ui components; brand colors (#f07b26, #d4620f) used via design tokens. Lucide Icons for navigation/actions. |
-| **IV. Next.js App Router** | ✅ PASS | Server components for data fetch; client components for forms/dialogs. Data access in `lib/` utilities; components remain focused on UI. |
+| Principle                    | Status  | Notes                                                                                                                                       |
+| ---------------------------- | ------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
+| **I. Schema-First Database** | ✅ PASS | New tables (quotation states, collections, approval chain) will be documented in `schema.sql`; RLS policies included.                       |
+| **II. Supabase Auth + RLS**  | ✅ PASS | Auth via Supabase; all sensitive data (quotations, approvals, collections) protected by RLS policies based on department and role.          |
+| **III. Design Tokens + UI**  | ✅ PASS | Tailwind CSS + Shadcn/ui components; brand colors (#f07b26, #d4620f) used via design tokens. Lucide Icons for navigation/actions.           |
+| **IV. Next.js App Router**   | ✅ PASS | Server components for data fetch; client components for forms/dialogs. Data access in `lib/` utilities; components remain focused on UI.    |
 | **V. Testing at All Levels** | ✅ PASS | Unit (component logic, utilities), Integration (server actions + Supabase), E2E (Playwright critical flows). Each story includes test plan. |
 
 **No violations identified.** Feature aligns with all constitution principles.
@@ -191,6 +198,7 @@ tests/
 **Entities to define**:
 
 #### Client
+
 - `id` (PK, UUID)
 - `department_id` (FK, dept access control)
 - `code` (UNIQUE, VARCHAR, format: C[6 digits])
@@ -204,6 +212,7 @@ tests/
 - Relationships: Many quotations, many purchase orders
 
 #### Quotation
+
 - `id` (PK, UUID)
 - `department_id` (FK)
 - `client_id` (FK → Client)
@@ -216,6 +225,7 @@ tests/
 - Relationships: Items (line items), approvals (audit trail)
 
 #### QuotationApproval (Audit Trail)
+
 - `id` (PK, UUID)
 - `quotation_id` (FK → Quotation)
 - `approved_by` (USER_ID)
@@ -225,6 +235,7 @@ tests/
 - `created_at` (TIMESTAMP)
 
 #### PurchaseOrder
+
 - `id` (PK, UUID)
 - `department_id` (FK)
 - `client_id` (FK → Client)
@@ -237,6 +248,7 @@ tests/
 - Relationships: Items (line items), collections
 
 #### Collection
+
 - `id` (PK, UUID)
 - `purchase_order_id` (FK → PurchaseOrder)
 - `amount` (DECIMAL)
@@ -247,6 +259,7 @@ tests/
 ### 1.2 API/Database Contracts (→ `contracts/`)
 
 #### Server Actions (Client → Server)
+
 - `createClient(data: ClientForm)` → Client | Error
 - `submitQuotationForApproval(quotationId: UUID)` → Quotation | Error
 - `approveQuotation(quotationId: UUID, role: Role)` → Quotation | Error
@@ -255,6 +268,7 @@ tests/
 - `recordCollection(poId: UUID, amount: Decimal)` → PurchaseOrder | Error
 
 #### RLS Policies
+
 - **Clients table**: Users can view clients in their department; create limited to sales_staff+
 - **Quotations table**: Users can view quotations in their department; create limited to sales_staff; approve limited to sales_manager/owner/executive based on role
 - **Collections table**: Users can create collections for their department; view own + approvers' collections
@@ -262,6 +276,7 @@ tests/
 ### 1.3 Quickstart Guide (→ `quickstart.md`)
 
 Examples for developers:
+
 - How to create a client with auto-generated code
 - How to submit a quotation and transition through approval states
 - How to record a collection and verify balance accumulation
@@ -271,28 +286,32 @@ Examples for developers:
 
 ## Phase 2: Tasks & Implementation (→ `tasks.md`)
 
-**Depends on**: Phase 1 design artifacts  
+**Depends on**: Phase 1 design artifacts
 **Output**: Ordered tasks for implementation, generated by `/speckit.tasks` command
 
 At this stage, the following task groups are anticipated:
 
 1. **Infrastructure (Database & RLS)**
+
    - Create/update tables in `schema.sql` (Clients, Quotations, QuotationApproval, PurchaseOrders, Collections)
    - Define RLS policies for department-based access control
    - Create approval routing functions/triggers
 
 2. **Layout & Navigation**
+
    - Build responsive Sidebar component (desktop + mobile hamburger)
    - Create main Dashboard layout wrapper
    - Wire up navigation between tabs
 
 3. **Client Management**
+
    - Build clients table with filtering/search
    - Create "Create Client" dialog with code generation
    - Create "Client Details" read-only dialog
    - Implement `createClient` server action + validation
 
 4. **Quotation Workflow**
+
    - Build quotations table with status filtering
    - Create quotation details dialog with approval chain visibility
    - Implement submit/approve/reject server actions
@@ -300,18 +319,21 @@ At this stage, the following task groups are anticipated:
    - Toast notifications for approval outcomes
 
 5. **Purchase Orders & Collections**
+
    - Build purchase orders table
    - Create PO details dialog with collection history
    - Create "Record Collection" dialog with balance validation
    - Implement `recordCollection` server action with transaction safety
 
 6. **Component & Dialog Polish**
+
    - Form validation (required fields, format constraints)
    - Error handling & user feedback (toasts, inline errors)
    - Empty states (no results from filter)
    - Loading states (table/dialog skeletons)
 
 7. **Testing**
+
    - Unit tests (code generation, approval routing, collection validation)
    - Integration tests (server actions + Supabase, RLS enforcement)
    - E2E tests (Playwright: full user journeys, responsive testing)
@@ -326,18 +348,19 @@ At this stage, the following task groups are anticipated:
 ## Complexity Tracking
 
 **No constitution violations identified.** Feature design adheres to all principles:
+
 - Schema-first via `schema.sql` updates
 - Supabase Auth + RLS for authorization
 - Consistent Tailwind + Shadcn/ui design
 - Next.js App Router best practices
 - Comprehensive test strategy
 
-| Decision | Justification | Considered Alternatives |
-|----------|---------------|------------------------|
-| Client-side code generation (C[6 digits]) | Simplicity; no server roundtrip. Uniqueness enforced via DB constraint + retry. | Server-side sequential (more complex state) |
-| In-app toast only (no email) | Faster feedback loop; reduced infrastructure. Suits collaborative dashboard use case. | Email notifications (deferred to future) |
-| Table refresh on form submission (polling) | Simple, no WebSocket complexity. Acceptable for typical approval SLA. | Real-time WebSocket (overkill for this scope) |
-| Amount-based approval routing | Critical business requirement; implements accrual controls. | Flat approval chain (less control) |
+| Decision                                   | Justification                                                                         | Considered Alternatives                       |
+| ------------------------------------------ | ------------------------------------------------------------------------------------- | --------------------------------------------- |
+| Client-side code generation (C[6 digits])  | Simplicity; no server roundtrip. Uniqueness enforced via DB constraint + retry.       | Server-side sequential (more complex state)   |
+| In-app toast only (no email)               | Faster feedback loop; reduced infrastructure. Suits collaborative dashboard use case. | Email notifications (deferred to future)      |
+| Table refresh on form submission (polling) | Simple, no WebSocket complexity. Acceptable for typical approval SLA.                 | Real-time WebSocket (overkill for this scope) |
+| Amount-based approval routing              | Critical business requirement; implements accrual controls.                           | Flat approval chain (less control)            |
 
 ---
 
@@ -347,5 +370,3 @@ At this stage, the following task groups are anticipated:
 2. Review generated design artifacts for completeness and accuracy
 3. Run `/speckit.tasks` to generate detailed task breakdown in [tasks.md](tasks.md)
 4. Begin implementation with infrastructure & database setup (Phase 2, Task Group 1)
-
-

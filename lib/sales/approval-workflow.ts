@@ -36,9 +36,15 @@ function normalizeStatus(status: string): WorkflowStatus {
 }
 
 function normalizeRole(role: string): ApproverRole {
-  const normalized = String(role ?? "").trim().toLowerCase();
+  const normalized = String(role ?? "")
+    .trim()
+    .toLowerCase();
 
-  if (normalized === "sales_manager" || normalized === "owner" || normalized === "executive") {
+  if (
+    normalized === "sales_manager" ||
+    normalized === "owner" ||
+    normalized === "executive"
+  ) {
     return normalized;
   }
 
@@ -71,7 +77,9 @@ export function determineNextQuotationStatus(
 
   if (status === "pending_sales_manager") {
     if (role !== "sales_manager") {
-      throw new Error("Only sales_manager can approve this quotation at the current stage.");
+      throw new Error(
+        "Only sales_manager can approve this quotation at the current stage.",
+      );
     }
 
     return quotationAmount >= 3_000_000 ? "pending_owner" : "approved";

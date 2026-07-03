@@ -109,10 +109,7 @@ export function validateCollectionAmount(
     return amountError.replace("PO total amount", "Collection amount");
   }
 
-  if (
-    Number.isFinite(remainingBalance) &&
-    Number(amount) > Number(remainingBalance)
-  ) {
+  if (Number.isFinite(remainingBalance) && Number(amount) > Number(remainingBalance)) {
     return "Collection amount exceeds available balance.";
   }
 

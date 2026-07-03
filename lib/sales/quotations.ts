@@ -53,7 +53,9 @@ export async function fetchQuotations(_departmentId?: string): Promise<SalesQuot
 }
 
 function toRequiredApproverRole(role: unknown): RequiredApproverRole | null {
-  const normalized = String(role ?? "").trim().toLowerCase();
+  const normalized = String(role ?? "")
+    .trim()
+    .toLowerCase();
 
   if (
     normalized === "sales_manager" ||
@@ -211,7 +213,9 @@ export async function listSalesQuotations(): Promise<SalesQuotation[]> {
       clientConfirmedAt: row.client_confirmed_at ?? null,
       convertedPoId: row.converted_po_id ?? null,
       convertedPoStatus: (() => {
-        const po = Array.isArray(row.converted_po) ? row.converted_po[0] : row.converted_po;
+        const po = Array.isArray(row.converted_po)
+          ? row.converted_po[0]
+          : row.converted_po;
         return po?.status ?? null;
       })(),
       poConvertedAt: row.po_converted_at ?? null,
@@ -262,7 +266,9 @@ export async function updateSalesQuotationDetails(input: {
     quotationRow.converted_po_id === null;
 
   if (quotationRow.status !== "draft" && !isReopenedForPo) {
-    throw new Error("Sales details can only be edited while the quotation is a draft or re-opened for a PO.");
+    throw new Error(
+      "Sales details can only be edited while the quotation is a draft or re-opened for a PO.",
+    );
   }
 
   const directCost = Number(quotationRow.cost ?? 0);
@@ -300,7 +306,9 @@ export async function updateSalesQuotationDetails(input: {
   }
 }
 
-export async function findApproversForRole(role: RequiredApproverRole): Promise<Array<{ id: string }>> {
+export async function findApproversForRole(
+  role: RequiredApproverRole,
+): Promise<Array<{ id: string }>> {
   const supabase = await createClient();
   const department = role === "sales_manager" ? "sales" : "executive";
   const { data, error } = await supabase
@@ -432,7 +440,9 @@ export async function findPendingApprovalForRole(input: {
   return { approvalId: data.id };
 }
 
-export async function listPendingApprovalsForCurrentUser(): Promise<PendingApprovalItem[]> {
+export async function listPendingApprovalsForCurrentUser(): Promise<
+  PendingApprovalItem[]
+> {
   const supabase = await createClient();
   const {
     data: { user },
@@ -445,7 +455,9 @@ export async function listPendingApprovalsForCurrentUser(): Promise<PendingAppro
 
   const { data, error } = await supabase
     .from("quotation_approvals")
-    .select("id, quotation_id, approver_role, status, quotations:quotation_id(quotation_number, subject, amount)")
+    .select(
+      "id, quotation_id, approver_role, status, quotations:quotation_id(quotation_number, subject, amount)",
+    )
     .eq("approver_id", user.id)
     .eq("status", "pending")
     .order("created_at", { ascending: false });

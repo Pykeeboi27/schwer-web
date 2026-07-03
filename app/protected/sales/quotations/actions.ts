@@ -41,7 +41,9 @@ function asOptionalString(value: FormDataEntryValue | null): string | null {
 }
 
 function normalizeRole(role: string | undefined): RequiredApproverRole | null {
-  const normalized = String(role ?? "").trim().toLowerCase();
+  const normalized = String(role ?? "")
+    .trim()
+    .toLowerCase();
 
   if (
     normalized === "sales_manager" ||
@@ -55,7 +57,9 @@ function normalizeRole(role: string | undefined): RequiredApproverRole | null {
 }
 
 function shouldRestrictToHighValue(role: string | undefined): boolean {
-  const normalized = String(role ?? "").trim().toLowerCase();
+  const normalized = String(role ?? "")
+    .trim()
+    .toLowerCase();
   return normalized === "owner" || normalized === "executive";
 }
 
@@ -150,7 +154,9 @@ export async function rejectQuotationAction(
   userRole: string,
 ): Promise<ActionResponse<{ quotationId: string; role: RequiredApproverRole }>> {
   const normalizedQuotationId = String(quotationId ?? "").trim();
-  const normalizedReason = String(reason ?? "").trim().toUpperCase();
+  const normalizedReason = String(reason ?? "")
+    .trim()
+    .toUpperCase();
   const role = normalizeRole(userRole);
 
   if (!normalizedQuotationId) {
@@ -236,7 +242,9 @@ export async function markClientPoReceivedAction(
   clientPoNumber: string,
 ): Promise<ActionResponse<{ quotationId: string }>> {
   const normalizedId = String(quotationId ?? "").trim();
-  const normalizedPo = String(clientPoNumber ?? "").trim().toUpperCase();
+  const normalizedPo = String(clientPoNumber ?? "")
+    .trim()
+    .toUpperCase();
 
   if (!normalizedId) {
     return { success: false, error: "Quotation id is required." };
@@ -246,7 +254,10 @@ export async function markClientPoReceivedAction(
   }
 
   try {
-    await markClientPoReceived({ quotationId: normalizedId, clientPoNumber: normalizedPo });
+    await markClientPoReceived({
+      quotationId: normalizedId,
+      clientPoNumber: normalizedPo,
+    });
     revalidatePath("/protected/sales/quotations");
     return { success: true, data: { quotationId: normalizedId } };
   } catch (error) {
@@ -275,7 +286,8 @@ export async function convertToPurchaseOrderAction(
   } catch (error) {
     return {
       success: false,
-      error: error instanceof Error ? error.message : "Failed to convert to purchase order.",
+      error:
+        error instanceof Error ? error.message : "Failed to convert to purchase order.",
     };
   }
 }
@@ -316,7 +328,8 @@ export async function updateSalesQuotationDetailsAction(
       rawBank === "" ? null : parsePercentInput(rawBank, "Bank percentage");
 
     const rawSop = String(formData.get("sopPercentage") ?? "").trim();
-    const sopPercentage = rawSop === "" ? null : parsePercentInput(rawSop, "SOP percentage");
+    const sopPercentage =
+      rawSop === "" ? null : parsePercentInput(rawSop, "SOP percentage");
 
     const googleDriveLink = asOptionalString(formData.get("googleDriveLink"));
 

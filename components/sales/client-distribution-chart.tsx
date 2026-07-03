@@ -8,7 +8,10 @@ type ClientDistributionChartProps = {
   limit?: number;
 };
 
-export function ClientDistributionChart({ bars, limit = 8 }: ClientDistributionChartProps) {
+export function ClientDistributionChart({
+  bars,
+  limit = 8,
+}: ClientDistributionChartProps) {
   if (bars.length === 0) {
     return (
       <EmptyState

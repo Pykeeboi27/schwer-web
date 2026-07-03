@@ -1,6 +1,6 @@
 # Data Model: Sales Module Dashboard
 
-**Feature**: 003-sales-dashboard  
+**Feature**: 003-sales-dashboard
 **Date**: 2026-04-05
 
 ## Authoritative Source
@@ -18,6 +18,7 @@
 ## Entities
 
 ### 1) `public.clients`
+
 - **Purpose**: Customer master record for quotations and purchase orders.
 - **Primary key**: `id UUID`
 - **Key fields**:
@@ -29,6 +30,7 @@
   - `notes TEXT`
 
 ### 2) `public.client_contacts`
+
 - **Purpose**: Contact info per client.
 - **Primary key**: `id UUID`
 - **Foreign key**: `client_id → public.clients(id)`
@@ -38,6 +40,7 @@
   - `is_primary BOOLEAN NOT NULL DEFAULT FALSE`
 
 ### 3) `public.quotations`
+
 - **Purpose**: Quotation record submitted for approval.
 - **Primary key**: `id UUID`
 - **Foreign keys**:
@@ -53,6 +56,7 @@
   - `status approval_status_enum NOT NULL DEFAULT 'pending'`
 
 ### 4) `public.quotation_approvals`
+
 - **Purpose**: Tracks approval decisions per approver.
 - **Primary key**: `id UUID`
 - **Foreign keys**:
@@ -65,6 +69,7 @@
   - Unique constraint: `(quotation_id, approver_id)`
 
 ### 5) `public.purchase_orders`
+
 - **Purpose**: PO record (closed sale value and recognized sale tracking).
 - **Primary key**: `id UUID`
 - **Foreign keys**:
@@ -83,6 +88,7 @@
   - `notes TEXT`
 
 ### 6) `public.po_payments`
+
 - **Purpose**: Collection events for a PO.
 - **Primary key**: `id UUID`
 - **Foreign key**: `po_id → public.purchase_orders(id)`
@@ -98,18 +104,22 @@
 ## Key Rules & Transitions (Feature-relevant)
 
 ### Client lifecycle
+
 - Active: `clients.is_active = true`
 - Removed/inactive: `clients.is_active = false`
 - Historical quotations/POs remain linked via `client_id`.
 
 ### Quotation approval routing
+
 - If `quotations.amount < 3,000,000` → require sales_manager role approvals.
 - If `quotations.amount >= 3,000,000` → require sales_manager + owner + executive.
 
 ### Sales totals
+
 - Closed Sale total = SUM(`purchase_orders.po_amount`)
 - Recognized Sale total = SUM(`purchase_orders.recognized_amount`)
 
 ### Payment terms mapping
+
 - Spec’s `netDays` maps to `payment_terms_days`.
 - Optional fields (`downpaymentPercent`, free-form notes) can be stored in `notes` as structured JSON text.

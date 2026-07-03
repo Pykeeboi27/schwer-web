@@ -1,6 +1,12 @@
 import { CostingApprovalHistoryTable } from "@/components/executive/costing-approval-history-table";
 import { ExecutiveCostingApprovalsTable } from "@/components/executive/costing-approvals-table";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import { getExecutiveAccessRedirect } from "@/lib/executive/access";
 import {
   listCostingApprovalHistory,
@@ -33,8 +39,8 @@ export default async function ExecutiveCostingApprovalsPage() {
         <CardHeader>
           <CardTitle>Costing Approval</CardTitle>
           <CardDescription>
-            Review costing engineers&apos; quotations. Approve to hand the quotation over to Sales
-            for further information, or reject to send it back for edits.
+            Review costing engineers&apos; quotations. Approve to hand the quotation over
+            to Sales for further information, or reject to send it back for edits.
           </CardDescription>
         </CardHeader>
         <CardContent className="text-sm text-muted-foreground">
@@ -44,9 +50,7 @@ export default async function ExecutiveCostingApprovalsPage() {
         </CardContent>
       </Card>
 
-      {isExecutiveActor ? (
-        <ExecutiveCostingApprovalsTable items={items} />
-      ) : null}
+      {isExecutiveActor ? <ExecutiveCostingApprovalsTable items={items} /> : null}
 
       {isExecutiveActor ? (
         <Card>

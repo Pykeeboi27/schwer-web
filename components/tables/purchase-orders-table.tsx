@@ -67,7 +67,9 @@ export function PurchaseOrdersTable({
 }: PurchaseOrdersTableProps) {
   const [sortBy, setSortBy] = useState<SortBy>("approvedAt");
   const [sortDirection, setSortDirection] = useState<SortDirection>("desc");
-  const [selectedPurchaseOrderId, setSelectedPurchaseOrderId] = useState<string | null>(null);
+  const [selectedPurchaseOrderId, setSelectedPurchaseOrderId] = useState<string | null>(
+    null,
+  );
   const [searchQuery, setSearchQuery] = useState("");
   const [approvalFilter, setApprovalFilter] = useState<ApprovalFilter>("all");
 
@@ -191,7 +193,9 @@ export function PurchaseOrdersTable({
               filteredAndSorted.map((purchaseOrder) => {
                 const progressPercent = Math.min(
                   100,
-                  Math.round((purchaseOrder.recognizedAmount / purchaseOrder.poAmount) * 100),
+                  Math.round(
+                    (purchaseOrder.recognizedAmount / purchaseOrder.poAmount) * 100,
+                  ),
                 );
 
                 return (
@@ -203,12 +207,18 @@ export function PurchaseOrdersTable({
                     aria-label={`View purchase order ${purchaseOrder.poNumber}`}
                     onClick={() => setSelectedPurchaseOrderId(purchaseOrder.id)}
                     onKeyDown={(event) =>
-                      onRowKeyDown(event, () => setSelectedPurchaseOrderId(purchaseOrder.id))
+                      onRowKeyDown(event, () =>
+                        setSelectedPurchaseOrderId(purchaseOrder.id),
+                      )
                     }
                   >
-                    <td className="px-3 py-2 font-mono text-xs">{purchaseOrder.poNumber}</td>
+                    <td className="px-3 py-2 font-mono text-xs">
+                      {purchaseOrder.poNumber}
+                    </td>
                     <td className="px-3 py-2">{purchaseOrder.clientName}</td>
-                    <td className="px-3 py-2">{formatCurrency(purchaseOrder.poAmount)}</td>
+                    <td className="px-3 py-2">
+                      {formatCurrency(purchaseOrder.poAmount)}
+                    </td>
                     <td className="px-3 py-2">
                       {formatCurrency(purchaseOrder.recognizedAmount)}
                     </td>

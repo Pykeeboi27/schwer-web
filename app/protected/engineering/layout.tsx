@@ -22,7 +22,10 @@ export default function EngineeringLayout({ children }: { children: React.ReactN
 
   return (
     <div className="flex min-w-0 flex-1 flex-col gap-4">
-      <nav className="rounded-md border bg-card p-2" aria-label="Engineering section tabs">
+      <nav
+        className="rounded-md border bg-card p-2"
+        aria-label="Engineering section tabs"
+      >
         <ul className="flex flex-wrap items-center gap-2 text-sm">
           {ENGINEERING_TABS.map((tab) => (
             <li key={tab.href}>

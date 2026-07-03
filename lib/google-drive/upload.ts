@@ -96,7 +96,9 @@ export async function uploadFileToDrive(
   ].join("\r\n");
 
   const bodyBytes = new TextEncoder().encode(body);
-  const combined = new Uint8Array(bodyBytes.length + buffer.length + boundary.length + 10);
+  const combined = new Uint8Array(
+    bodyBytes.length + buffer.length + boundary.length + 10,
+  );
   combined.set(bodyBytes, 0);
   combined.set(buffer, bodyBytes.length);
   const closing = new TextEncoder().encode(`\r\n--${boundary}--`);

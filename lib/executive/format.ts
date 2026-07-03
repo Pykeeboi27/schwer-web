@@ -25,7 +25,10 @@ export function formatCurrency(value: number | null | undefined): string {
   return CURRENCY_FORMATTER.format(Number(value ?? 0));
 }
 
-export function formatPercent(value: number | null | undefined, fractionDigits = 2): string {
+export function formatPercent(
+  value: number | null | undefined,
+  fractionDigits = 2,
+): string {
   const numericValue = Number(value ?? 0);
   return getPercentFormatter(fractionDigits).format(numericValue / 100);
 }

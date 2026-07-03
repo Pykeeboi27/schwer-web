@@ -54,7 +54,9 @@ export function EditCostingQuotationDialog({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
-  const [quotationNumber, setQuotationNumber] = useState(quotation?.quotationNumber ?? "");
+  const [quotationNumber, setQuotationNumber] = useState(
+    quotation?.quotationNumber ?? "",
+  );
 
   const dialogTitleId = useMemo(() => "edit-costing-quotation-dialog-title", []);
 
@@ -157,7 +159,11 @@ export function EditCostingQuotationDialog({
               Edit Costing Quotation
             </h2>
           </div>
-          <Button variant="ghost" onClick={() => onOpenChange(false)} aria-label="Close dialog">
+          <Button
+            variant="ghost"
+            onClick={() => onOpenChange(false)}
+            aria-label="Close dialog"
+          >
             Close
           </Button>
         </div>
@@ -189,7 +195,9 @@ export function EditCostingQuotationDialog({
               </Button>
             </div>
             {fieldErrors.quotationNumber ? (
-              <p className="mt-1 text-xs text-destructive">{fieldErrors.quotationNumber}</p>
+              <p className="mt-1 text-xs text-destructive">
+                {fieldErrors.quotationNumber}
+              </p>
             ) : null}
           </div>
 
@@ -257,7 +265,9 @@ export function EditCostingQuotationDialog({
               className="mt-1"
             />
             {fieldErrors.googleDriveLink ? (
-              <p className="mt-1 text-xs text-destructive">{fieldErrors.googleDriveLink}</p>
+              <p className="mt-1 text-xs text-destructive">
+                {fieldErrors.googleDriveLink}
+              </p>
             ) : null}
           </div>
 

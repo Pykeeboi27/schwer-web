@@ -26,7 +26,9 @@ export function RevenueTrendChart({ data }: RevenueTrendChartProps) {
     <div className="space-y-2">
       {data.map((bar) => (
         <div key={bar.label} className="flex items-center gap-3 text-sm">
-          <span className="w-8 shrink-0 text-right text-xs text-muted-foreground">{bar.label}</span>
+          <span className="w-8 shrink-0 text-right text-xs text-muted-foreground">
+            {bar.label}
+          </span>
           <div className="h-2.5 flex-1 overflow-hidden rounded-full bg-muted">
             <div
               className="h-full rounded-full bg-primary"

@@ -19,8 +19,6 @@ export function hasExecutiveApprovalAccess(profile: CurrentProfile | null): bool
   }
 
   return (
-    profile.isExecutiveViewer ||
-    profile.role === "owner" ||
-    profile.role === "executive"
+    profile.isExecutiveViewer || profile.role === "owner" || profile.role === "executive"
   );
 }

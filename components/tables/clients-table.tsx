@@ -106,7 +106,9 @@ export function ClientsTable({ clients }: ClientsTableProps) {
                   <EmptyState
                     icon={SearchX}
                     title={
-                      hasActiveFilter ? "No results match your search." : "No clients found."
+                      hasActiveFilter
+                        ? "No results match your search."
+                        : "No clients found."
                     }
                     description={
                       hasActiveFilter

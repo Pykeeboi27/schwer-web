@@ -14,6 +14,7 @@ npm run test:e2e      # Playwright E2E (requires E2E_* env vars)
 ```
 
 Run a single test file:
+
 ```bash
 npx vitest run tests/unit/approval-workflow.test.ts
 ```
@@ -74,11 +75,11 @@ The key function is `determineNextQuotationStatus(currentStatus, role, amount)`.
 
 ### Testing
 
-| Layer | Tool | Location |
-|---|---|---|
-| Unit | Vitest + jsdom | `tests/unit/` |
+| Layer       | Tool                   | Location             |
+| ----------- | ---------------------- | -------------------- |
+| Unit        | Vitest + jsdom         | `tests/unit/`        |
 | Integration | Vitest + real Supabase | `tests/integration/` |
-| E2E | Playwright (Chromium) | `tests/e2e/` |
+| E2E         | Playwright (Chromium)  | `tests/e2e/`         |
 
 E2E tests auto-start the dev server. Integration tests hit a real Supabase instance configured via `E2E_*` environment variables.
 

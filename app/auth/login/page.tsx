@@ -30,7 +30,9 @@ async function LoginPageContent({ searchParams }: LoginPageProps) {
     if (isEnsureCurrentProfileError(error)) {
       const params = new URLSearchParams({
         error: "We couldn't load your profile. Please try again.",
-        retry: safeRedirectTo ? `/auth/login?redirectTo=${encodeURIComponent(safeRedirectTo)}` : "/auth/login",
+        retry: safeRedirectTo
+          ? `/auth/login?redirectTo=${encodeURIComponent(safeRedirectTo)}`
+          : "/auth/login",
       });
 
       redirect(`/auth/error?${params.toString()}`);

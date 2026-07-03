@@ -130,14 +130,18 @@ export function ReadyForQuotationTable({
                     onRowKeyDown(event, () => setSelectedQuotation(quotation))
                   }
                 >
-                  <td className="px-3 py-2 font-mono text-xs">{quotation.quotationNumber}</td>
+                  <td className="px-3 py-2 font-mono text-xs">
+                    {quotation.quotationNumber}
+                  </td>
                   <td className="px-3 py-2">{quotation.clientName}</td>
                   <td className="px-3 py-2">{quotation.subject || "-"}</td>
                   <td className="px-3 py-2">{formatCurrency(quotation.amount)}</td>
                   <td className="px-3 py-2">
                     {quotation.cost === null ? "-" : formatCurrency(quotation.cost)}
                   </td>
-                  <td className="px-3 py-2">{formatPercent(quotation.salesMarginPercent)}</td>
+                  <td className="px-3 py-2">
+                    {formatPercent(quotation.salesMarginPercent)}
+                  </td>
                   <td className="px-3 py-2">{quotation.paymentTerms ?? "—"}</td>
                   <td className="px-3 py-2">{formatLeadTime(quotation.leadTimeDays)}</td>
                   <td className="px-3 py-2 text-muted-foreground">
