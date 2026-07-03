@@ -39,12 +39,8 @@ The sales workspace under `/protected/sales` now includes:
 ### Feature 004 test commands
 
 ```bash
-npm run test:unit
-npm run test:integration
-npx playwright test tests/e2e/sales-dashboard-layout.spec.ts tests/e2e/clients-create-search.spec.ts tests/e2e/quotations-approval-workflow.spec.ts tests/e2e/purchase-orders-collection.spec.ts
+npm run test
 ```
-
-Authenticated Playwright specs require environment variables such as `E2E_SALES_LOGIN_EMAIL` / `E2E_SALES_LOGIN_PASSWORD` and role-specific approver credentials.
 
 ## Feature 005: Executive Dashboard
 
@@ -63,8 +59,7 @@ The executive workspace under `/protected/executive` now includes:
 ### Feature 005 test commands
 
 ```bash
-npx vitest run tests/unit/executive/period.test.ts tests/unit/executive/metrics.test.ts tests/unit/executive/targets-validation.test.ts tests/unit/executive/sales-performance.test.ts tests/integration/executive-dashboard-kpis.test.ts tests/integration/executive-targets.test.ts tests/integration/executive-sales-performance.test.ts
-npx playwright test tests/e2e/executive-dashboard.spec.ts tests/e2e/executive-dashboard-target.spec.ts tests/e2e/executive-dashboard-performance.spec.ts
+npx vitest run tests/unit/executive/period.test.ts tests/unit/executive/metrics.test.ts tests/unit/executive/targets-validation.test.ts tests/unit/executive/sales-performance.test.ts
 ```
 
 ## Features

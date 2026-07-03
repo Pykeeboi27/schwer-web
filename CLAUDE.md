@@ -8,9 +8,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 npm run dev           # Start dev server on port 3000
 npm run build         # Production build
 npm run lint          # ESLint
-npm run test          # Unit + integration tests (Vitest)
-npm run test:unit     # Unit tests only
-npm run test:e2e      # Playwright E2E (requires E2E_* env vars)
+npm run format        # Prettier check (npm run format:write to fix)
+npm run test          # Unit tests (Vitest)
+npm run test:unit     # Unit tests (alias)
 ```
 
 Run a single test file:
@@ -75,13 +75,12 @@ The key function is `determineNextQuotationStatus(currentStatus, role, amount)`.
 
 ### Testing
 
-| Layer       | Tool                   | Location             |
-| ----------- | ---------------------- | -------------------- |
-| Unit        | Vitest + jsdom         | `tests/unit/`        |
-| Integration | Vitest + real Supabase | `tests/integration/` |
-| E2E         | Playwright (Chromium)  | `tests/e2e/`         |
+| Layer | Tool           | Location      |
+| ----- | -------------- | ------------- |
+| Unit  | Vitest + jsdom | `tests/unit/` |
 
-E2E tests auto-start the dev server. Integration tests hit a real Supabase instance configured via `E2E_*` environment variables.
+Unit tests are the only test suite. Run with coverage via
+`npm run test -- --coverage`.
 
 ### Database
 
