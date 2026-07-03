@@ -13,9 +13,16 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { NumberInput } from "@/components/ui/number-input";
+import {
+  Callout,
+  fieldClassName,
+  StatusBadge,
+  textareaClassName,
+} from "@/components/patterns";
 import { computeSalesPricing, computeVatBreakdown } from "@/lib/sales/pricing";
 import type { SalesQuotation } from "@/lib/sales/quotations";
 import { formatCurrency } from "@/lib/utils/number-format";
+import { cn } from "@/lib/utils";
 import { useToast } from "@/lib/utils/toast-notification";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
@@ -35,8 +42,6 @@ const PAYMENT_TERMS_OPTIONS = [
   "Other",
 ] as const;
 
-const textareaClassName =
-  "mt-1 flex w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50";
 
 function formatPercent(value: number | null): string {
   if (value === null) {
@@ -443,7 +448,12 @@ export function QuotationDetailsDialog({
           </div>
           <div className="grid grid-cols-[160px_1fr] gap-2">
             <dt className="text-muted-foreground">Status</dt>
-            <dd>{statusLabel(quotation.status)}</dd>
+            <dd>
+              <StatusBadge
+                status={quotation.status}
+                label={statusLabel(quotation.status)}
+              />
+            </dd>
           </div>
           <div className="grid grid-cols-[160px_1fr] gap-2">
             <dt className="text-muted-foreground">Approval Chain</dt>
@@ -576,7 +586,7 @@ export function QuotationDetailsDialog({
                   id="sales-payment-terms"
                   value={paymentTermsSelect}
                   onChange={(event) => setPaymentTermsSelect(event.target.value)}
-                  className="mt-1 flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm"
+                  className={cn(fieldClassName, "mt-1 h-9 py-1")}
                 >
                   <option value="">Select payment terms</option>
                   {PAYMENT_TERMS_OPTIONS.map((option) => (
@@ -764,20 +774,20 @@ export function QuotationDetailsDialog({
         ) : null}
 
         {isReopenedForPo ? (
-          <div className="mt-4 rounded-md border bg-muted/20 p-3 text-xs text-muted-foreground">
+          <Callout tone="muted" className="mt-4 text-xs text-muted-foreground">
             Client PO <span className="font-medium text-foreground">{quotation.clientPoNumber}</span>{" "}
             recorded. Adjust the pricing above if needed, then convert to a purchase order.
-          </div>
+          </Callout>
         ) : null}
 
         {isConverted ? (
-          <div className="mt-4 rounded-md border border-green-200 bg-green-50 p-3 text-sm text-green-800 dark:border-green-900 dark:bg-green-950/40 dark:text-green-300">
+          <Callout tone="success" className="mt-4">
             Converted to a purchase order
             {quotation.poConvertedAt
               ? ` on ${new Date(quotation.poConvertedAt).toLocaleDateString()}`
               : ""}
             . Track its approval and collections in the Purchase Orders module.
-          </div>
+          </Callout>
         ) : null}
 
         {canApproveReject ? (

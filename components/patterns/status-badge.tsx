@@ -54,6 +54,11 @@ const STATUS_REGISTRY: Record<string, StatusMeta> = {
   overdue: { tone: "danger", label: "Overdue" },
 };
 
+/** Default display label for a known status key (falls back to the key itself). */
+export function statusLabel(status: string): string {
+  return STATUS_REGISTRY[status]?.label ?? status;
+}
+
 export type StatusBadgeProps = {
   /** Known status key — looks up the default tone + label from the registry. */
   status?: string;

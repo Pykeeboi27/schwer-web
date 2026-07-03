@@ -6,6 +6,7 @@ import {
 } from "@/app/protected/sales/purchase-orders/actions";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { EmptyState } from "@/components/patterns";
 import type { PendingPoApprovalItem } from "@/lib/sales/purchase-orders";
 import { formatCurrency } from "@/lib/utils/number-format";
 import { useToast } from "@/lib/utils/toast-notification";
@@ -70,14 +71,14 @@ export function ExecutivePoApprovalsTable({
 
   if (items.length === 0) {
     return (
-      <div className="rounded-md border bg-card p-5 text-sm text-muted-foreground">
-        No pending purchase order approvals at the moment.
+      <div className="rounded-md border">
+        <EmptyState title="No pending purchase order approvals at the moment." />
       </div>
     );
   }
 
   return (
-    <div className="overflow-x-auto rounded-md border bg-card">
+    <div className="overflow-x-auto rounded-md border">
       <table className="w-full min-w-[920px] text-sm">
         <thead className="bg-muted/40 text-left">
           <tr>

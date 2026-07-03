@@ -7,9 +7,9 @@ import {
   updatePurchaseOrderReferencesAction,
 } from "@/app/protected/sales/purchase-orders/actions";
 import { RecordCollectionDialog } from "@/components/dialogs/record-collection-dialog";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { StatusBadge } from "@/components/patterns";
 import type { SalesPoPayment, SalesPurchaseOrder } from "@/lib/sales/purchase-orders";
 import { formatCurrency } from "@/lib/utils/number-format";
 import { useToast } from "@/lib/utils/toast-notification";
@@ -23,14 +23,6 @@ type PurchaseOrderDetailsDialogProps = {
   payments: SalesPoPayment[];
   currentUserId: string;
   currentUserRole: string | null;
-};
-
-const APPROVAL_LABELS: Record<SalesPurchaseOrder["status"], string> = {
-  draft: "Draft",
-  pending: "Pending Approval",
-  approved: "Approved",
-  rejected: "Rejected",
-  cancelled: "Cancelled",
 };
 
 function formatDateTime(value: string | null): string {
@@ -242,8 +234,8 @@ export function PurchaseOrderDetailsDialog({
             </div>
             <div className="grid grid-cols-[160px_1fr] gap-2">
               <dt className="text-muted-foreground">Approval Status</dt>
-              <dd>
-                <Badge variant="outline">{APPROVAL_LABELS[purchaseOrder.status]}</Badge>
+              <dd className="flex flex-wrap items-center gap-x-1">
+                <StatusBadge status={purchaseOrder.status} />
                 {purchaseOrder.status === "pending" && purchaseOrder.pendingApprovalRoles.length > 0
                   ? ` · awaiting ${purchaseOrder.pendingApprovalRoles.join(" -> ")}`
                   : ""}
@@ -292,7 +284,9 @@ export function PurchaseOrderDetailsDialog({
             </div>
             <div className="grid grid-cols-[160px_1fr] gap-2">
               <dt className="text-muted-foreground">Payment Status</dt>
-              <dd>{purchaseOrder.paymentStatus}</dd>
+              <dd>
+                <StatusBadge status={purchaseOrder.paymentStatus} />
+              </dd>
             </div>
           </dl>
 

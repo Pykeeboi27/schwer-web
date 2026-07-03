@@ -2,6 +2,7 @@
 
 import { QuotationDetailsDialog } from "@/components/dialogs/quotation-details-dialog";
 import { Input } from "@/components/ui/input";
+import { EmptyState } from "@/components/patterns";
 import type { SalesQuotation } from "@/lib/sales/quotations";
 import { Inbox, Search } from "lucide-react";
 import { useMemo, useState, type KeyboardEvent } from "react";
@@ -102,20 +103,20 @@ export function ReadyForPurchaseOrderTable({
           <tbody>
             {filtered.length === 0 ? (
               <tr>
-                <td colSpan={10} className="px-3 py-10 text-center text-muted-foreground">
-                  <div className="flex flex-col items-center gap-2">
-                    <Inbox className="h-5 w-5" aria-hidden="true" />
-                    <p className="font-medium text-foreground">
-                      {searchQuery
+                <td colSpan={10}>
+                  <EmptyState
+                    icon={Inbox}
+                    title={
+                      searchQuery
                         ? "No quotations match your search."
-                        : "No quotations awaiting purchase-order conversion yet."}
-                    </p>
-                    {!searchQuery && (
-                      <p className="text-xs text-muted-foreground">
-                        Approved quotations with a recorded client PO will appear here.
-                      </p>
-                    )}
-                  </div>
+                        : "No quotations awaiting purchase-order conversion yet."
+                    }
+                    description={
+                      searchQuery
+                        ? undefined
+                        : "Approved quotations with a recorded client PO will appear here."
+                    }
+                  />
                 </td>
               </tr>
             ) : (

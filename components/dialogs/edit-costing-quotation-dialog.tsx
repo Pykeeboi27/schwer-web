@@ -1,15 +1,15 @@
 "use client";
 
-"use client";
-
 import { updateCostingQuotationAction } from "@/app/protected/engineering/quotations/actions";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { NumberInput } from "@/components/ui/number-input";
+import { Callout, fieldClassName, textareaClassName } from "@/components/patterns";
 import type { CostingQuotation } from "@/lib/engineering/costing-quotations";
 import { suggestQuotationNumber } from "@/lib/engineering/suggest-quotation-number";
 import { useToast } from "@/lib/utils/toast-notification";
+import { cn } from "@/lib/utils";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 
@@ -163,10 +163,9 @@ export function EditCostingQuotationDialog({
         </div>
 
         {quotation.costingRejectionReason ? (
-          <div className="mb-4 rounded-md border border-destructive/40 bg-destructive/10 p-3 text-sm">
-            <p className="font-medium text-destructive">Rejected by executive</p>
-            <p className="mt-1 text-foreground">{quotation.costingRejectionReason}</p>
-          </div>
+          <Callout tone="destructive" title="Rejected by executive" className="mb-4">
+            <p className="text-foreground">{quotation.costingRejectionReason}</p>
+          </Callout>
         ) : null}
 
         <form onSubmit={handleSubmit} className="grid gap-4 md:grid-cols-2">
@@ -202,7 +201,7 @@ export function EditCostingQuotationDialog({
               required
               defaultValue={quotation.clientId}
               aria-invalid={Boolean(fieldErrors.clientId)}
-              className="mt-1 flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm"
+              className={cn(fieldClassName, "mt-1 h-9 py-1")}
             >
               <option value="">Select client</option>
               {activeClients.map((client) => (
@@ -269,7 +268,7 @@ export function EditCostingQuotationDialog({
               name="notes"
               rows={3}
               defaultValue={quotation.notes ?? ""}
-              className="mt-1 flex w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
+              className={textareaClassName}
               placeholder="Add any commercial notes or comments (optional)"
             />
           </div>

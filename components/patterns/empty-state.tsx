@@ -6,15 +6,23 @@ type EmptyStateProps = {
   icon?: LucideIcon;
   title: ReactNode;
   description?: ReactNode;
+  /** Optional action(s) rendered below the description (e.g. a "Clear search" button). */
+  children?: ReactNode;
   className?: string;
 };
 
 /**
  * Single empty-state treatment. Replaces the three divergent variants that were
  * in use (in-row icon+text, bare `<p>`, and bordered card). Center-aligned,
- * muted, with an optional icon.
+ * muted, with an optional icon and optional action.
  */
-export function EmptyState({ icon: Icon, title, description, className }: EmptyStateProps) {
+export function EmptyState({
+  icon: Icon,
+  title,
+  description,
+  children,
+  className,
+}: EmptyStateProps) {
   return (
     <div
       className={cn(
@@ -27,6 +35,7 @@ export function EmptyState({ icon: Icon, title, description, className }: EmptyS
       {description ? (
         <p className="text-xs text-muted-foreground">{description}</p>
       ) : null}
+      {children ? <div className="mt-1">{children}</div> : null}
     </div>
   );
 }

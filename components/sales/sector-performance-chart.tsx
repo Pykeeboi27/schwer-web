@@ -1,3 +1,4 @@
+import { EmptyState } from "@/components/patterns";
 import type { SectorPerformanceSlice } from "@/lib/sales/dashboard-charts";
 import { formatCurrency } from "@/lib/utils/number-format";
 
@@ -20,9 +21,10 @@ export function SectorPerformanceChart({ slices }: SectorPerformanceChartProps) 
 
   if (slices.length === 0 || total <= 0) {
     return (
-      <div className="rounded-md border border-dashed p-6 text-center text-sm text-muted-foreground">
-        No approved quotations yet to break down by sector.
-      </div>
+      <EmptyState
+        title="No sector data yet"
+        description="No approved quotations yet to break down by sector."
+      />
     );
   }
 

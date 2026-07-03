@@ -14,7 +14,11 @@ export function DashboardLayout({ children, sidebar }: DashboardLayoutProps) {
   const isExecutiveRoute = pathname.startsWith("/protected/executive");
 
   if (!isSalesRoute && !isExecutiveRoute) {
-    return <div className="mx-auto flex w-full max-w-5xl flex-col gap-20 p-4 sm:p-6 lg:p-8">{children}</div>;
+    return (
+      <div className="mx-auto flex w-full max-w-5xl flex-col gap-6 p-4 sm:p-6 lg:p-8">
+        {children}
+      </div>
+    );
   }
 
   return (

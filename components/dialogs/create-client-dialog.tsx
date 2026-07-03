@@ -4,8 +4,10 @@ import { createClientAction } from "@/app/protected/sales/clients/actions";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { fieldClassName } from "@/components/patterns";
 import { generateClientCode } from "@/lib/utils/client-code-generator";
 import { useToast } from "@/lib/utils/toast-notification";
+import { cn } from "@/lib/utils";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
 
@@ -226,7 +228,7 @@ export function CreateClientDialog({ onCreated, existingNames = [] }: CreateClie
                   id="sector"
                   name="sector"
                   defaultValue="commercial"
-                  className="mt-1 flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm"
+                  className={cn(fieldClassName, "mt-1 h-9 py-1")}
                 >
                   <option value="commercial">Commercial</option>
                   <option value="industrial">Industrial</option>

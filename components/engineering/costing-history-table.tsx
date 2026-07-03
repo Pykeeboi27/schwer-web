@@ -1,3 +1,4 @@
+import { EmptyState } from "@/components/patterns";
 import type { CostingApprovedHistoryItem } from "@/lib/engineering/costing-quotations";
 import { ExternalLink } from "lucide-react";
 
@@ -23,9 +24,7 @@ function formatDate(iso: string): string {
 
 export function CostingHistoryTable({ items }: CostingHistoryTableProps) {
   if (items.length === 0) {
-    return (
-      <p className="text-sm text-muted-foreground">No approved costing quotations yet.</p>
-    );
+    return <EmptyState title="No approved costing quotations yet." />;
   }
 
   return (

@@ -5,8 +5,10 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { NumberInput } from "@/components/ui/number-input";
+import { fieldClassName, textareaClassName } from "@/components/patterns";
 import { suggestQuotationNumber } from "@/lib/engineering/suggest-quotation-number";
 import { useToast } from "@/lib/utils/toast-notification";
+import { cn } from "@/lib/utils";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 
@@ -197,7 +199,7 @@ export function CreateCostingQuotationDialog({ clients }: CreateCostingQuotation
                   name="clientId"
                   required
                   aria-invalid={Boolean(fieldErrors.clientId)}
-                  className="mt-1 flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm"
+                  className={cn(fieldClassName, "mt-1 h-9 py-1")}
                 >
                   <option value="">Select client</option>
                   {activeClients.map((client) => (
@@ -263,7 +265,7 @@ export function CreateCostingQuotationDialog({ clients }: CreateCostingQuotation
                   id="costing-notes"
                   name="notes"
                   rows={3}
-                  className="mt-1 flex w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
+                  className={textareaClassName}
                   placeholder="Add any commercial notes or comments (optional)"
                 />
               </div>

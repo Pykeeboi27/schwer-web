@@ -6,6 +6,7 @@ import {
 } from "@/app/protected/executive/costing-approvals/actions";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { EmptyState } from "@/components/patterns";
 import type { CostingApprovalItem } from "@/lib/executive/costing-approvals";
 import { useToast } from "@/lib/utils/toast-notification";
 import { ExternalLink } from "lucide-react";
@@ -77,14 +78,14 @@ export function ExecutiveCostingApprovalsTable({ items }: ExecutiveCostingApprov
 
   if (visible.length === 0) {
     return (
-      <div className="rounded-md border bg-card p-5 text-sm text-muted-foreground">
-        No quotations awaiting costing approval.
+      <div className="rounded-md border">
+        <EmptyState title="No quotations awaiting costing approval." />
       </div>
     );
   }
 
   return (
-    <div className="overflow-x-auto rounded-md border bg-card">
+    <div className="overflow-x-auto rounded-md border">
       <table className="w-full min-w-[1080px] text-sm">
         <thead className="bg-muted/40 text-left">
           <tr>
