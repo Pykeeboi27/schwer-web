@@ -45,5 +45,15 @@ repos:
         language: docker_image
         entry: ghcr.io/aquasecurity/trivy:latest
         stages: [pre-push]
-        args: ["fs", ".", "--severity", "HIGH,CRITICAL", "--exit-code", "1", "--scanners", "vuln,misconfig,secret"]
+        args:
+          [
+            "fs",
+            ".",
+            "--severity",
+            "HIGH,CRITICAL",
+            "--exit-code",
+            "1",
+            "--scanners",
+            "vuln,misconfig,secret",
+          ]
         pass_filenames: false

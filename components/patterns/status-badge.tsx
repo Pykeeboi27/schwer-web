@@ -12,13 +12,7 @@ import type { ReactNode } from "react";
  * (e.g. "Pending" vs "Pending Approval").
  */
 export type StatusTone =
-  | "neutral"
-  | "pending"
-  | "success"
-  | "danger"
-  | "muted"
-  | "info"
-  | "returned";
+  "neutral" | "pending" | "success" | "danger" | "muted" | "info" | "returned";
 
 const TONE_CLASSES: Record<StatusTone, string> = {
   neutral:
