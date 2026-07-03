@@ -5,6 +5,7 @@ import {
   type SignUpActionState,
 } from "@/app/auth/sign-up/actions";
 import { DEPARTMENTS } from "@/lib/profile/departments";
+import { fieldClassName } from "@/components/patterns";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import {
@@ -46,9 +47,9 @@ export function SignUpForm({
 
   return (
     <div className={cn("flex flex-col gap-6", className)} {...props}>
-      <Card className="border-primary/20 bg-background/85 shadow-2xl backdrop-blur-sm">
+      <Card>
         <CardHeader>
-          <CardTitle className="text-2xl tracking-tight">Sign up</CardTitle>
+          <CardTitle className="text-xl">Sign up</CardTitle>
           <CardDescription>Create your Schwer Online Management account</CardDescription>
         </CardHeader>
         <CardContent>
@@ -72,7 +73,7 @@ export function SignUpForm({
                   name="department"
                   required
                   defaultValue=""
-                  className="h-9 rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                  className={cn(fieldClassName, "h-9 py-1")}
                 >
                   <option value="" disabled>
                     Select department
@@ -137,11 +138,7 @@ export function SignUpForm({
                 </div>
               )}
 
-              <Button
-                type="submit"
-                className="w-full font-semibold transition-all hover:bg-primary/90"
-                disabled={isPending}
-              >
+              <Button type="submit" className="w-full" disabled={isPending}>
                 {isPending ? "Creating account…" : "Sign up"}
               </Button>
             </div>
