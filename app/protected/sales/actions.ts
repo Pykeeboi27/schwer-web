@@ -45,7 +45,9 @@ export async function createClientAction(formData: FormData): Promise<SalesActio
     const companyName = getRequiredString(formData, "companyName");
     const sector = parseSector(formData.get("sector"));
     const paymentTermsDays = parsePaymentNetDays(formData.get("paymentTermsDays"));
-    const downpaymentPercent = parseOptionalDownpaymentPercent(formData.get("downpaymentPercent"));
+    const downpaymentPercent = parseOptionalDownpaymentPercent(
+      formData.get("downpaymentPercent"),
+    );
     const notes = buildPaymentTermsNotes({
       downpaymentPercent,
       notes: String(formData.get("paymentTermsNotes") ?? "").trim(),
@@ -71,7 +73,9 @@ export async function updateClientAction(formData: FormData): Promise<SalesActio
     const companyName = getRequiredString(formData, "companyName");
     const sector = parseSector(formData.get("sector"));
     const paymentTermsDays = parsePaymentNetDays(formData.get("paymentTermsDays"));
-    const downpaymentPercent = parseOptionalDownpaymentPercent(formData.get("downpaymentPercent"));
+    const downpaymentPercent = parseOptionalDownpaymentPercent(
+      formData.get("downpaymentPercent"),
+    );
     const notes = buildPaymentTermsNotes({
       downpaymentPercent,
       notes: String(formData.get("paymentTermsNotes") ?? "").trim(),
@@ -91,7 +95,9 @@ export async function updateClientAction(formData: FormData): Promise<SalesActio
   }
 }
 
-export async function inactivateClientAction(formData: FormData): Promise<SalesActionResult> {
+export async function inactivateClientAction(
+  formData: FormData,
+): Promise<SalesActionResult> {
   try {
     const id = getRequiredString(formData, "id");
     await inactivateSalesClient(id);
@@ -101,7 +107,9 @@ export async function inactivateClientAction(formData: FormData): Promise<SalesA
   }
 }
 
-export async function addClientContactAction(formData: FormData): Promise<SalesActionResult> {
+export async function addClientContactAction(
+  formData: FormData,
+): Promise<SalesActionResult> {
   try {
     const clientId = getRequiredString(formData, "clientId");
     const fullName = getRequiredString(formData, "fullName");
@@ -127,7 +135,9 @@ export async function addClientContactAction(formData: FormData): Promise<SalesA
   }
 }
 
-export async function setPrimaryContactAction(formData: FormData): Promise<SalesActionResult> {
+export async function setPrimaryContactAction(
+  formData: FormData,
+): Promise<SalesActionResult> {
   try {
     const clientId = getRequiredString(formData, "clientId");
     const contactId = getRequiredString(formData, "contactId");
@@ -138,7 +148,9 @@ export async function setPrimaryContactAction(formData: FormData): Promise<Sales
   }
 }
 
-export async function submitQuotationAction(formData: FormData): Promise<SalesActionResult> {
+export async function submitQuotationAction(
+  formData: FormData,
+): Promise<SalesActionResult> {
   try {
     const quotationId = getRequiredString(formData, "quotationId");
     await submitQuotationForApproval(quotationId);
@@ -148,7 +160,9 @@ export async function submitQuotationAction(formData: FormData): Promise<SalesAc
   }
 }
 
-export async function approveQuotationAction(formData: FormData): Promise<SalesActionResult> {
+export async function approveQuotationAction(
+  formData: FormData,
+): Promise<SalesActionResult> {
   try {
     const approvalId = getRequiredString(formData, "approvalId");
     const note = String(formData.get("note") ?? "").trim() || null;
@@ -159,7 +173,9 @@ export async function approveQuotationAction(formData: FormData): Promise<SalesA
   }
 }
 
-export async function rejectQuotationAction(formData: FormData): Promise<SalesActionResult> {
+export async function rejectQuotationAction(
+  formData: FormData,
+): Promise<SalesActionResult> {
   try {
     const approvalId = getRequiredString(formData, "approvalId");
     const reason = getRequiredString(formData, "reason");

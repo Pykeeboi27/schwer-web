@@ -1,9 +1,6 @@
 "use client";
 
-import {
-  loginAction,
-  type LoginActionState,
-} from "@/app/auth/login/actions";
+import { loginAction, type LoginActionState } from "@/app/auth/login/actions";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import {
@@ -65,9 +62,9 @@ export function LoginForm({
 
   return (
     <div className={cn("flex flex-col gap-6", className)} {...props}>
-      <Card className="border-primary/20 bg-background/85 shadow-2xl backdrop-blur-sm">
+      <Card>
         <CardHeader>
-          <CardTitle className="text-2xl tracking-tight">Login</CardTitle>
+          <CardTitle className="text-xl">Login</CardTitle>
           <CardDescription>
             Enter your credentials to access Schwer Online Management
           </CardDescription>
@@ -121,20 +118,11 @@ export function LoginForm({
                 </div>
               )}
 
-              <Button
-                type="submit"
-                className="w-full font-semibold transition-all hover:bg-primary/90"
-                disabled={isPending}
-              >
+              <Button type="submit" className="w-full" disabled={isPending}>
                 {isPending ? "Logging in…" : "Login"}
               </Button>
 
-              <Button
-                type="button"
-                variant="outline"
-                className="w-full transition-colors hover:bg-muted"
-                asChild
-              >
+              <Button type="button" variant="outline" className="w-full" asChild>
                 <Link href="/auth/oauth/google">Continue with Google</Link>
               </Button>
             </div>

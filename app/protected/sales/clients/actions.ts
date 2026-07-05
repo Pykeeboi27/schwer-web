@@ -91,7 +91,14 @@ export async function createClientAction(
       };
     }
 
-    const validation = validateClientForm({ name, contactPerson, email, phone, address, tin });
+    const validation = validateClientForm({
+      name,
+      contactPerson,
+      email,
+      phone,
+      address,
+      tin,
+    });
     if (!validation.valid) {
       return {
         success: false,

@@ -18,7 +18,9 @@ function emitToast(payload: ToastPayload): void {
     return;
   }
 
-  window.dispatchEvent(new CustomEvent<ToastPayload>(TOAST_EVENT_NAME, { detail: payload }));
+  window.dispatchEvent(
+    new CustomEvent<ToastPayload>(TOAST_EVENT_NAME, { detail: payload }),
+  );
 }
 
 export function useToast() {
@@ -44,8 +46,10 @@ export function useToast() {
 
   return {
     notify,
-    success: (message: string, durationMs = 3000) => notify("success", message, { durationMs }),
-    error: (message: string, durationMs = 5000) => notify("error", message, { durationMs }),
+    success: (message: string, durationMs = 3000) =>
+      notify("success", message, { durationMs }),
+    error: (message: string, durationMs = 5000) =>
+      notify("error", message, { durationMs }),
     info: (message: string, durationMs = 3000) => notify("info", message, { durationMs }),
   };
 }

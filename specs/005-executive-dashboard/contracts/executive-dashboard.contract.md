@@ -17,6 +17,7 @@ Define the minimum data contract between the Executive Dashboard UI and the serv
   - `ytd`
 
 **Semantics**:
+
 - YTD KPI cards (Revenue YTD vs Target, Average Overall Margin YTD) always represent YTD.
 - `periodFilter` applies to:
   - revenue breakdown

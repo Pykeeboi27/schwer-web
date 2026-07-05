@@ -20,7 +20,10 @@ export function getEngineeringAccessRedirect(
   profile: CurrentProfile | null,
   pathname: string,
 ): string | null {
-  if (pathname.startsWith("/protected/engineering") && canAccessEngineeringDashboard(profile)) {
+  if (
+    pathname.startsWith("/protected/engineering") &&
+    canAccessEngineeringDashboard(profile)
+  ) {
     return null;
   }
 

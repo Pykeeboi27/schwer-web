@@ -1,6 +1,7 @@
 "use client";
 
 import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 import { Menu, X } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -70,18 +71,18 @@ export function Sidebar({ currentUserRole }: SidebarProps) {
 
       {isMobile && isOpen && (
         <div
-          className="fixed inset-0 z-30 bg-black/40 md:hidden"
+          className="fixed inset-0 z-30 bg-black/50 md:hidden"
           onClick={() => setIsOpen(false)}
           aria-hidden="true"
         />
       )}
 
       <aside
-        className={`
-          fixed inset-y-0 left-0 z-40 w-64 border-r bg-background transition-transform duration-300 ease-in-out
-          md:static md:h-fit md:rounded-md md:border
-          ${isMobile ? (isOpen ? "translate-x-0" : "-translate-x-full") : "translate-x-0"}
-        `}
+        className={cn(
+          "fixed inset-y-0 left-0 z-40 w-64 border-r bg-background transition-transform duration-300 ease-in-out",
+          "md:static md:h-fit md:rounded-lg md:border",
+          isMobile && !isOpen ? "-translate-x-full" : "translate-x-0",
+        )}
       >
         <div className="border-b p-5">
           <h2 className="text-lg font-semibold">
@@ -99,14 +100,12 @@ export function Sidebar({ currentUserRole }: SidebarProps) {
             <Link
               key={item.href}
               href={item.href}
-              className={`
-                block rounded-md px-3 py-2 text-sm transition-colors
-                ${
-                  isActive(item.href)
-                    ? "bg-primary/10 font-medium text-primary"
-                    : "text-muted-foreground hover:bg-muted hover:text-foreground"
-                }
-              `}
+              className={cn(
+                "block rounded-md px-3 py-2 text-sm transition-colors",
+                isActive(item.href)
+                  ? "bg-primary/10 font-medium text-primary"
+                  : "text-muted-foreground hover:bg-muted hover:text-foreground",
+              )}
             >
               <span>{item.label}</span>
             </Link>

@@ -1,8 +1,8 @@
 # Feature Specification: Authentication + Department Dashboard Redirect
 
-**Feature Branch**: `001-auth-dept-redirect`  
-**Created**: 2026-04-03  
-**Status**: Draft  
+**Feature Branch**: `001-auth-dept-redirect`
+**Created**: 2026-04-03
+**Status**: Draft
 **Input**: User description: "We will start the project with the log in and sign up feature, the log-in must ask for email and password and the password has an option to be hidden or not, the sign up must also do the same. The sign up card must include these criteria: email, password, department (deparments are seen on schema.sql). Google authentication must also be implemented. After successfully logging in and signing up, the user will be redirected to their respective dashboards, based on their department (deparments are seen on schema.sql)."
 
 ## Clarifications
@@ -14,13 +14,13 @@
 - Q: For Google auth, how is department selected when missing? → A: After Google auth completes, show an in-app “Choose department” step, then redirect to `/protected/[department]`.
 - Q: How should unconfirmed-email users behave on login? → A: Block login until email is confirmed (show “check your email / confirm” message).
 
-## User Scenarios & Testing *(mandatory)*
+## User Scenarios & Testing _(mandatory)_
 
 <!--
   IMPORTANT: User stories should be PRIORITIZED as user journeys ordered by importance.
   Each user story/journey must be INDEPENDENTLY TESTABLE - meaning if you implement just ONE of them,
   you should still have a viable MVP (Minimum Viable Product) that delivers value.
-  
+
   Assign priorities (P1, P2, P3, etc.) to each story, where P1 is the most critical.
   Think of each story as a standalone slice of functionality that can be:
   - Developed independently
@@ -94,7 +94,7 @@ As a user, I can sign in using Google authentication. If it's my first time usin
 - User attempts to access a dashboard not matching their department: access is denied and user is redirected to their own dashboard.
 - User has signed up but not confirmed email: user cannot access dashboards until confirmation is completed.
 
-## Requirements *(mandatory)*
+## Requirements _(mandatory)_
 
 ### Functional Requirements
 
@@ -115,7 +115,7 @@ As a user, I can sign in using Google authentication. If it's my first time usin
 - **FR-015**: After Google authentication, if the user has no stored department, the system MUST present an in-app “Choose department” step and block access to `/protected/*` until it is completed.
 - **FR-016**: Once a user’s department is set, the system MUST prevent changing it (department is set-once for this MVP).
 
-### Constitution-Driven Constraints *(mandatory)*
+### Constitution-Driven Constraints _(mandatory)_
 
 - **C-001 (Stack)**: Features MUST use the project's approved technology stack and UI primitives (per the project constitution).
 - **C-002 (Auth/RLS)**: Authentication MUST use Supabase Auth. Authorization MUST follow Supabase rules, including Row Level Security (RLS) for sensitive data.
@@ -123,13 +123,13 @@ As a user, I can sign in using Google authentication. If it's my first time usin
 - **C-004 (Design)**: UI MUST follow the project's brand tokens and consistent styling.
 - **C-005 (Testing)**: Every story MUST define unit + integration + E2E coverage appropriate to its scope.
 
-### Key Entities *(include if feature involves data)*
+### Key Entities _(include if feature involves data)_
 
 - **User Account**: An authenticated identity (email/password or Google authentication).
 - **Profile**: A persistent record associated with the user that includes at minimum: email and department (as defined by `department_enum`).
 - **Department**: One of: `hr`, `sales`, `accounting`, `engineering`, `purchasing`, `executive`. Used to determine dashboard routing and access.
 
-## Success Criteria *(mandatory)*
+## Success Criteria _(mandatory)_
 
 ### Measurable Outcomes
 

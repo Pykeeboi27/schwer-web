@@ -92,7 +92,9 @@ export function TargetEditorForm({
                 <input type="hidden" name="quarter" value={q} />
                 <Label
                   htmlFor={`q${q}Target`}
-                  className={`text-xs font-medium ${quarterDisabled ? "text-muted-foreground" : ""}`}
+                  className={`text-xs font-medium ${
+                    quarterDisabled ? "text-muted-foreground" : ""
+                  }`}
                 >
                   Q{q} target
                 </Label>

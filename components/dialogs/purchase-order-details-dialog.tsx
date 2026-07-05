@@ -7,9 +7,9 @@ import {
   updatePurchaseOrderReferencesAction,
 } from "@/app/protected/sales/purchase-orders/actions";
 import { RecordCollectionDialog } from "@/components/dialogs/record-collection-dialog";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { StatusBadge } from "@/components/patterns";
 import type { SalesPoPayment, SalesPurchaseOrder } from "@/lib/sales/purchase-orders";
 import { formatCurrency } from "@/lib/utils/number-format";
 import { useToast } from "@/lib/utils/toast-notification";
@@ -23,14 +23,6 @@ type PurchaseOrderDetailsDialogProps = {
   payments: SalesPoPayment[];
   currentUserId: string;
   currentUserRole: string | null;
-};
-
-const APPROVAL_LABELS: Record<SalesPurchaseOrder["status"], string> = {
-  draft: "Draft",
-  pending: "Pending Approval",
-  approved: "Approved",
-  rejected: "Rejected",
-  cancelled: "Cancelled",
 };
 
 function formatDateTime(value: string | null): string {
@@ -62,7 +54,9 @@ export function PurchaseOrderDetailsDialog({
   const [editQuotationReference, setEditQuotationReference] = useState("");
 
   void currentUserId;
-  const normalizedRole = String(currentUserRole ?? "").trim().toLowerCase();
+  const normalizedRole = String(currentUserRole ?? "")
+    .trim()
+    .toLowerCase();
 
   const paymentHistory = useMemo(() => {
     if (!purchaseOrder) {
@@ -124,7 +118,12 @@ export function PurchaseOrderDetailsDialog({
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [open, onOpenChange, purchaseOrder?.clientPoNumber, purchaseOrder?.quotationReference]);
+  }, [
+    open,
+    onOpenChange,
+    purchaseOrder?.clientPoNumber,
+    purchaseOrder?.quotationReference,
+  ]);
 
   if (!open || !purchaseOrder) {
     return null;
@@ -192,7 +191,11 @@ export function PurchaseOrderDetailsDialog({
                 Converted from quotation; routed through the PO approval workflow.
               </p>
             </div>
-            <Button variant="ghost" onClick={handleClose} aria-label="Close purchase order details dialog">
+            <Button
+              variant="ghost"
+              onClick={handleClose}
+              aria-label="Close purchase order details dialog"
+            >
               Close
             </Button>
           </div>
@@ -213,7 +216,7 @@ export function PurchaseOrderDetailsDialog({
                     className="h-8"
                   />
                 ) : (
-                  purchaseOrder.clientPoNumber ?? "—"
+                  (purchaseOrder.clientPoNumber ?? "—")
                 )}
               </dd>
             </div>
@@ -223,12 +226,14 @@ export function PurchaseOrderDetailsDialog({
                 {isDraft ? (
                   <Input
                     value={editQuotationReference}
-                    onChange={(e) => setEditQuotationReference(e.target.value.toUpperCase())}
+                    onChange={(e) =>
+                      setEditQuotationReference(e.target.value.toUpperCase())
+                    }
                     placeholder="Quotation reference"
                     className="h-8"
                   />
                 ) : (
-                  purchaseOrder.quotationReference ?? "—"
+                  (purchaseOrder.quotationReference ?? "—")
                 )}
               </dd>
             </div>
@@ -242,16 +247,19 @@ export function PurchaseOrderDetailsDialog({
             </div>
             <div className="grid grid-cols-[160px_1fr] gap-2">
               <dt className="text-muted-foreground">Approval Status</dt>
-              <dd>
-                <Badge variant="outline">{APPROVAL_LABELS[purchaseOrder.status]}</Badge>
-                {purchaseOrder.status === "pending" && purchaseOrder.pendingApprovalRoles.length > 0
+              <dd className="flex flex-wrap items-center gap-x-1">
+                <StatusBadge status={purchaseOrder.status} />
+                {purchaseOrder.status === "pending" &&
+                purchaseOrder.pendingApprovalRoles.length > 0
                   ? ` · awaiting ${purchaseOrder.pendingApprovalRoles.join(" -> ")}`
                   : ""}
               </dd>
             </div>
             <div className="grid grid-cols-[160px_1fr] gap-2">
               <dt className="text-muted-foreground">Direct Cost</dt>
-              <dd>{purchaseOrder.cost === null ? "—" : formatCurrency(purchaseOrder.cost)}</dd>
+              <dd>
+                {purchaseOrder.cost === null ? "—" : formatCurrency(purchaseOrder.cost)}
+              </dd>
             </div>
             <div className="grid grid-cols-[160px_1fr] gap-2">
               <dt className="text-muted-foreground">Margin</dt>
@@ -274,8 +282,8 @@ export function PurchaseOrderDetailsDialog({
               <dt className="text-muted-foreground">Payment Terms</dt>
               <dd>
                 {purchaseOrder.paymentTerms === "Other"
-                  ? purchaseOrder.paymentTermsCustom ?? "Other"
-                  : purchaseOrder.paymentTerms ?? "—"}
+                  ? (purchaseOrder.paymentTermsCustom ?? "Other")
+                  : (purchaseOrder.paymentTerms ?? "—")}
               </dd>
             </div>
             <div className="grid grid-cols-[160px_1fr] gap-2">
@@ -283,7 +291,9 @@ export function PurchaseOrderDetailsDialog({
               <dd>
                 {purchaseOrder.leadTimeDays === null
                   ? "—"
-                  : `${purchaseOrder.leadTimeDays} day${purchaseOrder.leadTimeDays === 1 ? "" : "s"}`}
+                  : `${purchaseOrder.leadTimeDays} day${
+                      purchaseOrder.leadTimeDays === 1 ? "" : "s"
+                    }`}
               </dd>
             </div>
             <div className="grid grid-cols-[160px_1fr] gap-2">
@@ -292,7 +302,9 @@ export function PurchaseOrderDetailsDialog({
             </div>
             <div className="grid grid-cols-[160px_1fr] gap-2">
               <dt className="text-muted-foreground">Payment Status</dt>
-              <dd>{purchaseOrder.paymentStatus}</dd>
+              <dd>
+                <StatusBadge status={purchaseOrder.paymentStatus} />
+              </dd>
             </div>
           </dl>
 
@@ -320,11 +332,15 @@ export function PurchaseOrderDetailsDialog({
             <div className="mt-5 space-y-3 rounded-md border bg-muted/20 p-4">
               <h3 className="text-base font-semibold">Draft — Edit &amp; Resubmit</h3>
               <p className="text-sm text-muted-foreground">
-                This purchase order was returned to draft after rejection. Update the details above
-                then save, or submit directly for approval.
+                This purchase order was returned to draft after rejection. Update the
+                details above then save, or submit directly for approval.
               </p>
               <div className="flex justify-end gap-2">
-                <Button variant="outline" onClick={handleSaveReferences} disabled={isSubmitting}>
+                <Button
+                  variant="outline"
+                  onClick={handleSaveReferences}
+                  disabled={isSubmitting}
+                >
                   {isSubmitting ? "Saving..." : "Save Changes"}
                 </Button>
                 <Button onClick={handleResubmit} disabled={isSubmitting}>
@@ -345,11 +361,15 @@ export function PurchaseOrderDetailsDialog({
 
               <div className="max-h-64 space-y-2 overflow-auto rounded border p-3">
                 {paymentHistory.length === 0 ? (
-                  <p className="text-sm text-muted-foreground">No collections recorded yet.</p>
+                  <p className="text-sm text-muted-foreground">
+                    No collections recorded yet.
+                  </p>
                 ) : (
                   paymentHistory.map((payment) => (
                     <div key={payment.id} className="rounded border p-2 text-sm">
-                      <p className="font-medium">{formatCurrency(payment.amountCollected)}</p>
+                      <p className="font-medium">
+                        {formatCurrency(payment.amountCollected)}
+                      </p>
                       <p className="text-xs text-muted-foreground">
                         {new Date(payment.paymentDate).toLocaleDateString()}
                         {payment.paymentMethod ? ` • ${payment.paymentMethod}` : ""}

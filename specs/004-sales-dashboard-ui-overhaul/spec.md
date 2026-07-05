@@ -1,11 +1,11 @@
 # Feature Specification: Sales Dashboard UI Overhaul
 
-**Feature Branch**: `004-sales-dashboard-ui-overhaul`  
-**Created**: April 5, 2026  
-**Status**: Draft  
+**Feature Branch**: `004-sales-dashboard-ui-overhaul`
+**Created**: April 5, 2026
+**Status**: Draft
 **Input**: User description: Multiple UX and functionality fixes for sales dashboard including layout, client management, quotation approvals, and purchase order tracking
 
-## User Scenarios & Testing *(mandatory)*
+## User Scenarios & Testing _(mandatory)_
 
 ### User Story 1 - Responsive Dashboard Layout with Sidebar Navigation (Priority: P1)
 
@@ -95,7 +95,7 @@ Sales employees need to manage purchase orders in a table format with dialog-bas
 - How does the sidebar navigation respond when the user resizes the browser viewport between mobile and desktop breakpoints?
 - What happens if a collection is recorded offline? (Sync handling)
 
-## Requirements *(mandatory)*
+## Requirements _(mandatory)_
 
 ### Functional Requirements
 
@@ -123,7 +123,7 @@ Sales employees need to manage purchase orders in a table format with dialog-bas
 - **FR-022**: System MUST display in-app toast notifications for all approval actions (submit for approval, approve, reject) with clear success/error messages. Success toasts auto-dismiss after 3 seconds; error toasts auto-dismiss after 5 seconds.
 - **FR-023**: Tables (clients, quotations, purchase orders) MUST refresh when users perform form submissions (create, record collection, approve, reject) to reflect immediate changes
 
-### Constitution-Driven Constraints *(mandatory)*
+### Constitution-Driven Constraints _(mandatory)_
 
 - **C-001 (Stack)**: Features MUST use Next.js (React), TypeScript, Tailwind CSS, and Shadcn/ui components consistent with the project
 - **C-002 (Auth/RLS)**: All data access MUST use Supabase Auth and enforce Row-Level Security; sales manager approval functionality MUST verify permissions at the database level
@@ -138,7 +138,7 @@ Sales employees need to manage purchase orders in a table format with dialog-bas
 - **Purchase Order**: Represents a PO with associated client, items, total amount, collected amount (accumulative), and status
 - **Collection**: Represents a payment collected against a PO with amount and date; multiple collections can be recorded per PO and must sum to the collected amount
 
-## Success Criteria *(mandatory)*
+## Success Criteria _(mandatory)_
 
 ### Measurable Outcomes
 

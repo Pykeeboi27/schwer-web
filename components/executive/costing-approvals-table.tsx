@@ -6,6 +6,7 @@ import {
 } from "@/app/protected/executive/costing-approvals/actions";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { EmptyState } from "@/components/patterns";
 import type { CostingApprovalItem } from "@/lib/executive/costing-approvals";
 import { useToast } from "@/lib/utils/toast-notification";
 import { ExternalLink } from "lucide-react";
@@ -24,7 +25,9 @@ function formatCurrency(amount: number): string {
   }).format(amount);
 }
 
-export function ExecutiveCostingApprovalsTable({ items }: ExecutiveCostingApprovalsTableProps) {
+export function ExecutiveCostingApprovalsTable({
+  items,
+}: ExecutiveCostingApprovalsTableProps) {
   const router = useRouter();
   const { success, error } = useToast();
   const [busyId, setBusyId] = useState<string | null>(null);
@@ -77,14 +80,14 @@ export function ExecutiveCostingApprovalsTable({ items }: ExecutiveCostingApprov
 
   if (visible.length === 0) {
     return (
-      <div className="rounded-md border bg-card p-5 text-sm text-muted-foreground">
-        No quotations awaiting costing approval.
+      <div className="rounded-md border">
+        <EmptyState title="No quotations awaiting costing approval." />
       </div>
     );
   }
 
   return (
-    <div className="overflow-x-auto rounded-md border bg-card">
+    <div className="overflow-x-auto rounded-md border">
       <table className="w-full min-w-[1080px] text-sm">
         <thead className="bg-muted/40 text-left">
           <tr>
@@ -143,7 +146,11 @@ export function ExecutiveCostingApprovalsTable({ items }: ExecutiveCostingApprov
                 </td>
                 <td className="px-3 py-2">
                   <div className="flex flex-wrap gap-2">
-                    <Button size="sm" onClick={() => handleApprove(item)} disabled={isBusy}>
+                    <Button
+                      size="sm"
+                      onClick={() => handleApprove(item)}
+                      disabled={isBusy}
+                    >
                       {isBusy ? "Saving..." : "Approve"}
                     </Button>
                     <Button

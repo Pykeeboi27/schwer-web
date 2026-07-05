@@ -27,7 +27,9 @@ export async function GET(request: NextRequest) {
   const type = searchParams.get("type") as EmailOtpType | null;
   const next = searchParams.get("next") ?? "/protected";
   const redirectTo = isSafeProtectedRedirectTarget(next) ? next : null;
-  const retryPath = redirectTo ? `/auth/login?redirectTo=${encodeURIComponent(redirectTo)}` : "/auth/login";
+  const retryPath = redirectTo
+    ? `/auth/login?redirectTo=${encodeURIComponent(redirectTo)}`
+    : "/auth/login";
 
   const supabase = await createClient();
 

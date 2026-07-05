@@ -1,8 +1,8 @@
 # Feature Specification: Auth Fixes
 
-**Feature Branch**: `002-auth-fixes`  
-**Created**: 2026-04-03  
-**Status**: Draft  
+**Feature Branch**: `002-auth-fixes`
+**Created**: 2026-04-03
+**Status**: Draft
 **Input**: Fix login redirect loop, ensure sign-up creates a profile record, apply Schwer brand colors (primary/secondary) and app name, and default logged-out users to the login page.
 
 ## Clarifications
@@ -13,13 +13,13 @@
 - Q: What should `/` do for logged-out users? → A: `/` remains a public landing page that presents Login and Sign up buttons; only protected routes redirect to the login page.
 - Q: What should happen after login if a user has no department selected? → A: Always route the user to `/auth/choose-department` and block dashboard access until a department is chosen.
 
-## User Scenarios & Testing *(mandatory)*
+## User Scenarios & Testing _(mandatory)_
 
 <!--
   IMPORTANT: User stories should be PRIORITIZED as user journeys ordered by importance.
   Each user story/journey must be INDEPENDENTLY TESTABLE - meaning if you implement just ONE of them,
   you should still have a viable MVP (Minimum Viable Product) that delivers value.
-  
+
   Assign priorities (P1, P2, P3, etc.) to each story, where P1 is the most critical.
   Think of each story as a standalone slice of functionality that can be:
   - Developed independently
@@ -94,7 +94,7 @@ As a user, the application should clearly display the product name “Schwer Onl
 - User exists without a profile (legacy users): system should create or repair profile on next successful auth, without duplicates.
 - User opens multiple tabs and logs in/out in one tab while the other is navigating.
 
-## Requirements *(mandatory)*
+## Requirements _(mandatory)_
 
 <!--
   ACTION REQUIRED: The content in this section represents placeholders.
@@ -120,7 +120,7 @@ As a user, the application should clearly display the product name “Schwer Onl
   - Primary: `#f07b26`
   - Secondary: `#d4620f`
 
-### Constitution-Driven Constraints *(mandatory)*
+### Constitution-Driven Constraints _(mandatory)_
 
 - **C-001 (Approved Stack)**: The feature MUST comply with the project constitution’s approved technology and UI constraints.
 - **C-002 (Access Control)**: Protected access MUST follow the constitution’s authentication and authorization principles (unauthenticated users cannot access protected areas; authorization is enforced consistently).
@@ -128,13 +128,13 @@ As a user, the application should clearly display the product name “Schwer Onl
 - **C-004 (Design Tokens)**: UI MUST follow the constitution’s brand tokens and consistent styling rules.
 - **C-005 (Testing)**: Changes MUST include appropriate unit, integration, and end-to-end test coverage for the modified behaviors.
 
-### Key Entities *(include if feature involves data)*
+### Key Entities _(include if feature involves data)_
 
 - **User Account**: An authenticated user identity that can log into the application.
 - **Profile**: A user-associated record that stores the application’s user profile information required for normal operation.
 - **Department Selection**: The user’s chosen department context (where applicable) that may influence the post-login destination.
 
-## Success Criteria *(mandatory)*
+## Success Criteria _(mandatory)_
 
 <!--
   ACTION REQUIRED: Define measurable success criteria.

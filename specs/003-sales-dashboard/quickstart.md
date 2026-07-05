@@ -1,6 +1,6 @@
 # Quickstart: Sales Module Dashboard
 
-**Feature**: 003-sales-dashboard  
+**Feature**: 003-sales-dashboard
 **Date**: 2026-04-05
 
 ## Prerequisites

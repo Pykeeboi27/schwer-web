@@ -45,14 +45,20 @@ export function getExecutiveAccessRedirect(
   profile: CurrentProfile | null,
   pathname = "/protected/executive",
 ): string | null {
-  if (pathname.startsWith("/protected/executive") && isExecutiveDashboardViewer(profile)) {
+  if (
+    pathname.startsWith("/protected/executive") &&
+    isExecutiveDashboardViewer(profile)
+  ) {
     return null;
   }
 
   const fallbackPath = getExecutiveFallbackPath(profile);
 
   // Prevent redirect loops when a non-viewer resolves back to /protected/executive.
-  if (pathname.startsWith("/protected/executive") && fallbackPath.startsWith("/protected/executive")) {
+  if (
+    pathname.startsWith("/protected/executive") &&
+    fallbackPath.startsWith("/protected/executive")
+  ) {
     return getExecutiveNoAccessPath();
   }
 

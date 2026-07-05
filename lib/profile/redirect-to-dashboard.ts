@@ -4,7 +4,9 @@ export function getDepartmentDashboardPath(department: string): string {
   return `/protected/${department}`;
 }
 
-export function isSafeProtectedRedirectTarget(target: string | null | undefined): target is string {
+export function isSafeProtectedRedirectTarget(
+  target: string | null | undefined,
+): target is string {
   return typeof target === "string" && /^\/protected(\/|\?|$)/.test(target);
 }
 

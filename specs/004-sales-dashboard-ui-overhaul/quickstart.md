@@ -1,7 +1,7 @@
 # Developer Quickstart: Sales Dashboard UI Overhaul
 
-**Feature**: 004-sales-dashboard-ui-overhaul  
-**Date**: April 5, 2026  
+**Feature**: 004-sales-dashboard-ui-overhaul
+**Date**: April 5, 2026
 **Purpose**: Help developers understand the feature architecture, setup, and common patterns
 
 ---
@@ -66,17 +66,21 @@ SUPABASE_SERVICE_ROLE_KEY=your-service-role-key (server-side only)
 ### Local Development
 
 1. **Install dependencies**:
+
    ```bash
    npm install
    ```
 
 2. **Start dev server**:
+
    ```bash
    npm run dev
    ```
+
    Access dashboard at `http://localhost:3000/protected/sales`
 
 3. **Database setup** (one-time):
+
    - Apply migration: `schema.sql` changes (in Supabase SQL editor)
    - Create test user profiles with roles: `sales_staff`, `sales_manager`, `owner`, `executive`
    - Seed test data (clients, quotations, POs)
@@ -125,6 +129,7 @@ npx playwright test tests/e2e/sales-*.spec.ts tests/e2e/*-workflow.spec.ts tests
 ### Task 1: Add a New Client
 
 **Files involved**:
+
 - `app/protected/sales/clients/page.tsx` (table view)
 - `app/protected/sales/clients/actions.ts` (server action)
 - `components/dialogs/create-client-dialog.tsx` (dialog)
@@ -138,9 +143,13 @@ npx playwright test tests/e2e/sales-*.spec.ts tests/e2e/*-workflow.spec.ts tests
    ```tsx
    // components/dialogs/create-client-dialog.tsx
    export function CreateClientDialog({ open, onOpenChange }) {
-     const [code, setCode] = useState('');
+     const [code, setCode] = useState("");
      const [formData, setFormData] = useState({
-       name: '', contact_person: '', email: '', phone: '', address: ''
+       name: "",
+       contact_person: "",
+       email: "",
+       phone: "",
+       address: "",
      });
      const router = useRouter();
      const { toast } = useToast();
@@ -159,7 +168,7 @@ npx playwright test tests/e2e/sales-*.spec.ts tests/e2e/*-workflow.spec.ts tests
        if (isUnique) {
          setCode(newCode);
        } else {
-         toast({ title: 'Failed to generate unique code', variant: 'destructive' });
+         toast({ title: "Failed to generate unique code", variant: "destructive" });
        }
      };
 
@@ -167,18 +176,20 @@ npx playwright test tests/e2e/sales-*.spec.ts tests/e2e/*-workflow.spec.ts tests
        e.preventDefault();
        try {
          await createClient({ code, ...formData });
-         toast({ title: 'Client created successfully' });
+         toast({ title: "Client created successfully" });
          onOpenChange(false);
          router.refresh(); // Refresh client list table
        } catch (error) {
-         toast({ title: error.message, variant: 'destructive' });
+         toast({ title: error.message, variant: "destructive" });
        }
      };
 
      return (
        <Dialog open={open} onOpenChange={onOpenChange}>
          <DialogContent>
-           <DialogHeader><DialogTitle>Create Client</DialogTitle></DialogHeader>
+           <DialogHeader>
+             <DialogTitle>Create Client</DialogTitle>
+           </DialogHeader>
            <form onSubmit={handleSubmit}>
              <div className="space-y-4">
                <div>
@@ -187,7 +198,7 @@ npx playwright test tests/e2e/sales-*.spec.ts tests/e2e/*-workflow.spec.ts tests
                    id="name"
                    required
                    value={formData.name}
-                   onChange={(e) => setFormData({...formData, name: e.target.value})}
+                   onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                  />
                </div>
 
@@ -206,7 +217,9 @@ npx playwright test tests/e2e/sales-*.spec.ts tests/e2e/*-workflow.spec.ts tests
                  <Input
                    id="contact"
                    value={formData.contact_person}
-                   onChange={(e) => setFormData({...formData, contact_person: e.target.value})}
+                   onChange={(e) =>
+                     setFormData({ ...formData, contact_person: e.target.value })
+                   }
                  />
                </div>
 
@@ -216,7 +229,7 @@ npx playwright test tests/e2e/sales-*.spec.ts tests/e2e/*-workflow.spec.ts tests
                    id="email"
                    type="email"
                    value={formData.email}
-                   onChange={(e) => setFormData({...formData, email: e.target.value})}
+                   onChange={(e) => setFormData({ ...formData, email: e.target.value })}
                  />
                </div>
 
@@ -225,7 +238,7 @@ npx playwright test tests/e2e/sales-*.spec.ts tests/e2e/*-workflow.spec.ts tests
                  <Input
                    id="phone"
                    value={formData.phone}
-                   onChange={(e) => setFormData({...formData, phone: e.target.value})}
+                   onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
                  />
                </div>
 
@@ -235,7 +248,7 @@ npx playwright test tests/e2e/sales-*.spec.ts tests/e2e/*-workflow.spec.ts tests
                    id="address"
                    as="textarea"
                    value={formData.address}
-                   onChange={(e) => setFormData({...formData, address: e.target.value})}
+                   onChange={(e) => setFormData({ ...formData, address: e.target.value })}
                  />
                </div>
              </div>
@@ -254,14 +267,14 @@ npx playwright test tests/e2e/sales-*.spec.ts tests/e2e/*-workflow.spec.ts tests
 
    ```typescript
    // app/protected/sales/clients/actions.ts
-   'use server';
+   "use server";
 
-   import { createClient } from '@/lib/sales/clients';
-   import { getCurrentUser } from '@/lib/supabase/auth';
+   import { createClient } from "@/lib/sales/clients";
+   import { getCurrentUser } from "@/lib/supabase/auth";
 
    export async function createClientAction(data: CreateClientForm) {
      const user = await getCurrentUser();
-     if (!user) throw new Error('Unauthorized');
+     if (!user) throw new Error("Unauthorized");
 
      try {
        const newClient = await createClient(user.id, data);
@@ -303,16 +316,16 @@ npx playwright test tests/e2e/sales-*.spec.ts tests/e2e/*-workflow.spec.ts tests
    // lib/utils/client-code-generator.ts
    export function generateClientCode(): string {
      const randomDigits = Array.from({ length: 6 }, () =>
-       Math.floor(Math.random() * 10)
-     ).join('');
+       Math.floor(Math.random() * 10),
+     ).join("");
      return `C${randomDigits}`;
    }
 
    export async function validateClientCodeUniqueness(code: string): Promise<boolean> {
      const { data } = await supabaseClient
-       .from('clients')
-       .select('id')
-       .eq('code', code)
+       .from("clients")
+       .select("id")
+       .eq("code", code)
        .single();
      return !data; // True if code is unique
    }
@@ -323,6 +336,7 @@ npx playwright test tests/e2e/sales-*.spec.ts tests/e2e/*-workflow.spec.ts tests
 ### Task 2: Approve a Quotation (High-Value)
 
 **Files involved**:
+
 - `app/protected/sales/quotations/page.tsx` (table)
 - `app/protected/sales/quotations/actions.ts` (server actions)
 - `components/dialogs/quotation-details-dialog.tsx` (dialog with approve button)
@@ -335,39 +349,45 @@ npx playwright test tests/e2e/sales-*.spec.ts tests/e2e/*-workflow.spec.ts tests
 
    ```typescript
    // lib/sales/approval-workflow.ts
-   import { determineNextQuotationStatus } from '@/lib/sales/approval-workflow';
+   import { determineNextQuotationStatus } from "@/lib/sales/approval-workflow";
 
    export function getApprovalChainStatus(
      quotation: Quotation,
-     userRole: string
+     userRole: string,
    ): {
      canApprove: boolean;
      nextLevel: string;
      message: string;
    } {
-     const nextStatus = determineNextQuotationStatus(quotation.status, userRole, quotation.amount);
+     const nextStatus = determineNextQuotationStatus(
+       quotation.status,
+       userRole,
+       quotation.amount,
+     );
 
-     if (nextStatus === 'approved') {
+     if (nextStatus === "approved") {
        return {
          canApprove: false,
-         nextLevel: 'finalized',
-         message: 'Quotation approval is complete',
+         nextLevel: "finalized",
+         message: "Quotation approval is complete",
        };
      }
 
      const roleToStatusMap = {
-       'sales_manager': 'pending_sales_manager',
-       'owner': 'pending_owner',
-       'executive': 'pending_executive',
+       sales_manager: "pending_sales_manager",
+       owner: "pending_owner",
+       executive: "pending_executive",
      };
 
-     const canApprove = quotation.status === roleToStatusMap[userRole] && nextStatus !== quotation.status;
+     const canApprove =
+       quotation.status === roleToStatusMap[userRole] && nextStatus !== quotation.status;
 
      return {
        canApprove,
        nextLevel,
-       message: canApprove ? `You can approve this quotation` : 
-                `Waiting for ${nextLevel} approval`,
+       message: canApprove
+         ? `You can approve this quotation`
+         : `Waiting for ${nextLevel} approval`,
      };
    }
    ```
@@ -388,11 +408,11 @@ npx playwright test tests/e2e/sales-*.spec.ts tests/e2e/*-workflow.spec.ts tests
        setIsApproving(true);
        try {
          await approveQuotation(quotation.id);
-         toast({ title: 'Quotation approved successfully' });
+         toast({ title: "Quotation approved successfully" });
          router.refresh();
          onOpenChange(false);
        } catch (error) {
-         toast({ title: error.message, variant: 'destructive' });
+         toast({ title: error.message, variant: "destructive" });
        } finally {
          setIsApproving(false);
        }
@@ -404,27 +424,37 @@ npx playwright test tests/e2e/sales-*.spec.ts tests/e2e/*-workflow.spec.ts tests
            <DialogHeader>
              <DialogTitle>Quotation Details</DialogTitle>
            </DialogHeader>
-           
+
            <div className="space-y-4">
-             <div><strong>Amount:</strong> ${quotation.amount.toLocaleString()}</div>
-             <div><strong>Status:</strong> <Badge>{quotation.status}</Badge></div>
-             <div><strong>Client:</strong> {quotation.client.name}</div>
-             
+             <div>
+               <strong>Amount:</strong> ${quotation.amount.toLocaleString()}
+             </div>
+             <div>
+               <strong>Status:</strong> <Badge>{quotation.status}</Badge>
+             </div>
+             <div>
+               <strong>Client:</strong> {quotation.client.name}
+             </div>
+
              {/* Approval Chain Visualization */}
              <div className="border-t pt-4">
                <strong>Approval Chain:</strong>
                {quotation.amount >= 3000000 && (
                  <div className="mt-2 space-y-2 text-sm">
                    <div className="flex items-center gap-2">
-                     {quotation.approval_chain?.sales_manager?.status === 'approved' ? '✓' : '○'}
+                     {quotation.approval_chain?.sales_manager?.status === "approved"
+                       ? "✓"
+                       : "○"}
                      Sales Manager
                    </div>
                    <div className="flex items-center gap-2">
-                     {quotation.approval_chain?.owner?.status === 'approved' ? '✓' : '○'}
+                     {quotation.approval_chain?.owner?.status === "approved" ? "✓" : "○"}
                      Owner
                    </div>
                    <div className="flex items-center gap-2">
-                     {quotation.approval_chain?.executive?.status === 'approved' ? '✓' : '○'}
+                     {quotation.approval_chain?.executive?.status === "approved"
+                       ? "✓"
+                       : "○"}
                      Executive
                    </div>
                  </div>
@@ -456,14 +486,14 @@ npx playwright test tests/e2e/sales-*.spec.ts tests/e2e/*-workflow.spec.ts tests
 
    ```typescript
    // app/protected/sales/quotations/actions.ts
-   'use server';
+   "use server";
 
-   import { approveQuotation as approveQuotationService } from '@/lib/sales/quotations';
-   import { getCurrentUser } from '@/lib/supabase/auth';
+   import { approveQuotation as approveQuotationService } from "@/lib/sales/quotations";
+   import { getCurrentUser } from "@/lib/supabase/auth";
 
    export async function approveQuotation(quotationId: string) {
      const user = await getCurrentUser();
-     if (!user) throw new Error('Unauthorized');
+     if (!user) throw new Error("Unauthorized");
 
      try {
        const updated = await approveQuotationService(quotationId, user.id, user.role);
@@ -481,7 +511,7 @@ npx playwright test tests/e2e/sales-*.spec.ts tests/e2e/*-workflow.spec.ts tests
    export async function approveQuotation(
      quotationId: string,
      userId: string,
-     userRole: string
+     userRole: string,
    ) {
      const quotation = await getQuotation(quotationId);
      const newStatus = determineNextQuotationStatus(
@@ -491,31 +521,31 @@ npx playwright test tests/e2e/sales-*.spec.ts tests/e2e/*-workflow.spec.ts tests
      );
 
      if (newStatus === quotation.status) {
-       throw new Error('Quotation approval is already complete');
+       throw new Error("Quotation approval is already complete");
      }
 
      // Update quotation status + approval chain
      const { data, error } = await supabaseServer
-       .from('quotations')
+       .from("quotations")
        .update({
          status: newStatus,
          approval_chain: {
            ...quotation.approval_chain,
            [userRole]: {
-             status: 'approved',
+             status: "approved",
              approved_by: userId,
              approved_at: new Date().toISOString(),
            },
          },
        })
-       .eq('id', quotationId)
+       .eq("id", quotationId)
        .select()
        .single();
 
      if (error) throw new Error(error.message);
 
      // Log approval in audit table
-     await logApprovalAction(quotationId, userId, userRole, 'approved');
+     await logApprovalAction(quotationId, userId, userRole, "approved");
 
      return data;
    }
@@ -526,6 +556,7 @@ npx playwright test tests/e2e/sales-*.spec.ts tests/e2e/*-workflow.spec.ts tests
 ### Task 3: Record a Collection on a Purchase Order
 
 **Files involved**:
+
 - `app/protected/sales/purchase-orders/page.tsx` (table)
 - `app/protected/sales/purchase-orders/actions.ts` (server actions)
 - `components/dialogs/record-collection-dialog.tsx` (dialog)
@@ -539,7 +570,7 @@ npx playwright test tests/e2e/sales-*.spec.ts tests/e2e/*-workflow.spec.ts tests
    // components/dialogs/record-collection-dialog.tsx
    export function RecordCollectionDialog({ po, open, onOpenChange }) {
      const { toast } = useToast();
-     const [amount, setAmount] = useState('');
+     const [amount, setAmount] = useState("");
      const [isSubmitting, setIsSubmitting] = useState(false);
      const router = useRouter();
 
@@ -550,14 +581,14 @@ npx playwright test tests/e2e/sales-*.spec.ts tests/e2e/*-workflow.spec.ts tests
        const collectionAmount = parseFloat(amount);
 
        if (collectionAmount <= 0) {
-         toast({ title: 'Amount must be greater than 0', variant: 'destructive' });
+         toast({ title: "Amount must be greater than 0", variant: "destructive" });
          return;
        }
 
        if (collectionAmount > remainingAmount) {
          toast({
            title: `Amount exceeds remaining balance (${remainingAmount.toLocaleString()})`,
-           variant: 'destructive',
+           variant: "destructive",
          });
          return;
        }
@@ -567,11 +598,11 @@ npx playwright test tests/e2e/sales-*.spec.ts tests/e2e/*-workflow.spec.ts tests
        try {
          await recordCollection(po.id, collectionAmount);
          toast({ title: `Collection of $${collectionAmount.toLocaleString()} recorded` });
-         setAmount('');
+         setAmount("");
          router.refresh();
          onOpenChange(false);
        } catch (error) {
-         toast({ title: error.message, variant: 'destructive' });
+         toast({ title: error.message, variant: "destructive" });
        } finally {
          setIsSubmitting(false);
        }
@@ -615,11 +646,7 @@ npx playwright test tests/e2e/sales-*.spec.ts tests/e2e/*-workflow.spec.ts tests
              </div>
 
              <DialogFooter className="mt-6">
-               <Button
-                 type="submit"
-                 disabled={isSubmitting}
-                 loading={isSubmitting}
-               >
+               <Button type="submit" disabled={isSubmitting} loading={isSubmitting}>
                  Record Collection
                </Button>
              </DialogFooter>
@@ -634,14 +661,14 @@ npx playwright test tests/e2e/sales-*.spec.ts tests/e2e/*-workflow.spec.ts tests
 
    ```typescript
    // app/protected/sales/purchase-orders/actions.ts
-   'use server';
+   "use server";
 
-   import { recordCollection as recordCollectionService } from '@/lib/sales/purchase-orders';
-   import { getCurrentUser } from '@/lib/supabase/auth';
+   import { recordCollection as recordCollectionService } from "@/lib/sales/purchase-orders";
+   import { getCurrentUser } from "@/lib/supabase/auth";
 
    export async function recordCollection(poId: string, amount: number) {
      const user = await getCurrentUser();
-     if (!user) throw new Error('Unauthorized');
+     if (!user) throw new Error("Unauthorized");
 
      return await recordCollectionService(poId, amount, user.id);
    }
@@ -651,12 +678,8 @@ npx playwright test tests/e2e/sales-*.spec.ts tests/e2e/*-workflow.spec.ts tests
 
    ```typescript
    // lib/sales/purchase-orders.ts
-   export async function recordCollection(
-     poId: string,
-     amount: number,
-     userId: string
-   ) {
-     return await supabaseServer.rpc('create_collection', {
+   export async function recordCollection(poId: string, amount: number, userId: string) {
+     return await supabaseServer.rpc("create_collection", {
        po_id: poId,
        collection_amount: amount,
        recorded_by: userId,
@@ -672,23 +695,23 @@ npx playwright test tests/e2e/sales-*.spec.ts tests/e2e/*-workflow.spec.ts tests
 
 ```tsx
 // components/layouts/sidebar.tsx
-'use client';
+"use client";
 
-import { useState } from 'react';
-import { useMediaQuery } from '@/lib/utils/useMediaQuery';
-import { Menu, X } from 'lucide-react';
-import { Button } from '@/components/ui/button';
+import { useState } from "react";
+import { useMediaQuery } from "@/lib/utils/useMediaQuery";
+import { Menu, X } from "lucide-react";
+import { Button } from "@/components/ui/button";
 
 export function Sidebar() {
   const [isOpen, setIsOpen] = useState(false);
-  const isMobile = useMediaQuery('(max-width: 768px)');
+  const isMobile = useMediaQuery("(max-width: 768px)");
 
   const toggleSidebar = () => setIsOpen(!isOpen);
 
   const navItems = [
-    { label: 'Clients', href: '/protected/sales/clients' },
-    { label: 'Quotations', href: '/protected/sales/quotations' },
-    { label: 'Purchase Orders', href: '/protected/sales/purchase-orders' },
+    { label: "Clients", href: "/protected/sales/clients" },
+    { label: "Quotations", href: "/protected/sales/quotations" },
+    { label: "Purchase Orders", href: "/protected/sales/purchase-orders" },
   ];
 
   return (
@@ -710,7 +733,7 @@ export function Sidebar() {
           fixed md:relative md:block
           w-64 h-screen bg-gray-900 text-white
           transition-transform duration-300 ease-in-out
-          ${isOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}
+          ${isOpen ? "translate-x-0" : "-translate-x-full md:translate-x-0"}
           z-40
         `}
       >
@@ -748,10 +771,10 @@ export function Sidebar() {
 
 ```tsx
 // components/tables/clients-table.tsx
-'use client';
+"use client";
 
-import { useState, useMemo } from 'react';
-import { Input } from '@/components/ui/input';
+import { useState, useMemo } from "react";
+import { Input } from "@/components/ui/input";
 import {
   Table,
   TableBody,
@@ -759,11 +782,11 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from '@/components/ui/table';
-import { ClientDetailsDialog } from '@/components/dialogs/client-details-dialog';
+} from "@/components/ui/table";
+import { ClientDetailsDialog } from "@/components/dialogs/client-details-dialog";
 
 export function ClientsTable({ clients }: { clients: Client[] }) {
-  const [searchTerm, setSearchTerm] = useState('');
+  const [searchTerm, setSearchTerm] = useState("");
   const [selectedClient, setSelectedClient] = useState<Client | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
 
@@ -773,9 +796,9 @@ export function ClientsTable({ clients }: { clients: Client[] }) {
         (client) =>
           client.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
           client.code.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          client.email?.toLowerCase().includes(searchTerm.toLowerCase())
+          client.email?.toLowerCase().includes(searchTerm.toLowerCase()),
       ),
-    [clients, searchTerm]
+    [clients, searchTerm],
   );
 
   return (
@@ -813,7 +836,9 @@ export function ClientsTable({ clients }: { clients: Client[] }) {
                   setDialogOpen(true);
                 }}
               >
-                <TableCell><code className="bg-gray-100 px-2 py-1 rounded">{client.code}</code></TableCell>
+                <TableCell>
+                  <code className="bg-gray-100 px-2 py-1 rounded">{client.code}</code>
+                </TableCell>
                 <TableCell>{client.name}</TableCell>
                 <TableCell>{client.contact_person}</TableCell>
                 <TableCell>{client.email}</TableCell>
@@ -844,19 +869,17 @@ export function ClientsTable({ clients }: { clients: Client[] }) {
 
 ```typescript
 // tests/unit/client-code-generator.test.ts
-import { describe, it, expect } from 'vitest';
-import { generateClientCode } from '@/lib/utils/client-code-generator';
+import { describe, it, expect } from "vitest";
+import { generateClientCode } from "@/lib/utils/client-code-generator";
 
-describe('generateClientCode', () => {
-  it('should generate code with C prefix and 6 digits', () => {
+describe("generateClientCode", () => {
+  it("should generate code with C prefix and 6 digits", () => {
     const code = generateClientCode();
     expect(code).toMatch(/^C\d{6}$/);
   });
 
-  it('should generate different codes on multiple calls', () => {
-    const codes = new Set(
-      Array.from({ length: 10 }, () => generateClientCode())
-    );
+  it("should generate different codes on multiple calls", () => {
+    const codes = new Set(Array.from({ length: 10 }, () => generateClientCode()));
     expect(codes.size).toBeGreaterThan(1); // Should not always be the same
   });
 });
@@ -866,40 +889,40 @@ describe('generateClientCode', () => {
 
 ```typescript
 // tests/integration/clients.test.ts
-import { describe, it, expect, beforeEach } from 'vitest';
-import { createClient } from '@/lib/sales/clients';
-import { supabaseServiceRole } from '@/lib/supabase/server';
+import { describe, it, expect, beforeEach } from "vitest";
+import { createClient } from "@/lib/sales/clients";
+import { supabaseServiceRole } from "@/lib/supabase/server";
 
-describe('createClient', () => {
+describe("createClient", () => {
   beforeEach(async () => {
     // Setup: Create test user and department
     // Setup: Login as test user
   });
 
-  it('should create a client with unique code', async () => {
-    const result = await createClient('user-123', {
-      code: 'C123456',
-      name: 'Test Client',
-      email: 'test@example.com',
+  it("should create a client with unique code", async () => {
+    const result = await createClient("user-123", {
+      code: "C123456",
+      name: "Test Client",
+      email: "test@example.com",
     });
 
-    expect(result).toHaveProperty('id');
-    expect(result.code).toBe('C123456');
-    expect(result.name).toBe('Test Client');
+    expect(result).toHaveProperty("id");
+    expect(result.code).toBe("C123456");
+    expect(result.name).toBe("Test Client");
   });
 
-  it('should fail on duplicate code', async () => {
-    await createClient('user-123', {
-      code: 'C999999',
-      name: 'Client A',
+  it("should fail on duplicate code", async () => {
+    await createClient("user-123", {
+      code: "C999999",
+      name: "Client A",
     });
 
     expect(async () => {
-      await createClient('user-123', {
-        code: 'C999999', // Duplicate
-        name: 'Client B',
+      await createClient("user-123", {
+        code: "C999999", // Duplicate
+        name: "Client B",
       });
-    }).rejects.toThrow('Unique constraint violation');
+    }).rejects.toThrow("Unique constraint violation");
   });
 });
 ```
@@ -908,18 +931,18 @@ describe('createClient', () => {
 
 ```typescript
 // tests/e2e/clients-create-search.spec.ts
-import { test, expect } from '@playwright/test';
+import { test, expect } from "@playwright/test";
 
-test.describe('Create Client E2E', () => {
-  test('should create a client on desktop', async ({ page }) => {
+test.describe("Create Client E2E", () => {
+  test("should create a client on desktop", async ({ page }) => {
     // Login
-    await page.goto('/auth/login');
-    await page.fill('input[name="email"]', 'staff@example.com');
-    await page.fill('input[name="password"]', 'password');
+    await page.goto("/auth/login");
+    await page.fill('input[name="email"]', "staff@example.com");
+    await page.fill('input[name="password"]', "password");
     await page.click('button:has-text("Sign In")');
 
     // Navigate to clients
-    await page.goto('/protected/sales/clients');
+    await page.goto("/protected/sales/clients");
 
     // Open create dialog
     await page.click('button:has-text("Create Client")');
@@ -932,19 +955,19 @@ test.describe('Create Client E2E', () => {
     expect(code).toMatch(/^C\d{6}$/);
 
     // Fill form and submit
-    await page.fill('input[name="name"]', 'New Client Inc');
-    await page.fill('input[name="email"]', 'contact@newclient.com');
+    await page.fill('input[name="name"]', "New Client Inc");
+    await page.fill('input[name="email"]', "contact@newclient.com");
     await page.click('button[type="submit"]');
 
     // Verify success toast
-    expect(page.locator('text=Client created successfully')).toBeVisible();
+    expect(page.locator("text=Client created successfully")).toBeVisible();
 
     // Verify in table
-    expect(page.locator('text=New Client Inc')).toBeVisible();
+    expect(page.locator("text=New Client Inc")).toBeVisible();
     expect(page.locator('code:has-text("' + code + '")')).toBeVisible();
   });
 
-  test('should create and search on mobile', async ({ page }) => {
+  test("should create and search on mobile", async ({ page }) => {
     // Set mobile viewport
     await page.setViewportSize({ width: 375, height: 667 });
     // ... rest of test with hamburger menu interactions
@@ -1011,6 +1034,7 @@ lib/utils/
 **Symptoms**: Queries return empty data unexpectedly, or inserts fail with permission errors.
 
 **Checks**:
+
 - Confirm the authenticated user has a profile row with the expected `department` and `role`.
 - Validate `schema.sql` RLS policies for `clients`, `quotations`, `quotation_approvals`, `purchase_orders`, and collection/payment tables.
 - Verify you are signed in using the same account expected by the test or browser session.
@@ -1020,6 +1044,7 @@ lib/utils/
 **Symptoms**: Client creation fails with duplicate/unique errors even after generating a new code.
 
 **Checks**:
+
 - Use the Generate Code action again and resubmit.
 - Confirm uniqueness check reads the latest state (`validateClientCodeUniqueness`).
 - If running parallel tests, avoid reusing fixed client codes across specs.
@@ -1029,6 +1054,7 @@ lib/utils/
 **Symptoms**: Collection form shows amount format errors or "exceeds available balance".
 
 **Checks**:
+
 - Enter a positive number with up to 15 digits and up to 2 decimal places.
 - Ensure amount does not exceed current PO remaining balance.
 - Confirm PO totals and recognized amount are current after a refresh.

@@ -4,8 +4,10 @@ import { createClientAction } from "@/app/protected/sales/clients/actions";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { fieldClassName } from "@/components/patterns";
 import { generateClientCode } from "@/lib/utils/client-code-generator";
 import { useToast } from "@/lib/utils/toast-notification";
+import { cn } from "@/lib/utils";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
 
@@ -16,11 +18,19 @@ type CreateClientDialogProps = {
 
 function formatTin(raw: string): string {
   const digits = raw.replace(/\D/g, "").slice(0, 14);
-  const parts = [digits.slice(0, 3), digits.slice(3, 6), digits.slice(6, 9), digits.slice(9, 14)];
+  const parts = [
+    digits.slice(0, 3),
+    digits.slice(3, 6),
+    digits.slice(6, 9),
+    digits.slice(9, 14),
+  ];
   return parts.filter(Boolean).join("-");
 }
 
-export function CreateClientDialog({ onCreated, existingNames = [] }: CreateClientDialogProps) {
+export function CreateClientDialog({
+  onCreated,
+  existingNames = [],
+}: CreateClientDialogProps) {
   const router = useRouter();
   const { success, error } = useToast();
   const [open, setOpen] = useState(false);
@@ -118,7 +128,8 @@ export function CreateClientDialog({ onCreated, existingNames = [] }: CreateClie
     setFormError(null);
     setFieldErrors({});
 
-    const nameInput = (event.currentTarget.elements.namedItem("name") as HTMLInputElement)?.value ?? "";
+    const nameInput =
+      (event.currentTarget.elements.namedItem("name") as HTMLInputElement)?.value ?? "";
     const dupNormalized = nameInput.trim().toLowerCase();
     const isDup = existingNames.some((n) => n.trim().toLowerCase() === dupNormalized);
     if (isDup) {
@@ -172,7 +183,11 @@ export function CreateClientDialog({ onCreated, existingNames = [] }: CreateClie
                   Fill out client details and generate a unique client code.
                 </p>
               </div>
-              <Button variant="ghost" onClick={closeDialog} aria-label="Close create client dialog">
+              <Button
+                variant="ghost"
+                onClick={closeDialog}
+                aria-label="Close create client dialog"
+              >
                 Close
               </Button>
             </div>
@@ -216,7 +231,9 @@ export function CreateClientDialog({ onCreated, existingNames = [] }: CreateClie
                   placeholder="Juan Dela Cruz"
                 />
                 {fieldErrors.contactPerson ? (
-                  <p className="mt-1 text-xs text-destructive">{fieldErrors.contactPerson}</p>
+                  <p className="mt-1 text-xs text-destructive">
+                    {fieldErrors.contactPerson}
+                  </p>
                 ) : null}
               </div>
 
@@ -226,7 +243,7 @@ export function CreateClientDialog({ onCreated, existingNames = [] }: CreateClie
                   id="sector"
                   name="sector"
                   defaultValue="commercial"
-                  className="mt-1 flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm"
+                  className={cn(fieldClassName, "mt-1 h-9 py-1")}
                 >
                   <option value="commercial">Commercial</option>
                   <option value="industrial">Industrial</option>

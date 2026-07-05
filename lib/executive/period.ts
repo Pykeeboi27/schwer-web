@@ -89,7 +89,9 @@ export function getPeriodDateRange(
   };
 }
 
-export function buildMonthBuckets(year: number): Array<{ month: number; label: string; year: number }> {
+export function buildMonthBuckets(
+  year: number,
+): Array<{ month: number; label: string; year: number }> {
   return Array.from({ length: 12 }, (_, index) => ({
     month: index + 1,
     label: getMonthLabel(index + 1),
@@ -97,7 +99,9 @@ export function buildMonthBuckets(year: number): Array<{ month: number; label: s
   }));
 }
 
-export function buildQuarterBuckets(year: number): Array<{ quarter: number; label: string; year: number }> {
+export function buildQuarterBuckets(
+  year: number,
+): Array<{ quarter: number; label: string; year: number }> {
   return [1, 2, 3, 4].map((quarter) => ({
     quarter,
     label: getQuarterLabel(quarter),

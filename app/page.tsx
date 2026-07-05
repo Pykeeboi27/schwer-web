@@ -26,12 +26,8 @@ const FEATURES = [
 
 export default function Home() {
   return (
-    <main className="relative min-h-screen overflow-hidden bg-gradient-to-b from-secondary/20 via-background to-background text-foreground">
-      {/* Decorative blobs */}
-      <div className="pointer-events-none absolute -left-32 top-0 h-96 w-96 rounded-full bg-primary/15 blur-3xl" />
-      <div className="pointer-events-none absolute -right-32 bottom-20 h-96 w-96 rounded-full bg-secondary/20 blur-3xl" />
-
-      <div className="relative mx-auto flex min-h-screen w-full max-w-6xl flex-col px-6 py-8 md:px-10">
+    <main className="min-h-screen bg-background text-foreground">
+      <div className="mx-auto flex min-h-screen w-full max-w-6xl flex-col px-6 py-8 md:px-10">
         {/* Header */}
         <header className="flex items-center justify-between">
           <Link
@@ -50,29 +46,28 @@ export default function Home() {
             <SchwerLogo className="h-12" />
           </div>
 
-          <span className="rounded-full border border-primary/30 bg-primary/10 px-4 py-1 text-xs font-semibold uppercase tracking-[0.12em] text-primary">
-            Schwer ERP Portal
-          </span>
+          <span className="text-sm font-medium text-primary">Schwer ERP Portal</span>
 
-          <h1 className="mt-5 max-w-3xl text-4xl font-semibold leading-tight tracking-tight sm:text-5xl md:text-6xl">
-            Schwer Online<br className="hidden sm:block" /> Management
+          <h1 className="mt-4 max-w-3xl text-4xl font-semibold leading-tight tracking-tight sm:text-5xl md:text-6xl">
+            Schwer Online
+            <br className="hidden sm:block" /> Management
           </h1>
 
           <p className="mt-5 max-w-xl text-base leading-relaxed text-muted-foreground sm:text-lg">
-            Centralize operations for HR, Sales, Accounting, Engineering, and
-            Purchasing in one secure system.
+            Centralize operations for HR, Sales, Accounting, Engineering, and Purchasing
+            in one secure system.
           </p>
 
           <div className="mt-8 flex flex-wrap gap-3">
             <Link
               href="/auth/login"
-              className="inline-flex h-11 items-center justify-center rounded-md bg-primary px-7 text-sm font-semibold text-primary-foreground shadow-sm transition-all hover:bg-primary/90 hover:-translate-y-px hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+              className="inline-flex h-11 items-center justify-center rounded-md bg-primary px-7 text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
             >
               Login
             </Link>
             <Link
               href="/auth/sign-up"
-              className="inline-flex h-11 items-center justify-center rounded-md border border-input bg-background px-7 text-sm font-medium transition-all hover:bg-muted hover:-translate-y-px hover:shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+              className="inline-flex h-11 items-center justify-center rounded-md border border-input bg-background px-7 text-sm font-medium transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
             >
               Sign up
             </Link>
@@ -81,14 +76,13 @@ export default function Home() {
           {/* Feature cards */}
           <div className="mt-16 grid w-full gap-4 sm:grid-cols-3">
             {FEATURES.map(({ icon: Icon, title, description }) => (
-              <div
-                key={title}
-                className="group rounded-xl border bg-card p-5 transition-all hover:-translate-y-0.5 hover:border-primary/30 hover:shadow-md"
-              >
-                <div className="mb-3 inline-flex h-9 w-9 items-center justify-center rounded-lg bg-primary/10">
-                  <Icon className="h-4.5 w-4.5 text-primary" size={18} />
-                </div>
-                <h2 className="text-sm font-semibold text-primary">{title}</h2>
+              <div key={title} className="rounded-lg border bg-card p-5">
+                <Icon
+                  className="mb-3 h-5 w-5 text-primary"
+                  aria-hidden="true"
+                  size={20}
+                />
+                <h2 className="text-sm font-semibold">{title}</h2>
                 <p className="mt-1.5 text-sm leading-relaxed text-muted-foreground">
                   {description}
                 </p>

@@ -22,8 +22,14 @@ type ActionResponse<T> = {
 type RequiredApproverRole = "sales_manager" | "owner" | "executive";
 
 function normalizeRole(role: string | undefined): RequiredApproverRole | null {
-  const normalized = String(role ?? "").trim().toLowerCase();
-  if (normalized === "sales_manager" || normalized === "owner" || normalized === "executive") {
+  const normalized = String(role ?? "")
+    .trim()
+    .toLowerCase();
+  if (
+    normalized === "sales_manager" ||
+    normalized === "owner" ||
+    normalized === "executive"
+  ) {
     return normalized;
   }
   return null;
@@ -103,7 +109,9 @@ export async function rejectPurchaseOrderAction(
   userRole: string,
 ): Promise<ActionResponse<{ poId: string }>> {
   const normalizedPoId = String(poId ?? "").trim();
-  const normalizedReason = String(reason ?? "").trim().toUpperCase();
+  const normalizedReason = String(reason ?? "")
+    .trim()
+    .toUpperCase();
   const role = normalizeRole(userRole);
 
   if (!normalizedPoId) {
@@ -154,7 +162,8 @@ export async function resubmitPurchaseOrderAction(
   } catch (error) {
     return {
       success: false,
-      error: error instanceof Error ? error.message : "Failed to resubmit purchase order.",
+      error:
+        error instanceof Error ? error.message : "Failed to resubmit purchase order.",
     };
   }
 }
@@ -185,7 +194,10 @@ export async function updatePurchaseOrderReferencesAction(
   } catch (error) {
     return {
       success: false,
-      error: error instanceof Error ? error.message : "Failed to update purchase order references.",
+      error:
+        error instanceof Error
+          ? error.message
+          : "Failed to update purchase order references.",
     };
   }
 }

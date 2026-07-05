@@ -1,8 +1,8 @@
 "use client";
 
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { EmptyState, StatusBadge, statusLabel } from "@/components/patterns";
 import { QuotationDetailsDialog } from "@/components/dialogs/quotation-details-dialog";
 import type { SalesQuotation } from "@/lib/sales/quotations";
 import { FileText, Search } from "lucide-react";
@@ -17,24 +17,6 @@ type QuotationsTableProps = {
 type SortBy = "createdAt" | "amount";
 type SortDirection = "asc" | "desc";
 type StatusFilter = "all" | SalesQuotation["status"];
-
-const STATUS_LABELS: Record<SalesQuotation["status"], string> = {
-  draft: "Draft",
-  pending: "Pending",
-  approved: "Approved",
-  rejected: "Rejected",
-  cancelled: "Cancelled",
-  closed: "Closed",
-};
-
-const STATUS_CLASSES: Record<SalesQuotation["status"], string> = {
-  draft: "border-slate-200 bg-slate-50 text-slate-600 dark:border-slate-700 dark:bg-slate-900/40 dark:text-slate-300",
-  pending: "border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-300",
-  approved: "border-green-200 bg-green-50 text-green-700 dark:border-green-900 dark:bg-green-950/40 dark:text-green-300",
-  rejected: "border-red-200 bg-red-50 text-red-700 dark:border-red-900 dark:bg-red-950/40 dark:text-red-300",
-  cancelled: "border-gray-200 bg-gray-50 text-gray-500 dark:border-gray-700 dark:bg-gray-900/40 dark:text-gray-400",
-  closed: "border-blue-200 bg-blue-50 text-blue-700 dark:border-blue-900 dark:bg-blue-950/40 dark:text-blue-300",
-};
 
 const ALL_STATUSES: SalesQuotation["status"][] = [
   "draft",
@@ -51,14 +33,6 @@ function formatCurrency(amount: number): string {
     currency: "PHP",
     maximumFractionDigits: 2,
   }).format(amount);
-}
-
-function StatusBadge({ status }: { status: SalesQuotation["status"] }) {
-  return (
-    <Badge className={STATUS_CLASSES[status]} variant="outline">
-      {STATUS_LABELS[status]}
-    </Badge>
-  );
 }
 
 function sortQuotations(
@@ -154,7 +128,7 @@ export function QuotationsTable({
               size="sm"
               onClick={() => setStatusFilter(s)}
             >
-              {STATUS_LABELS[s]}
+              {statusLabel(s)}
             </Button>
           ))}
           <span className="ml-2 text-xs text-muted-foreground">Sort:</span>
@@ -191,16 +165,16 @@ export function QuotationsTable({
           <tbody>
             {filteredAndSorted.length === 0 ? (
               <tr>
-                <td colSpan={5} className="px-3 py-10 text-center text-muted-foreground">
-                  <div className="flex flex-col items-center gap-2">
-                    <FileText className="h-5 w-5" aria-hidden="true" />
-                    <p className="font-medium text-foreground">No quotations found.</p>
-                    <p className="text-xs text-muted-foreground">
-                      {searchQuery || statusFilter !== "all"
+                <td colSpan={5}>
+                  <EmptyState
+                    icon={FileText}
+                    title="No quotations found."
+                    description={
+                      searchQuery || statusFilter !== "all"
                         ? "Try adjusting your search or filter."
-                        : "Submitted quotations will appear here after creation."}
-                    </p>
-                  </div>
+                        : "Submitted quotations will appear here after creation."
+                    }
+                  />
                 </td>
               </tr>
             ) : (
@@ -212,9 +186,13 @@ export function QuotationsTable({
                   tabIndex={0}
                   aria-label={`View quotation ${quotation.quotationNumber}`}
                   onClick={() => setSelectedQuotation(quotation)}
-                  onKeyDown={(event) => onRowKeyDown(event, () => setSelectedQuotation(quotation))}
+                  onKeyDown={(event) =>
+                    onRowKeyDown(event, () => setSelectedQuotation(quotation))
+                  }
                 >
-                  <td className="px-3 py-2 font-mono text-xs">{quotation.quotationNumber}</td>
+                  <td className="px-3 py-2 font-mono text-xs">
+                    {quotation.quotationNumber}
+                  </td>
                   <td className="px-3 py-2">{quotation.clientName}</td>
                   <td className="px-3 py-2">{formatCurrency(quotation.amount)}</td>
                   <td className="px-3 py-2">

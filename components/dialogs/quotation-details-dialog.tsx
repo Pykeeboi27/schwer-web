@@ -13,9 +13,16 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { NumberInput } from "@/components/ui/number-input";
+import {
+  Callout,
+  fieldClassName,
+  StatusBadge,
+  textareaClassName,
+} from "@/components/patterns";
 import { computeSalesPricing, computeVatBreakdown } from "@/lib/sales/pricing";
 import type { SalesQuotation } from "@/lib/sales/quotations";
 import { formatCurrency } from "@/lib/utils/number-format";
+import { cn } from "@/lib/utils";
 import { useToast } from "@/lib/utils/toast-notification";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
@@ -34,9 +41,6 @@ const PAYMENT_TERMS_OPTIONS = [
   "30 Days",
   "Other",
 ] as const;
-
-const textareaClassName =
-  "mt-1 flex w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50";
 
 function formatPercent(value: number | null): string {
   if (value === null) {
@@ -109,7 +113,10 @@ export function QuotationDetailsDialog({
   const [clientPoNumber, setClientPoNumber] = useState("");
 
   const normalizedRole = useMemo(
-    () => String(currentUserRole ?? "").trim().toLowerCase(),
+    () =>
+      String(currentUserRole ?? "")
+        .trim()
+        .toLowerCase(),
     [currentUserRole],
   );
 
@@ -178,7 +185,9 @@ export function QuotationDetailsDialog({
     const storedTerms = quotation.paymentTerms ?? "";
     if (
       storedTerms !== "" &&
-      !PAYMENT_TERMS_OPTIONS.includes(storedTerms as (typeof PAYMENT_TERMS_OPTIONS)[number])
+      !PAYMENT_TERMS_OPTIONS.includes(
+        storedTerms as (typeof PAYMENT_TERMS_OPTIONS)[number],
+      )
     ) {
       setPaymentTermsSelect("Other");
       setPaymentTermsCustom(quotation.paymentTermsCustom ?? storedTerms);
@@ -229,7 +238,9 @@ export function QuotationDetailsDialog({
   });
 
   const paymentTermsResolved =
-    paymentTermsSelect === "Other" ? paymentTermsCustom.trim() : paymentTermsSelect.trim();
+    paymentTermsSelect === "Other"
+      ? paymentTermsCustom.trim()
+      : paymentTermsSelect.trim();
 
   const salesDetailsComplete =
     marginPercentage.trim() !== "" &&
@@ -322,7 +333,10 @@ export function QuotationDetailsDialog({
     }
 
     setIsSubmitting(true);
-    const response = await markClientPoReceivedAction(quotation.id, clientPoNumber.trim());
+    const response = await markClientPoReceivedAction(
+      quotation.id,
+      clientPoNumber.trim(),
+    );
     if (!response.success) {
       error(response.error ?? "Failed to record the client PO.");
       setIsSubmitting(false);
@@ -411,7 +425,11 @@ export function QuotationDetailsDialog({
                 : "Review details and process approval actions."}
             </p>
           </div>
-          <Button variant="ghost" onClick={handleClose} aria-label="Close quotation details dialog">
+          <Button
+            variant="ghost"
+            onClick={handleClose}
+            aria-label="Close quotation details dialog"
+          >
             Close
           </Button>
         </div>
@@ -443,7 +461,12 @@ export function QuotationDetailsDialog({
           </div>
           <div className="grid grid-cols-[160px_1fr] gap-2">
             <dt className="text-muted-foreground">Status</dt>
-            <dd>{statusLabel(quotation.status)}</dd>
+            <dd>
+              <StatusBadge
+                status={quotation.status}
+                label={statusLabel(quotation.status)}
+              />
+            </dd>
           </div>
           <div className="grid grid-cols-[160px_1fr] gap-2">
             <dt className="text-muted-foreground">Approval Chain</dt>
@@ -485,7 +508,11 @@ export function QuotationDetailsDialog({
               </div>
               <div>
                 <Label>Margin Amount</Label>
-                <Input value={formatCurrency(pricing.marginAmount)} readOnly className="mt-1 bg-muted/40" />
+                <Input
+                  value={formatCurrency(pricing.marginAmount)}
+                  readOnly
+                  className="mt-1 bg-muted/40"
+                />
               </div>
               <div>
                 <Label htmlFor="sales-bank-percent">Bank %</Label>
@@ -499,7 +526,11 @@ export function QuotationDetailsDialog({
               </div>
               <div>
                 <Label>Bank Amount</Label>
-                <Input value={formatCurrency(pricing.bankAmount)} readOnly className="mt-1 bg-muted/40" />
+                <Input
+                  value={formatCurrency(pricing.bankAmount)}
+                  readOnly
+                  className="mt-1 bg-muted/40"
+                />
               </div>
               <div>
                 <Label htmlFor="sales-sop-percent">SOP %</Label>
@@ -513,48 +544,56 @@ export function QuotationDetailsDialog({
               </div>
               <div>
                 <Label>SOP Amount</Label>
-                <Input value={formatCurrency(pricing.sopAmount)} readOnly className="mt-1 bg-muted/40" />
+                <Input
+                  value={formatCurrency(pricing.sopAmount)}
+                  readOnly
+                  className="mt-1 bg-muted/40"
+                />
               </div>
             </div>
 
             <div className="grid grid-cols-[160px_1fr] items-center gap-2 border-t pt-3">
               <Label className="font-semibold">Selling Amount</Label>
-              <span className="text-base font-semibold">{formatCurrency(pricing.sellingAmount)}</span>
+              <span className="text-base font-semibold">
+                {formatCurrency(pricing.sellingAmount)}
+              </span>
             </div>
 
-            {(pricing.marginAmount > 0 || pricing.bankAmount > 0 || pricing.sopAmount > 0) ? (() => {
-              const vat = computeVatBreakdown(pricing);
-              return (
-                <div className="rounded-md border bg-muted/30 p-3 text-sm space-y-1">
-                  <div className="flex justify-between text-muted-foreground">
-                    <span>Selling Amount</span>
-                    <span>{formatCurrency(pricing.sellingAmount)}</span>
-                  </div>
-                  {pricing.marginAmount > 0 ? (
-                    <div className="flex justify-between text-muted-foreground">
-                      <span>+ Margin VAT (12%)</span>
-                      <span>{formatCurrency(vat.marginVat)}</span>
+            {pricing.marginAmount > 0 || pricing.bankAmount > 0 || pricing.sopAmount > 0
+              ? (() => {
+                  const vat = computeVatBreakdown(pricing);
+                  return (
+                    <div className="rounded-md border bg-muted/30 p-3 text-sm space-y-1">
+                      <div className="flex justify-between text-muted-foreground">
+                        <span>Selling Amount</span>
+                        <span>{formatCurrency(pricing.sellingAmount)}</span>
+                      </div>
+                      {pricing.marginAmount > 0 ? (
+                        <div className="flex justify-between text-muted-foreground">
+                          <span>+ Margin VAT (12%)</span>
+                          <span>{formatCurrency(vat.marginVat)}</span>
+                        </div>
+                      ) : null}
+                      {pricing.bankAmount > 0 ? (
+                        <div className="flex justify-between text-muted-foreground">
+                          <span>+ Bank VAT (12%)</span>
+                          <span>{formatCurrency(vat.bankVat)}</span>
+                        </div>
+                      ) : null}
+                      {pricing.sopAmount > 0 ? (
+                        <div className="flex justify-between text-muted-foreground">
+                          <span>+ SOP VAT (12%)</span>
+                          <span>{formatCurrency(vat.sopVat)}</span>
+                        </div>
+                      ) : null}
+                      <div className="flex justify-between border-t pt-1 font-semibold">
+                        <span>Grand Total (incl. VAT)</span>
+                        <span>{formatCurrency(vat.grandTotal)}</span>
+                      </div>
                     </div>
-                  ) : null}
-                  {pricing.bankAmount > 0 ? (
-                    <div className="flex justify-between text-muted-foreground">
-                      <span>+ Bank VAT (12%)</span>
-                      <span>{formatCurrency(vat.bankVat)}</span>
-                    </div>
-                  ) : null}
-                  {pricing.sopAmount > 0 ? (
-                    <div className="flex justify-between text-muted-foreground">
-                      <span>+ SOP VAT (12%)</span>
-                      <span>{formatCurrency(vat.sopVat)}</span>
-                    </div>
-                  ) : null}
-                  <div className="flex justify-between border-t pt-1 font-semibold">
-                    <span>Grand Total (incl. VAT)</span>
-                    <span>{formatCurrency(vat.grandTotal)}</span>
-                  </div>
-                </div>
-              );
-            })() : null}
+                  );
+                })()
+              : null}
 
             <div className="grid gap-3 sm:grid-cols-2">
               <div>
@@ -576,7 +615,7 @@ export function QuotationDetailsDialog({
                   id="sales-payment-terms"
                   value={paymentTermsSelect}
                   onChange={(event) => setPaymentTermsSelect(event.target.value)}
-                  className="mt-1 flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm"
+                  className={cn(fieldClassName, "mt-1 h-9 py-1")}
                 >
                   <option value="">Select payment terms</option>
                   {PAYMENT_TERMS_OPTIONS.map((option) => (
@@ -606,7 +645,9 @@ export function QuotationDetailsDialog({
               <Label>Google Drive Document</Label>
               {driveNotConfigured ? (
                 <div className="mt-1 space-y-2">
-                  <p className="text-xs text-muted-foreground">Drive upload not configured. Enter the link manually.</p>
+                  <p className="text-xs text-muted-foreground">
+                    Drive upload not configured. Enter the link manually.
+                  </p>
                   <Input
                     id="sales-drive-link"
                     type="url"
@@ -630,13 +671,16 @@ export function QuotationDetailsDialog({
                       try {
                         const form = new FormData();
                         form.append("file", file);
-                        const res = await fetch("/api/drive-upload", { method: "POST", body: form });
+                        const res = await fetch("/api/drive-upload", {
+                          method: "POST",
+                          body: form,
+                        });
                         if (res.status === 503) {
                           setDriveNotConfigured(true);
                           return;
                         }
                         if (!res.ok) throw new Error("Upload failed.");
-                        const data = await res.json() as { webViewLink: string };
+                        const data = (await res.json()) as { webViewLink: string };
                         setGoogleDriveLink(data.webViewLink);
                         setDriveUploadedName(file.name);
                       } catch {
@@ -652,12 +696,28 @@ export function QuotationDetailsDialog({
                   ) : null}
                   {driveUploadedName && googleDriveLink ? (
                     <p className="text-xs">
-                      Uploaded: <a href={googleDriveLink} target="_blank" rel="noopener noreferrer" className="text-primary underline">{driveUploadedName}</a>
+                      Uploaded:{" "}
+                      <a
+                        href={googleDriveLink}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-primary underline"
+                      >
+                        {driveUploadedName}
+                      </a>
                     </p>
                   ) : null}
                   {!driveUploadedName && googleDriveLink ? (
                     <p className="text-xs">
-                      Current: <a href={googleDriveLink} target="_blank" rel="noopener noreferrer" className="text-primary underline">View file</a>
+                      Current:{" "}
+                      <a
+                        href={googleDriveLink}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-primary underline"
+                      >
+                        View file
+                      </a>
                     </p>
                   ) : null}
                 </div>
@@ -709,8 +769,8 @@ export function QuotationDetailsDialog({
               <dt className="text-muted-foreground">Payment Terms</dt>
               <dd>
                 {quotation.paymentTerms === "Other"
-                  ? quotation.paymentTermsCustom ?? "Other"
-                  : quotation.paymentTerms ?? "—"}
+                  ? (quotation.paymentTermsCustom ?? "Other")
+                  : (quotation.paymentTerms ?? "—")}
               </dd>
             </div>
             <div className="grid grid-cols-[160px_1fr] gap-2">
@@ -746,8 +806,8 @@ export function QuotationDetailsDialog({
             <div>
               <h3 className="text-base font-semibold">Client Confirmed?</h3>
               <p className="text-xs text-muted-foreground">
-                When the client confirms and provides their PO, record it here to re-open the
-                quotation for editing before converting it to a purchase order.
+                When the client confirms and provides their PO, record it here to re-open
+                the quotation for editing before converting it to a purchase order.
               </p>
             </div>
             <div>
@@ -764,20 +824,24 @@ export function QuotationDetailsDialog({
         ) : null}
 
         {isReopenedForPo ? (
-          <div className="mt-4 rounded-md border bg-muted/20 p-3 text-xs text-muted-foreground">
-            Client PO <span className="font-medium text-foreground">{quotation.clientPoNumber}</span>{" "}
-            recorded. Adjust the pricing above if needed, then convert to a purchase order.
-          </div>
+          <Callout tone="muted" className="mt-4 text-xs text-muted-foreground">
+            Client PO{" "}
+            <span className="font-medium text-foreground">
+              {quotation.clientPoNumber}
+            </span>{" "}
+            recorded. Adjust the pricing above if needed, then convert to a purchase
+            order.
+          </Callout>
         ) : null}
 
         {isConverted ? (
-          <div className="mt-4 rounded-md border border-green-200 bg-green-50 p-3 text-sm text-green-800 dark:border-green-900 dark:bg-green-950/40 dark:text-green-300">
+          <Callout tone="success" className="mt-4">
             Converted to a purchase order
             {quotation.poConvertedAt
               ? ` on ${new Date(quotation.poConvertedAt).toLocaleDateString()}`
               : ""}
             . Track its approval and collections in the Purchase Orders module.
-          </div>
+          </Callout>
         ) : null}
 
         {canApproveReject ? (
@@ -794,7 +858,11 @@ export function QuotationDetailsDialog({
         <div className="mt-5 flex flex-wrap justify-end gap-2">
           {isDraft ? (
             <>
-              <Button variant="outline" onClick={handleSaveSalesDetails} disabled={isSubmitting}>
+              <Button
+                variant="outline"
+                onClick={handleSaveSalesDetails}
+                disabled={isSubmitting}
+              >
                 {isSubmitting ? "Saving..." : "Save Sales Details"}
               </Button>
               <Button
@@ -814,7 +882,11 @@ export function QuotationDetailsDialog({
 
           {isReopenedForPo ? (
             <>
-              <Button variant="outline" onClick={handleSaveSalesDetails} disabled={isSubmitting}>
+              <Button
+                variant="outline"
+                onClick={handleSaveSalesDetails}
+                disabled={isSubmitting}
+              >
                 {isSubmitting ? "Saving..." : "Save Changes"}
               </Button>
               <Button

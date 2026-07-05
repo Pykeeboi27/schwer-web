@@ -1,3 +1,4 @@
+import { EmptyState, StatusBadge } from "@/components/patterns";
 import type { CostingApprovalHistoryItem } from "@/lib/executive/costing-approvals";
 
 type CostingApprovalHistoryTableProps = {
@@ -22,9 +23,7 @@ function formatDate(iso: string): string {
 
 export function CostingApprovalHistoryTable({ items }: CostingApprovalHistoryTableProps) {
   if (items.length === 0) {
-    return (
-      <p className="text-sm text-muted-foreground">No past costing approval decisions yet.</p>
-    );
+    return <EmptyState title="No past costing approval decisions yet." />;
   }
 
   return (
@@ -55,20 +54,14 @@ export function CostingApprovalHistoryTable({ items }: CostingApprovalHistoryTab
               </td>
               <td className="px-3 py-2">{item.preparedByName}</td>
               <td className="px-3 py-2">
-                {item.decision === "approved" ? (
-                  <span className="inline-flex rounded-full bg-green-100 px-2 py-0.5 text-xs font-medium text-green-800 dark:bg-green-900/30 dark:text-green-400">
-                    Approved
-                  </span>
-                ) : (
-                  <span className="inline-flex rounded-full bg-red-100 px-2 py-0.5 text-xs font-medium text-red-800 dark:bg-red-900/30 dark:text-red-400">
-                    Rejected
-                  </span>
-                )}
+                <StatusBadge status={item.decision} />
               </td>
               <td className="px-3 py-2 text-xs text-muted-foreground">
                 {item.rejectionReason ?? "-"}
               </td>
-              <td className="px-3 py-2 text-muted-foreground">{formatDate(item.resolvedAt)}</td>
+              <td className="px-3 py-2 text-muted-foreground">
+                {formatDate(item.resolvedAt)}
+              </td>
             </tr>
           ))}
         </tbody>

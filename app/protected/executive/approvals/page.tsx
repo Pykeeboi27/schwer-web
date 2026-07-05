@@ -1,6 +1,12 @@
 import { ExecutiveApprovalsTable } from "@/components/executive/approvals-table";
 import { ExecutivePoApprovalsTable } from "@/components/executive/po-approvals-table";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import { getExecutiveAccessRedirect } from "@/lib/executive/access";
 import { getCurrentProfile } from "@/lib/profile/get-current-profile";
 import { listPendingApprovalsForCurrentUser } from "@/lib/sales/quotations";
@@ -9,7 +15,10 @@ import { redirect } from "next/navigation";
 
 export default async function ExecutiveApprovalsPage() {
   const profile = await getCurrentProfile();
-  const redirectPath = getExecutiveAccessRedirect(profile, "/protected/executive/approvals");
+  const redirectPath = getExecutiveAccessRedirect(
+    profile,
+    "/protected/executive/approvals",
+  );
 
   if (redirectPath) {
     redirect(redirectPath);
@@ -36,12 +45,13 @@ export default async function ExecutiveApprovalsPage() {
         <CardHeader>
           <CardTitle>Executive Approvals</CardTitle>
           <CardDescription>
-            Review high-value quotations from Sales that require owner or executive approval.
+            Review high-value quotations from Sales that require owner or executive
+            approval.
           </CardDescription>
         </CardHeader>
         <CardContent className="text-sm text-muted-foreground">
-          Quotations with an amount of 3,000,000 or above are listed here when assigned to your
-          account.
+          Quotations with an amount of 3,000,000 or above are listed here when assigned to
+          your account.
         </CardContent>
       </Card>
 
@@ -54,8 +64,8 @@ export default async function ExecutiveApprovalsPage() {
         <CardHeader>
           <CardTitle>Purchase Order Approvals</CardTitle>
           <CardDescription>
-            High-value purchase orders converted from approved quotations that require owner or
-            executive approval.
+            High-value purchase orders converted from approved quotations that require
+            owner or executive approval.
           </CardDescription>
         </CardHeader>
       </Card>

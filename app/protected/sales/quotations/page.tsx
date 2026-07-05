@@ -21,7 +21,7 @@ export default async function SalesQuotationsPage() {
     profile?.role ?? undefined,
   );
 
-  const quotations = response.success ? response.data ?? [] : [];
+  const quotations = response.success ? (response.data ?? []) : [];
 
   const readyForQuotation = quotations.filter(
     (quotation) => quotation.status === "draft" && quotation.costingApprovedAt !== null,
@@ -49,17 +49,23 @@ export default async function SalesQuotationsPage() {
     (quotation) => !isReadyForPurchaseOrder(quotation),
   );
 
-  const pendingCount = statsQuotations.filter((quotation) => quotation.status === "pending").length;
-  const approvedCount = statsQuotations.filter((quotation) => quotation.status === "approved").length;
-  const rejectedCount = statsQuotations.filter((quotation) => quotation.status === "rejected").length;
+  const pendingCount = statsQuotations.filter(
+    (quotation) => quotation.status === "pending",
+  ).length;
+  const approvedCount = statsQuotations.filter(
+    (quotation) => quotation.status === "approved",
+  ).length;
+  const rejectedCount = statsQuotations.filter(
+    (quotation) => quotation.status === "rejected",
+  ).length;
 
   return (
     <div className="flex flex-col gap-4">
       <div className="rounded-md border border-l-4 border-l-primary bg-card p-5 pl-5">
         <h1 className="text-2xl font-semibold">Quotations</h1>
         <p className="mt-2 text-sm text-muted-foreground">
-          Quotations originate in engineering and reach this page after executive approves the
-          costing. Add the sales details, then submit through the approval workflow.
+          Quotations originate in engineering and reach this page after executive approves
+          the costing. Add the sales details, then submit through the approval workflow.
         </p>
       </div>
 
@@ -67,8 +73,8 @@ export default async function SalesQuotationsPage() {
         <section className="rounded-md border bg-card p-5">
           <h2 className="mb-1 text-lg font-semibold">Ready for Quotation</h2>
           <p className="mb-4 text-sm text-muted-foreground">
-            Costing quotations approved by the executive. Add the margin, payment terms, and lead
-            time, then submit for sales approval.
+            Costing quotations approved by the executive. Add the margin, payment terms,
+            and lead time, then submit for sales approval.
           </p>
           {response.success ? (
             <ReadyForQuotationTable
@@ -88,8 +94,8 @@ export default async function SalesQuotationsPage() {
         <section className="rounded-md border bg-card p-5">
           <h2 className="mb-1 text-lg font-semibold">Ready for Purchase Order</h2>
           <p className="mb-4 text-sm text-muted-foreground">
-            Approved quotations with a recorded client PO. Review the pricing, then convert to a
-            purchase order.
+            Approved quotations with a recorded client PO. Review the pricing, then
+            convert to a purchase order.
           </p>
           {response.success ? (
             <ReadyForPurchaseOrderTable
@@ -111,11 +117,15 @@ export default async function SalesQuotationsPage() {
           <p className="mt-1 text-xl font-semibold">{pendingCount}</p>
         </div>
         <div className="rounded-lg border bg-card p-4 shadow-sm">
-          <p className="text-xs uppercase tracking-wide text-muted-foreground">Approved</p>
+          <p className="text-xs uppercase tracking-wide text-muted-foreground">
+            Approved
+          </p>
           <p className="mt-1 text-xl font-semibold">{approvedCount}</p>
         </div>
         <div className="rounded-lg border bg-card p-4 shadow-sm">
-          <p className="text-xs uppercase tracking-wide text-muted-foreground">Rejected</p>
+          <p className="text-xs uppercase tracking-wide text-muted-foreground">
+            Rejected
+          </p>
           <p className="mt-1 text-xl font-semibold">{rejectedCount}</p>
         </div>
       </section>

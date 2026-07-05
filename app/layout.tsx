@@ -10,7 +10,8 @@ const defaultUrl = process.env.VERCEL_URL
 export const metadata: Metadata = {
   metadataBase: new URL(defaultUrl),
   title: "Schwer Online Management",
-  description: "Schwer Online Management centralizes department workflows in one secure portal.",
+  description:
+    "Schwer Online Management centralizes department workflows in one secure portal.",
 };
 
 const geistSans = Geist({

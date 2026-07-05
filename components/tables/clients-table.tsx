@@ -3,6 +3,7 @@
 import { ClientDetailsDialog } from "@/components/dialogs/client-details-dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { EmptyState } from "@/components/patterns";
 import type { SalesClient } from "@/lib/sales/clients";
 import { SearchX } from "lucide-react";
 import { useMemo, useState, type KeyboardEvent } from "react";
@@ -101,17 +102,20 @@ export function ClientsTable({ clients }: ClientsTableProps) {
           <tbody>
             {filteredClients.length === 0 ? (
               <tr>
-                <td colSpan={7} className="px-3 py-10 text-center text-muted-foreground">
-                  <div className="flex flex-col items-center gap-2">
-                    <SearchX className="h-5 w-5" aria-hidden="true" />
-                    <p className="font-medium text-foreground">
-                      {hasActiveFilter ? "No results match your search." : "No clients found."}
-                    </p>
-                    <p className="text-xs text-muted-foreground">
-                      {hasActiveFilter
+                <td colSpan={7}>
+                  <EmptyState
+                    icon={SearchX}
+                    title={
+                      hasActiveFilter
+                        ? "No results match your search."
+                        : "No clients found."
+                    }
+                    description={
+                      hasActiveFilter
                         ? "Try different search terms or clear the filter to see all clients."
-                        : "Create your first client to start tracking sales opportunities."}
-                    </p>
+                        : "Create your first client to start tracking sales opportunities."
+                    }
+                  >
                     {hasActiveFilter ? (
                       <Button
                         type="button"
@@ -122,7 +126,7 @@ export function ClientsTable({ clients }: ClientsTableProps) {
                         Clear search
                       </Button>
                     ) : null}
-                  </div>
+                  </EmptyState>
                 </td>
               </tr>
             ) : (

@@ -100,7 +100,9 @@ function getDayFromPoDate(dateValue: string | null): number | null {
 }
 
 export const executiveDashboardQueries = {
-  async fetchPurchaseOrderRows(range: PurchaseOrderRange): Promise<PurchaseOrderMetricRow[]> {
+  async fetchPurchaseOrderRows(
+    range: PurchaseOrderRange,
+  ): Promise<PurchaseOrderMetricRow[]> {
     const supabase = await createClient();
     const { data, error } = await supabase
       .from("purchase_orders")
@@ -192,7 +194,12 @@ export function summarizeRevenueAndMargin(rows: PurchaseOrderMetricRow[]): {
 export function buildKpiSummaryFromRows(
   rows: PurchaseOrderMetricRow[],
   annualTarget: number | null,
-  quarterlyTargets?: { q1: number | null; q2: number | null; q3: number | null; q4: number | null },
+  quarterlyTargets?: {
+    q1: number | null;
+    q2: number | null;
+    q3: number | null;
+    q4: number | null;
+  },
 ): ExecutiveKpiSummary {
   const totals = summarizeRevenueAndMargin(rows);
 
@@ -272,7 +279,9 @@ export function buildRevenueBreakdownFromRows(
   };
 }
 
-export function buildPoSummaryFromRows(rows: PurchaseOrderMetricRow[]): ExecutivePoSummary {
+export function buildPoSummaryFromRows(
+  rows: PurchaseOrderMetricRow[],
+): ExecutivePoSummary {
   return {
     poCount: rows.length,
     totalPoValue: rows.reduce((sum, row) => sum + toNumber(row.po_amount), 0),
@@ -422,13 +431,15 @@ export async function getExecutiveDashboardData(
 ): Promise<ExecutiveDashboardData> {
   assertViewerAccess(options.viewer);
 
-  const [kpis, revenueBreakdown, poSummary, salesPerformance, charts] = await Promise.all([
-    getExecutiveKpiSummary(options),
-    getExecutiveRevenueBreakdown(periodFilter, options),
-    getExecutivePoSummary(periodFilter, options),
-    getExecutiveSalesPerformance(periodFilter, options),
-    getSalesDashboardCharts(),
-  ]);
+  const [kpis, revenueBreakdown, poSummary, salesPerformance, charts] = await Promise.all(
+    [
+      getExecutiveKpiSummary(options),
+      getExecutiveRevenueBreakdown(periodFilter, options),
+      getExecutivePoSummary(periodFilter, options),
+      getExecutiveSalesPerformance(periodFilter, options),
+      getSalesDashboardCharts(),
+    ],
+  );
 
   return {
     periodFilter,

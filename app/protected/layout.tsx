@@ -9,11 +9,7 @@ import { SidebarSlot } from "@/components/layouts/sidebar-slot";
 import Link from "next/link";
 import { Suspense } from "react";
 
-export default function ProtectedLayout({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
+export default function ProtectedLayout({ children }: { children: React.ReactNode }) {
   return (
     <main className="min-h-screen flex flex-col">
       <div className="flex-1 w-full flex flex-col">
@@ -28,13 +24,23 @@ export default function ProtectedLayout({
             {!hasEnvVars ? (
               <EnvVarWarning />
             ) : (
-              <Suspense fallback={<div className="text-sm text-muted-foreground">Loading account...</div>}>
+              <Suspense
+                fallback={
+                  <div className="text-sm text-muted-foreground">Loading account...</div>
+                }
+              >
                 <AuthButton />
               </Suspense>
             )}
           </div>
         </nav>
-        <Suspense fallback={<div className="mx-auto w-full max-w-5xl p-5 text-sm text-muted-foreground">Loading page...</div>}>
+        <Suspense
+          fallback={
+            <div className="mx-auto w-full max-w-5xl p-5 text-sm text-muted-foreground">
+              Loading page...
+            </div>
+          }
+        >
           <div className="flex-1 w-full">
             <DashboardLayout sidebar={<SidebarSlot />}>{children}</DashboardLayout>
           </div>
