@@ -24,10 +24,12 @@ async function DepartmentPageContent({ params }: DepartmentPageProps) {
   }
 
   return (
-    <div className="flex-1 w-full flex flex-col gap-6">
-      <div className="rounded-md border p-5 bg-card">
-        <h1 className="text-2xl font-semibold capitalize">{department} Dashboard</h1>
-        <p className="text-sm text-muted-foreground mt-2">
+    <div className="flex w-full flex-1 flex-col gap-6">
+      <div className="rounded-lg border border-l-4 border-l-primary bg-card p-4 shadow-xs sm:p-5">
+        <h1 className="text-2xl font-semibold capitalize tracking-tight">
+          {department} Dashboard
+        </h1>
+        <p className="mt-2 text-sm text-muted-foreground">
           You are signed in and can access the {department} dashboard.
         </p>
       </div>
@@ -37,7 +39,13 @@ async function DepartmentPageContent({ params }: DepartmentPageProps) {
 
 export default function DepartmentPage({ params }: DepartmentPageProps) {
   return (
-    <Suspense fallback={<div className="flex-1 w-full text-sm text-muted-foreground">Loading dashboard...</div>}>
+    <Suspense
+      fallback={
+        <div className="flex-1 w-full text-sm text-muted-foreground">
+          Loading dashboard...
+        </div>
+      }
+    >
       <DepartmentPageContent params={params} />
     </Suspense>
   );

@@ -20,24 +20,22 @@ describe("quotation approval workflow", () => {
   });
 
   it("routes high-value quotations through owner then executive", () => {
-    expect(determineNextQuotationStatus("pending_sales_manager", "sales_manager", 3_000_000)).toBe(
-      "pending_owner",
-    );
+    expect(
+      determineNextQuotationStatus("pending_sales_manager", "sales_manager", 3_000_000),
+    ).toBe("pending_owner");
     expect(determineNextQuotationStatus("pending_owner", "owner", 3_000_000)).toBe(
       "pending_executive",
     );
-    expect(determineNextQuotationStatus("pending_executive", "executive", 3_000_000)).toBe(
-      "approved",
-    );
+    expect(
+      determineNextQuotationStatus("pending_executive", "executive", 3_000_000),
+    ).toBe("approved");
   });
 
   it("keeps terminal states unchanged", () => {
     expect(determineNextQuotationStatus("approved", "executive", 5_000_000)).toBe(
       "approved",
     );
-    expect(determineNextQuotationStatus("rejected", "owner", 5_000_000)).toBe(
-      "rejected",
-    );
+    expect(determineNextQuotationStatus("rejected", "owner", 5_000_000)).toBe("rejected");
   });
 
   it("throws when an unauthorized role attempts approval", () => {

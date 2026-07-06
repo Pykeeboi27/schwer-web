@@ -24,7 +24,9 @@ export const EMPTY_SALES_SUMMARY: SalesSummary = {
   recognizedSaleTotal: 0,
 };
 
-async function getQuotationCountByStatus(status: "draft" | "pending" | "approved" | "rejected") {
+async function getQuotationCountByStatus(
+  status: "draft" | "pending" | "approved" | "rejected",
+) {
   const supabase = await createClient();
   const { count, error } = await supabase
     .from("quotations")
@@ -41,19 +43,28 @@ async function getQuotationCountByStatus(status: "draft" | "pending" | "approved
 export async function getSalesSummary(): Promise<SalesSummary> {
   const supabase = await createClient();
 
-  const [{ count: totalClients, error: clientsError }, { data: poRows, error: poError }, draft, pending, approved, rejected] =
-    await Promise.all([
-      supabase.from("clients").select("id", { count: "exact", head: true }).eq("is_active", true),
-      supabase
-        .from("quotations")
-        .select("amount, recognized_amount")
-        .eq("status", "approved")
-        .eq("phase", "sales"),
-      getQuotationCountByStatus("draft"),
-      getQuotationCountByStatus("pending"),
-      getQuotationCountByStatus("approved"),
-      getQuotationCountByStatus("rejected"),
-    ]);
+  const [
+    { count: totalClients, error: clientsError },
+    { data: poRows, error: poError },
+    draft,
+    pending,
+    approved,
+    rejected,
+  ] = await Promise.all([
+    supabase
+      .from("clients")
+      .select("id", { count: "exact", head: true })
+      .eq("is_active", true),
+    supabase
+      .from("quotations")
+      .select("amount, recognized_amount")
+      .eq("status", "approved")
+      .eq("phase", "sales"),
+    getQuotationCountByStatus("draft"),
+    getQuotationCountByStatus("pending"),
+    getQuotationCountByStatus("approved"),
+    getQuotationCountByStatus("rejected"),
+  ]);
 
   if (clientsError || poError) {
     throw new Error("Failed to load sales dashboard summary.");

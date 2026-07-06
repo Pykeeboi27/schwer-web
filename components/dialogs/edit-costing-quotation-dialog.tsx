@@ -1,15 +1,16 @@
 "use client";
 
-"use client";
-
 import { updateCostingQuotationAction } from "@/app/protected/engineering/quotations/actions";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { NumberInput } from "@/components/ui/number-input";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Callout, fieldClassName, textareaClassName } from "@/components/patterns";
 import type { CostingQuotation } from "@/lib/engineering/costing-quotations";
 import { suggestQuotationNumber } from "@/lib/engineering/suggest-quotation-number";
 import { useToast } from "@/lib/utils/toast-notification";
+import { cn } from "@/lib/utils";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 
@@ -54,9 +55,9 @@ export function EditCostingQuotationDialog({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
-  const [quotationNumber, setQuotationNumber] = useState(quotation?.quotationNumber ?? "");
-
-  const dialogTitleId = useMemo(() => "edit-costing-quotation-dialog-title", []);
+  const [quotationNumber, setQuotationNumber] = useState(
+    quotation?.quotationNumber ?? "",
+  );
 
   const activeClients = useMemo(
     () => clients.filter((c) => c.isActive || c.id === quotation?.clientId),
@@ -71,18 +72,9 @@ export function EditCostingQuotationDialog({
       return;
     }
     setQuotationNumber(quotation?.quotationNumber ?? "");
+  }, [open, quotation?.quotationNumber]);
 
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") {
-        onOpenChange(false);
-      }
-    };
-
-    window.addEventListener("keydown", onKeyDown);
-    return () => window.removeEventListener("keydown", onKeyDown);
-  }, [open, onOpenChange, quotation?.quotationNumber]);
-
-  if (!open || !quotation) {
+  if (!quotation) {
     return null;
   }
 
@@ -144,29 +136,21 @@ export function EditCostingQuotationDialog({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-      <div
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby={dialogTitleId}
-        className="w-full max-w-2xl rounded-lg border bg-card p-5 shadow-lg"
-      >
-        <div className="mb-4 flex items-start justify-between gap-4">
-          <div>
-            <h2 id={dialogTitleId} className="text-xl font-semibold">
-              Edit Costing Quotation
-            </h2>
-          </div>
-          <Button variant="ghost" onClick={() => onOpenChange(false)} aria-label="Close dialog">
-            Close
-          </Button>
-        </div>
+    <Dialog
+      open={open}
+      onOpenChange={(next) => {
+        if (!next) onOpenChange(false);
+      }}
+    >
+      <DialogContent className="max-h-[85vh] max-w-2xl overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle>Edit Costing Quotation</DialogTitle>
+        </DialogHeader>
 
         {quotation.costingRejectionReason ? (
-          <div className="mb-4 rounded-md border border-destructive/40 bg-destructive/10 p-3 text-sm">
-            <p className="font-medium text-destructive">Rejected by executive</p>
-            <p className="mt-1 text-foreground">{quotation.costingRejectionReason}</p>
-          </div>
+          <Callout tone="destructive" title="Rejected by executive">
+            <p className="text-foreground">{quotation.costingRejectionReason}</p>
+          </Callout>
         ) : null}
 
         <form onSubmit={handleSubmit} className="grid gap-4 md:grid-cols-2">
@@ -190,7 +174,9 @@ export function EditCostingQuotationDialog({
               </Button>
             </div>
             {fieldErrors.quotationNumber ? (
-              <p className="mt-1 text-xs text-destructive">{fieldErrors.quotationNumber}</p>
+              <p className="mt-1 text-xs text-destructive">
+                {fieldErrors.quotationNumber}
+              </p>
             ) : null}
           </div>
 
@@ -202,7 +188,7 @@ export function EditCostingQuotationDialog({
               required
               defaultValue={quotation.clientId}
               aria-invalid={Boolean(fieldErrors.clientId)}
-              className="mt-1 flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm"
+              className={cn(fieldClassName, "mt-1 h-9 py-1")}
             >
               <option value="">Select client</option>
               {activeClients.map((client) => (
@@ -258,7 +244,9 @@ export function EditCostingQuotationDialog({
               className="mt-1"
             />
             {fieldErrors.googleDriveLink ? (
-              <p className="mt-1 text-xs text-destructive">{fieldErrors.googleDriveLink}</p>
+              <p className="mt-1 text-xs text-destructive">
+                {fieldErrors.googleDriveLink}
+              </p>
             ) : null}
           </div>
 
@@ -269,7 +257,7 @@ export function EditCostingQuotationDialog({
               name="notes"
               rows={3}
               defaultValue={quotation.notes ?? ""}
-              className="mt-1 flex w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
+              className={textareaClassName}
               placeholder="Add any commercial notes or comments (optional)"
             />
           </div>
@@ -280,7 +268,7 @@ export function EditCostingQuotationDialog({
             </p>
           ) : null}
 
-          <div className="md:col-span-2 flex justify-end gap-2">
+          <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end md:col-span-2">
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
               Cancel
             </Button>
@@ -289,7 +277,7 @@ export function EditCostingQuotationDialog({
             </Button>
           </div>
         </form>
-      </div>
-    </div>
+      </DialogContent>
+    </Dialog>
   );
 }

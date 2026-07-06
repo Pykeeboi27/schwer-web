@@ -33,7 +33,8 @@ export async function approveCostingQuotationAction(
   } catch (error) {
     return {
       success: false,
-      error: error instanceof Error ? error.message : "Failed to approve costing quotation.",
+      error:
+        error instanceof Error ? error.message : "Failed to approve costing quotation.",
     };
   }
 }
@@ -43,7 +44,9 @@ export async function rejectCostingQuotationAction(
   reason: string,
 ): Promise<ActionResponse<{ quotationId: string }>> {
   const normalizedId = String(quotationId ?? "").trim();
-  const normalizedReason = String(reason ?? "").trim().toUpperCase();
+  const normalizedReason = String(reason ?? "")
+    .trim()
+    .toUpperCase();
 
   if (!normalizedId) {
     return { success: false, error: "Quotation id is required." };
@@ -59,7 +62,8 @@ export async function rejectCostingQuotationAction(
   } catch (error) {
     return {
       success: false,
-      error: error instanceof Error ? error.message : "Failed to reject costing quotation.",
+      error:
+        error instanceof Error ? error.message : "Failed to reject costing quotation.",
     };
   }
 }

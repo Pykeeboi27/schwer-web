@@ -3,11 +3,18 @@
 import { recordCollectionAction } from "@/app/protected/sales/purchase-orders/actions";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import type { SalesPurchaseOrder } from "@/lib/sales/purchase-orders";
 import { validateCollectionAmount } from "@/lib/utils/form-validation";
 import { useToast } from "@/lib/utils/toast-notification";
 import { useRouter } from "next/navigation";
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 
 type RecordCollectionDialogProps = {
   open: boolean;
@@ -43,35 +50,17 @@ export function RecordCollectionDialog({
     return Math.max(purchaseOrder.poAmount - purchaseOrder.recognizedAmount, 0);
   }, [purchaseOrder]);
 
-  const handleClose = () => {
+  const resetState = () => {
     setAmount("");
     setAmountError(null);
     setFormError(null);
     setIsSubmitting(false);
-    onOpenChange(false);
   };
 
-  useEffect(() => {
-    if (!open) {
-      return;
-    }
-
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") {
-        setAmount("");
-        setAmountError(null);
-        setFormError(null);
-        setIsSubmitting(false);
-        onOpenChange(false);
-      }
-    };
-
-    window.addEventListener("keydown", onKeyDown);
-
-    return () => {
-      window.removeEventListener("keydown", onKeyDown);
-    };
-  }, [open, onOpenChange]);
+  const handleClose = () => {
+    resetState();
+    onOpenChange(false);
+  };
 
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -114,45 +103,39 @@ export function RecordCollectionDialog({
     setIsSubmitting(false);
   };
 
-  if (!open || !purchaseOrder) {
+  if (!purchaseOrder) {
     return null;
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-      <div
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="record-collection-title"
-        className="w-full max-w-lg rounded-lg border bg-card p-5 shadow-lg"
-      >
-        <div className="mb-4 flex items-start justify-between gap-4">
-          <div>
-            <h2 id="record-collection-title" className="text-xl font-semibold">
-              Record Collection
-            </h2>
-            <p className="text-sm text-muted-foreground">
-              Add a payment against this purchase order.
-            </p>
-          </div>
-          <Button variant="ghost" onClick={handleClose} aria-label="Close record collection dialog">
-            Close
-          </Button>
-        </div>
+    <Dialog
+      open={open}
+      onOpenChange={(next) => {
+        if (!next) handleClose();
+      }}
+    >
+      <DialogContent className="max-h-[85vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle>Record Collection</DialogTitle>
+          <DialogDescription>
+            Add a payment against this purchase order.
+          </DialogDescription>
+        </DialogHeader>
 
-        <div className="space-y-2 rounded border p-3 text-sm">
+        <div className="space-y-2 rounded-md border p-3 text-sm">
           <p>
             Total Amount: <strong>{formatCurrency(purchaseOrder.poAmount)}</strong>
           </p>
           <p>
-            Collected Amount: <strong>{formatCurrency(purchaseOrder.recognizedAmount)}</strong>
+            Collected Amount:{" "}
+            <strong>{formatCurrency(purchaseOrder.recognizedAmount)}</strong>
           </p>
           <p>
             Remaining Balance: <strong>{formatCurrency(remainingBalance)}</strong>
           </p>
         </div>
 
-        <form onSubmit={handleSubmit} className="mt-4 space-y-4">
+        <form onSubmit={handleSubmit} className="space-y-4">
           <div>
             <label htmlFor="collection-amount" className="text-sm font-medium">
               Collection Amount
@@ -168,7 +151,10 @@ export function RecordCollectionDialog({
                 const nextAmount = event.target.value;
                 setAmount(nextAmount);
                 if (amountError || formError) {
-                  const nextError = validateCollectionAmount(nextAmount, remainingBalance);
+                  const nextError = validateCollectionAmount(
+                    nextAmount,
+                    remainingBalance,
+                  );
                   setAmountError(nextError);
                   if (!nextError) {
                     setFormError(null);
@@ -193,7 +179,7 @@ export function RecordCollectionDialog({
             </p>
           ) : null}
 
-          <div className="flex justify-end gap-2">
+          <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
             <Button type="button" variant="outline" onClick={handleClose}>
               Cancel
             </Button>
@@ -202,7 +188,7 @@ export function RecordCollectionDialog({
             </Button>
           </div>
         </form>
-      </div>
-    </div>
+      </DialogContent>
+    </Dialog>
   );
 }

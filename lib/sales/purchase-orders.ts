@@ -7,7 +7,8 @@ import {
 import { createClient } from "@/lib/supabase/server";
 import { validatePoTotalAmount } from "@/lib/utils/form-validation";
 
-export type PurchaseOrderStatus = "draft" | "pending" | "approved" | "rejected" | "cancelled";
+export type PurchaseOrderStatus =
+  "draft" | "pending" | "approved" | "rejected" | "cancelled";
 
 export type SalesPurchaseOrder = {
   id: string;
@@ -73,14 +74,22 @@ function derivePaymentStatus(
 }
 
 function toRequiredApproverRole(role: unknown): RequiredApproverRole | null {
-  const normalized = String(role ?? "").trim().toLowerCase();
-  if (normalized === "sales_manager" || normalized === "owner" || normalized === "executive") {
+  const normalized = String(role ?? "")
+    .trim()
+    .toLowerCase();
+  if (
+    normalized === "sales_manager" ||
+    normalized === "owner" ||
+    normalized === "executive"
+  ) {
     return normalized;
   }
   return null;
 }
 
-export async function fetchPurchaseOrders(_departmentId?: string): Promise<SalesPurchaseOrder[]> {
+export async function fetchPurchaseOrders(
+  _departmentId?: string,
+): Promise<SalesPurchaseOrder[]> {
   void _departmentId;
   return listPurchaseOrders();
 }
@@ -102,7 +111,10 @@ export function parsePoAmount(raw: unknown): number {
   return value;
 }
 
-export function assertCollectionDoesNotExceedPo(poAmount: number, collectedAmount: number): void {
+export function assertCollectionDoesNotExceedPo(
+  poAmount: number,
+  collectedAmount: number,
+): void {
   if (collectedAmount > poAmount) {
     throw new Error("Collected amount cannot exceed the PO amount.");
   }
@@ -142,7 +154,8 @@ export async function listPurchaseOrders(): Promise<SalesPurchaseOrder[]> {
       quotationId: row.quotation_id ?? null,
       poNumber: row.po_number,
       clientPoNumber: row.client_po_number ?? null,
-      quotationReference: (row as Record<string, unknown>).quotation_reference as string | null ?? null,
+      quotationReference:
+        ((row as Record<string, unknown>).quotation_reference as string | null) ?? null,
       clientId: row.client_id,
       clientName: client?.company_name ?? "Unknown client",
       subject: row.subject,
@@ -324,7 +337,12 @@ export async function convertQuotationToPurchaseOrder(
   for (const role of roles) {
     const approvers = await findApproversForRole(role);
     for (const approver of approvers) {
-      rows.push({ po_id: po.id, approver_id: approver.id, approver_role: role, status: "pending" });
+      rows.push({
+        po_id: po.id,
+        approver_id: approver.id,
+        approver_role: role,
+        status: "pending",
+      });
     }
   }
 
@@ -343,7 +361,9 @@ export async function convertQuotationToPurchaseOrder(
     .eq("id", q.id);
 
   if (linkError) {
-    throw new Error(linkError.message || "Failed to link the purchase order to the quotation.");
+    throw new Error(
+      linkError.message || "Failed to link the purchase order to the quotation.",
+    );
   }
 
   return { purchaseOrderId: po.id };
@@ -404,7 +424,9 @@ export async function findPendingPoApprovalForRole(input: {
   return data ? { approvalId: data.id } : null;
 }
 
-export async function listPendingPoApprovalsForCurrentUser(): Promise<PendingPoApprovalItem[]> {
+export async function listPendingPoApprovalsForCurrentUser(): Promise<
+  PendingPoApprovalItem[]
+> {
   const supabase = await createClient();
   const {
     data: { user },
@@ -428,7 +450,9 @@ export async function listPendingPoApprovalsForCurrentUser(): Promise<PendingPoA
   }
 
   return (data ?? []).map((row) => {
-    const po = Array.isArray(row.purchase_orders) ? row.purchase_orders[0] : row.purchase_orders;
+    const po = Array.isArray(row.purchase_orders)
+      ? row.purchase_orders[0]
+      : row.purchase_orders;
     return {
       approvalId: row.id,
       poId: row.po_id,
@@ -534,23 +558,34 @@ export async function resubmitPurchaseOrderForApproval(poId: string): Promise<vo
   for (const role of roles) {
     const approvers = await findApproversForRole(role);
     for (const approver of approvers) {
-      rows.push({ po_id: poId, approver_id: approver.id, approver_role: role, status: "pending" });
+      rows.push({
+        po_id: poId,
+        approver_id: approver.id,
+        approver_role: role,
+        status: "pending",
+      });
     }
   }
 
   if (rows.length > 0) {
     const { error: approvalError } = await supabase.from("po_approvals").insert(rows);
     if (approvalError) {
-      throw new Error(approvalError.message || "Failed to create PO approval assignments.");
+      throw new Error(
+        approvalError.message || "Failed to create PO approval assignments.",
+      );
     }
   }
 }
 
-export async function listPoPayments(purchaseOrderId?: string): Promise<SalesPoPayment[]> {
+export async function listPoPayments(
+  purchaseOrderId?: string,
+): Promise<SalesPoPayment[]> {
   const supabase = await createClient();
   let query = supabase
     .from("po_payments")
-    .select("id, po_id, purchase_order_id, amount_collected, payment_date, payment_method, reference_number")
+    .select(
+      "id, po_id, purchase_order_id, amount_collected, payment_date, payment_method, reference_number",
+    )
     .order("created_at", { ascending: false });
 
   if (purchaseOrderId) {

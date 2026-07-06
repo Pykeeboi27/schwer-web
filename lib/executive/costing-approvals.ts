@@ -160,7 +160,9 @@ export async function rejectCostingQuotation(input: {
   }
 }
 
-export async function listCostingApprovalHistory(): Promise<CostingApprovalHistoryItem[]> {
+export async function listCostingApprovalHistory(): Promise<
+  CostingApprovalHistoryItem[]
+> {
   const supabase = await createClient();
 
   const { data, error } = await supabase

@@ -1,0 +1,59 @@
+repos:
+  # 1. Basic File Hygiene (Same as Python)
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.5.0
+    hooks:
+      - id: trailing-whitespace
+      - id: end-of-file-fixer
+      - id: check-yaml
+      - id: check-added-large-files
+      - id: check-json
+
+  # 2. Prettier (Code Formatting) — runs the project's own Prettier + config
+  #    (.prettierrc.json / .prettierignore) instead of a pinned mirror version.
+  - repo: local
+    hooks:
+      - id: prettier
+        name: Prettier
+        entry: npx prettier --write --ignore-unknown
+        language: system
+        types_or: [javascript, jsx, ts, tsx, json, css, scss, markdown]
+
+  # 3. ESLint (Linting) — runs the project's ESLint 9 flat config
+  #    (eslint.config.mjs). The old mirror pinned ESLint 8.56, which cannot
+  #    read the flat config and failed with "couldn't find a configuration file".
+  - repo: local
+    hooks:
+      - id: eslint
+        name: ESLint
+        entry: npx eslint --fix
+        language: system
+        files: \.[jt]sx?$ # Targets .js, .jsx, .ts, .tsx
+        types: [file]
+
+  # 4. Gitleaks (Secrets Detection - Same as Python)
+  - repo: https://github.com/gitleaks/gitleaks
+    rev: v8.18.1
+    hooks:
+      - id: gitleaks
+
+  # 5. Trivy (Dependency Scan)
+  - repo: local
+    hooks:
+      - id: trivy
+        name: Trivy Security Scan
+        language: docker_image
+        entry: ghcr.io/aquasecurity/trivy:latest
+        stages: [pre-push]
+        args:
+          [
+            "fs",
+            ".",
+            "--severity",
+            "HIGH,CRITICAL",
+            "--exit-code",
+            "1",
+            "--scanners",
+            "vuln,misconfig,secret",
+          ]
+        pass_filenames: false

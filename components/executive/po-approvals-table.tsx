@@ -6,6 +6,7 @@ import {
 } from "@/app/protected/sales/purchase-orders/actions";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { DataCard, DataField, EmptyState, ResponsiveTable } from "@/components/patterns";
 import type { PendingPoApprovalItem } from "@/lib/sales/purchase-orders";
 import { formatCurrency } from "@/lib/utils/number-format";
 import { useToast } from "@/lib/utils/toast-notification";
@@ -26,7 +27,9 @@ export function ExecutivePoApprovalsTable({
   const [isSubmittingId, setIsSubmittingId] = useState<string | null>(null);
   const [reasons, setReasons] = useState<Record<string, string>>({});
 
-  const normalizedRole = String(currentUserRole ?? "").trim().toLowerCase();
+  const normalizedRole = String(currentUserRole ?? "")
+    .trim()
+    .toLowerCase();
   const canApprove = normalizedRole === "owner" || normalizedRole === "executive";
 
   const handleApprove = async (item: PendingPoApprovalItem) => {
@@ -70,68 +73,120 @@ export function ExecutivePoApprovalsTable({
 
   if (items.length === 0) {
     return (
-      <div className="rounded-md border bg-card p-5 text-sm text-muted-foreground">
-        No pending purchase order approvals at the moment.
+      <div className="rounded-md border">
+        <EmptyState title="No pending purchase order approvals at the moment." />
       </div>
     );
   }
 
+  const reasonInput = (item: PendingPoApprovalItem, isBusy: boolean) => (
+    <Input
+      value={reasons[item.approvalId] ?? ""}
+      onChange={(event) =>
+        setReasons((current) => ({
+          ...current,
+          [item.approvalId]: event.target.value,
+        }))
+      }
+      placeholder="Reason required for reject"
+      aria-label={`Rejection reason for ${item.poNumber}`}
+      disabled={isBusy || !canApprove}
+    />
+  );
+
+  const actionButtons = (item: PendingPoApprovalItem, isBusy: boolean) => (
+    <>
+      <Button
+        size="sm"
+        className="flex-1"
+        onClick={() => handleApprove(item)}
+        disabled={isBusy || !canApprove}
+      >
+        {isBusy ? "Saving..." : "Approve"}
+      </Button>
+      <Button
+        size="sm"
+        variant="outline"
+        className="flex-1"
+        onClick={() => handleReject(item)}
+        disabled={isBusy || !canApprove}
+      >
+        Reject
+      </Button>
+    </>
+  );
+
   return (
-    <div className="overflow-x-auto rounded-md border bg-card">
-      <table className="w-full min-w-[920px] text-sm">
-        <thead className="bg-muted/40 text-left">
-          <tr>
-            <th className="px-3 py-2 font-medium">Purchase Order</th>
-            <th className="px-3 py-2 font-medium">Subject</th>
-            <th className="px-3 py-2 font-medium">Amount</th>
-            <th className="px-3 py-2 font-medium">Required Role</th>
-            <th className="px-3 py-2 font-medium">Rejection Reason</th>
-            <th className="px-3 py-2 font-medium">Actions</th>
-          </tr>
-        </thead>
-        <tbody>
-          {items.map((item) => {
-            const isBusy = isSubmittingId === item.approvalId;
-            return (
-              <tr key={item.approvalId} className="border-t align-top">
-                <td className="px-3 py-2 font-mono text-xs">{item.poNumber}</td>
-                <td className="px-3 py-2">{item.subject || "-"}</td>
-                <td className="px-3 py-2">{formatCurrency(item.amount)}</td>
-                <td className="px-3 py-2 capitalize">{item.approverRole.replaceAll("_", " ")}</td>
-                <td className="px-3 py-2">
-                  <Input
-                    value={reasons[item.approvalId] ?? ""}
-                    onChange={(event) =>
-                      setReasons((current) => ({
-                        ...current,
-                        [item.approvalId]: event.target.value,
-                      }))
-                    }
-                    placeholder="Reason required for reject"
-                    aria-label={`Rejection reason for ${item.poNumber}`}
-                    disabled={isBusy || !canApprove}
-                  />
-                </td>
-                <td className="px-3 py-2">
-                  <div className="flex gap-2">
-                    <Button size="sm" onClick={() => handleApprove(item)} disabled={isBusy || !canApprove}>
-                      {isBusy ? "Saving..." : "Approve"}
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => handleReject(item)}
-                      disabled={isBusy || !canApprove}
-                    >
-                      Reject
-                    </Button>
-                  </div>
-                </td>
-              </tr>
-            );
-          })}
-        </tbody>
-      </table>
-    </div>
+    <ResponsiveTable
+      table={
+        <table className="w-full min-w-[920px] text-sm">
+          <thead className="bg-muted/40 text-left">
+            <tr>
+              <th className="px-3 py-2 font-medium">Purchase Order</th>
+              <th className="px-3 py-2 font-medium">Subject</th>
+              <th className="px-3 py-2 font-medium">Amount</th>
+              <th className="px-3 py-2 font-medium">Required Role</th>
+              <th className="px-3 py-2 font-medium">Rejection Reason</th>
+              <th className="px-3 py-2 font-medium">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {items.map((item) => {
+              const isBusy = isSubmittingId === item.approvalId;
+              return (
+                <tr key={item.approvalId} className="border-t align-top">
+                  <td className="px-3 py-2 font-mono text-xs">{item.poNumber}</td>
+                  <td className="px-3 py-2">{item.subject || "-"}</td>
+                  <td className="px-3 py-2">{formatCurrency(item.amount)}</td>
+                  <td className="px-3 py-2 capitalize">
+                    {item.approverRole.replaceAll("_", " ")}
+                  </td>
+                  <td className="px-3 py-2">{reasonInput(item, isBusy)}</td>
+                  <td className="px-3 py-2">
+                    <div className="flex gap-2">{actionButtons(item, isBusy)}</div>
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      }
+      cards={items.map((item) => {
+        const isBusy = isSubmittingId === item.approvalId;
+        return (
+          <DataCard
+            key={item.approvalId}
+            header={
+              <>
+                <div className="min-w-0">
+                  <p className="font-mono text-xs text-muted-foreground">
+                    {item.poNumber}
+                  </p>
+                  <p className="truncate font-semibold">{item.subject || "-"}</p>
+                </div>
+                <span className="shrink-0 font-semibold">
+                  {formatCurrency(item.amount)}
+                </span>
+              </>
+            }
+            footer={
+              <>
+                {reasonInput(item, isBusy)}
+                <div className="flex gap-2">{actionButtons(item, isBusy)}</div>
+              </>
+            }
+          >
+            <DataField
+              label="Required Role"
+              value={
+                <span className="capitalize">
+                  {item.approverRole.replaceAll("_", " ")}
+                </span>
+              }
+            />
+          </DataCard>
+        );
+      })}
+    />
   );
 }

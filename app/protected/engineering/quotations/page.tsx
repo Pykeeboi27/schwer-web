@@ -1,6 +1,7 @@
 import { CreateCostingQuotationDialog } from "@/components/dialogs/create-costing-quotation-dialog";
 import { CostingHistoryTable } from "@/components/engineering/costing-history-table";
 import { CostingQuotationsTable } from "@/components/engineering/costing-quotations-table";
+import { PageHeader, Panel } from "@/components/patterns";
 import { getEngineeringAccessRedirect } from "@/lib/engineering/access";
 import {
   listCostingApprovedHistory,
@@ -12,7 +13,10 @@ import { redirect } from "next/navigation";
 
 export default async function EngineeringQuotationsPage() {
   const profile = await getCurrentProfile();
-  const redirectPath = getEngineeringAccessRedirect(profile, "/protected/engineering/quotations");
+  const redirectPath = getEngineeringAccessRedirect(
+    profile,
+    "/protected/engineering/quotations",
+  );
 
   if (redirectPath) {
     redirect(redirectPath);
@@ -27,15 +31,12 @@ export default async function EngineeringQuotationsPage() {
   ]);
 
   return (
-    <div className="flex flex-col gap-4">
-      <div className="rounded-md border bg-card p-5">
-        <h1 className="text-2xl font-semibold">Costing Quotations</h1>
-        <p className="mt-2 text-sm text-muted-foreground">
-          Create and manage quotations during the costing phase. Submit for executive approval once
-          cost and Drive link are in place.
-        </p>
-        {isCostingEngineer ? (
-          <div className="mt-4">
+    <div className="flex flex-col gap-6">
+      <PageHeader
+        title="Costing Quotations"
+        description="Create and manage quotations during the costing phase. Submit for executive approval once cost and Drive link are in place."
+        actions={
+          isCostingEngineer ? (
             <CreateCostingQuotationDialog
               clients={clients.map((c) => ({
                 id: c.id,
@@ -43,11 +44,11 @@ export default async function EngineeringQuotationsPage() {
                 isActive: c.isActive,
               }))}
             />
-          </div>
-        ) : null}
-      </div>
+          ) : null
+        }
+      />
 
-      <section className="rounded-md border bg-card p-5">
+      <Panel>
         <CostingQuotationsTable
           quotations={quotations}
           currentUserId={profile?.id ?? ""}
@@ -57,15 +58,14 @@ export default async function EngineeringQuotationsPage() {
             isActive: c.isActive,
           }))}
         />
-      </section>
+      </Panel>
 
-      <section className="rounded-md border bg-card p-5">
-        <h2 className="mb-3 text-lg font-semibold">Approved History</h2>
-        <p className="mb-4 text-sm text-muted-foreground">
-          Costing quotations that have been approved by the executive and handed over to Sales.
-        </p>
+      <Panel
+        title="Approved History"
+        description="Costing quotations that have been approved by the executive and handed over to Sales."
+      >
         <CostingHistoryTable items={history} />
-      </section>
+      </Panel>
     </div>
   );
 }

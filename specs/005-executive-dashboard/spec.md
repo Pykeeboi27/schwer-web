@@ -1,8 +1,8 @@
 # Feature Specification: Executive Dashboard
 
-**Feature Branch**: `005-executive-dashboard`  
-**Created**: 2026-04-05  
-**Status**: Draft  
+**Feature Branch**: `005-executive-dashboard`
+**Created**: 2026-04-05
+**Status**: Draft
 **Input**: Executive dashboard metrics and filters: Revenue Year-to-Date (YTD) vs Target (editable yearly target), Average Overall Margin (YTD), Revenue breakdown by Quarter and Month, Sales performance overview, PO totals and margin summary; filters: Monthly, Quarterly, Year-to-Date.
 
 ## Clarifications
@@ -10,7 +10,7 @@
 ### Session 2026-04-05
 
 - Q: For “Revenue YTD vs Target”, what should Revenue YTD be based on? → A: Booked revenue: sum of PO amount (purchase_orders.po_amount).
-- Q: For “Average Overall Margin (YTD)”, how should the margin % be calculated? → A: Weighted margin % = (SUM(margin_amount) / SUM(po_amount)) * 100.
+- Q: For “Average Overall Margin (YTD)”, how should the margin % be calculated? → A: Weighted margin % = (SUM(margin_amount) / SUM(po_amount)) \* 100.
 - Q: When editing the yearly revenue target, what scope should the target apply to? → A: Overall only (one annual target for the whole business).
 - Q: For Sales performance overview, what should “sales owner” mean for the ranking? → A: PO owner (group by `purchase_orders.created_by`).
 
@@ -21,7 +21,7 @@ Executive Dashboard Viewer (read-only): A user is a Viewer if profiles.is_execut
 
 Target Editor (can edit yearly target): A user is a Target Editor if profiles.role IN ('owner', 'executive') and profiles.is_active = TRUE. Target Editors can create/update the single overall annual target in public.revenue_targets (row where month IS NULL and sector IS NULL). Non-editors may view targets but cannot change them.
 
-## User Scenarios & Testing *(mandatory)*
+## User Scenarios & Testing _(mandatory)_
 
 ### User Story 1 - View Executive KPI Snapshot (Priority: P1)
 
@@ -81,7 +81,7 @@ As an executive user, I want an overview of sales performance for the selected p
 - A user attempts to edit the target without authorization — the system prevents the change; successful target changes are captured in public.audit_logs.
 - Data corrections occur after initial viewing — subsequent loads should reflect updated numbers (no requirement for real-time updates unless already supported).
 
-## Requirements *(mandatory)*
+## Requirements _(mandatory)_
 
 ### Functional Requirements
 
@@ -89,7 +89,7 @@ As an executive user, I want an overview of sales performance for the selected p
 - **FR-002**: System MUST display “Revenue Year-to-Date (YTD) vs Target”, including both the current YTD booked revenue (sum of PO amount) and the configured yearly target.
 - **FR-003**: System MUST allow Target Editors to edit the yearly revenue target used by the dashboard.
 - **FR-004**: System MUST validate target edits (must be a non-negative numeric value) before accepting changes.
-- **FR-005**: System MUST display “Average Overall Margin (YTD)” and define it as a weighted margin percentage for YTD booked revenue: (SUM(YTD margin amount) / SUM(YTD PO amount)) * 100.
+- **FR-005**: System MUST display “Average Overall Margin (YTD)” and define it as a weighted margin percentage for YTD booked revenue: (SUM(YTD margin amount) / SUM(YTD PO amount)) \* 100.
 - **FR-006**: System MUST provide a revenue breakdown (booked revenue (PO amount)) by quarter for the selected time period.
 - **FR-007**: System MUST provide a revenue breakdown (booked revenue (PO amount)) by month for the selected time period.
 - **FR-008**: System MUST provide period filters: Monthly, Quarterly, and Year-to-Date.
@@ -102,7 +102,7 @@ As an executive user, I want an overview of sales performance for the selected p
 - **FR-015**: System MUST scope all Executive Dashboard metrics and targets to the viewer’s permitted scope as enforced by RLS. For v1, the permitted scope is company-wide and restricted to users with profiles.is_executive_viewer = TRUE (and is_active = TRUE); users without this permission MUST NOT be able to read dashboard data (including purchase_orders aggregates and revenue_targets).
 - **FR-016**: The yearly revenue target MUST be a single overall annual target (not per sector) for v1.
 
-### Constitution-Driven Constraints *(mandatory)*
+### Constitution-Driven Constraints _(mandatory)_
 
 - **C-001 (Stack)**: Features MUST use the project's approved technology stack and UI primitives (per the project constitution).
 - **C-002 (Auth/Z)**: Features involving data access MUST enforce authentication and least-privilege authorization according to the project constitution.
@@ -110,7 +110,7 @@ As an executive user, I want an overview of sales performance for the selected p
 - **C-004 (Design)**: UI MUST follow the project's brand tokens and consistent styling.
 - **C-005 (Testing)**: Every story MUST define unit + integration + E2E coverage appropriate to its scope.
 
-### Key Entities *(include if feature involves data)*
+### Key Entities _(include if feature involves data)_
 
 - **Yearly Revenue Target**: A configured overall target revenue amount for a specific year; used to compute “YTD vs Target”.
 - **Revenue Summary**: Aggregated booked revenue totals for a time range (YTD, quarter, month) and organizational scope.
@@ -118,7 +118,7 @@ As an executive user, I want an overview of sales performance for the selected p
 - **Purchase Order (PO) Summary**: Aggregated PO totals and margin totals for a selected period and scope.
 - **Sales Performance Summary**: Aggregated performance metrics per PO owner (who created the PO) for the selected period and scope.
 
-## Success Criteria *(mandatory)*
+## Success Criteria _(mandatory)_
 
 ### Measurable Outcomes
 

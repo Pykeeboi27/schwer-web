@@ -1,5 +1,6 @@
 import { fetchPurchaseOrdersAction } from "@/app/protected/sales/purchase-orders/actions";
 import { PurchaseOrdersTable } from "@/components/tables/purchase-orders-table";
+import { PageHeader, Panel, StatCard } from "@/components/patterns";
 import { getCurrentProfile } from "@/lib/profile/get-current-profile";
 import { getSalesAccessRedirect } from "@/lib/sales/access";
 import { listPoPayments } from "@/lib/sales/purchase-orders";
@@ -15,7 +16,10 @@ function formatCurrency(amount: number): string {
 
 export default async function SalesPurchaseOrdersPage() {
   const profile = await getCurrentProfile();
-  const redirectPath = getSalesAccessRedirect(profile, "/protected/sales/purchase-orders");
+  const redirectPath = getSalesAccessRedirect(
+    profile,
+    "/protected/sales/purchase-orders",
+  );
 
   if (redirectPath) {
     redirect(redirectPath);
@@ -26,7 +30,7 @@ export default async function SalesPurchaseOrdersPage() {
     listPoPayments(),
   ]);
 
-  const purchaseOrders = response.success ? response.data ?? [] : [];
+  const purchaseOrders = response.success ? (response.data ?? []) : [];
 
   // Closed/recognized sales reflect fully-approved POs only.
   const totals = purchaseOrders.reduce(
@@ -43,27 +47,18 @@ export default async function SalesPurchaseOrdersPage() {
   );
 
   return (
-    <div className="flex flex-col gap-4">
-      <div className="rounded-md border border-l-4 border-l-primary bg-card p-5 pl-5">
-        <h1 className="text-2xl font-semibold">Purchase Orders</h1>
-        <p className="mt-2 text-sm text-muted-foreground">
-          Purchase orders converted from approved quotations. Pending POs await approval; once
-          approved, track collections here as payments come in.
-        </p>
+    <div className="flex flex-col gap-6">
+      <PageHeader
+        title="Purchase Orders"
+        description="Purchase orders converted from approved quotations. Pending POs await approval; once approved, track collections here as payments come in."
+      />
+
+      <div className="grid gap-4 sm:grid-cols-2">
+        <StatCard label="Closed Sales" value={formatCurrency(totals.closed)} accent />
+        <StatCard label="Recognized Sales" value={formatCurrency(totals.recognized)} />
       </div>
 
-      <section className="grid gap-3 rounded-md border bg-card p-5 sm:grid-cols-2">
-        <div className="rounded-lg border bg-card p-4 shadow-sm">
-          <p className="text-xs uppercase tracking-wide text-muted-foreground">Closed Sales</p>
-          <p className="mt-1 text-xl font-semibold">{formatCurrency(totals.closed)}</p>
-        </div>
-        <div className="rounded-lg border bg-card p-4 shadow-sm">
-          <p className="text-xs uppercase tracking-wide text-muted-foreground">Recognized Sales</p>
-          <p className="mt-1 text-xl font-semibold">{formatCurrency(totals.recognized)}</p>
-        </div>
-      </section>
-
-      <section className="rounded-md border bg-card p-5">
+      <Panel>
         {response.success ? (
           <PurchaseOrdersTable
             purchaseOrders={purchaseOrders}
@@ -76,7 +71,7 @@ export default async function SalesPurchaseOrdersPage() {
             {response.error ?? "Failed to load purchase orders."}
           </p>
         )}
-      </section>
+      </Panel>
     </div>
   );
 }

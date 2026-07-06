@@ -1,8 +1,8 @@
 # Feature Specification: Sales Module Dashboard
 
-**Feature Branch**: `003-sales-dashboard`  
-**Created**: 2026-04-05  
-**Status**: Draft  
+**Feature Branch**: `003-sales-dashboard`
+**Created**: 2026-04-05
+**Status**: Draft
 **Input**: Add a Sales module with its own dashboard, including: (1) Client Details CRUD with client classification and payment terms, (2) Quotation approval routing based on amount thresholds, (3) Purchase Orders logging with margin, sector tagging, and sales recognition tracking.
 
 ## Clarifications
@@ -13,7 +13,7 @@
 - Q: How should sector tagging work on POs? → A: Canonical sector uses Commercial/Industrial/Solar (schema sector_enum). Additionally capture an optional free-form “sectorTag” (single text field) stored in PO notes for extra labeling.
 - Q: Should a PO require a linked client? → A: Yes — PO must be linked to a Client.
 
-## User Scenarios & Testing *(mandatory)*
+## User Scenarios & Testing _(mandatory)_
 
 ### User Story 1 - Navigate the Sales dashboard and see summaries (Priority: P1)
 
@@ -98,7 +98,7 @@ As a Sales team user, I can log Purchase Orders (POs) with their amount, payment
 - Prevent saving a PO without selecting a client.
 - If a client is removed/inactivated, existing quotations/POs still display the client name as of creation time.
 
-## Requirements *(mandatory)*
+## Requirements _(mandatory)_
 
 ### Functional Requirements
 
@@ -117,7 +117,7 @@ As a Sales team user, I can log Purchase Orders (POs) with their amount, payment
 - **FR-004**: Users MUST be able to add, edit, update, and remove clients.
 - **FR-005**: A client record MUST include client details, contact information, and payment terms.
 - **FR-005a**: Client payment terms MUST be stored in structured form: `termLabel` (required), `netDays` (required), `downpaymentPercent` (optional), `notes` (optional).
-**Implementation Note (schema-first)**: In v1, netDaysis stored inclients.payment_terms_days. Optional downpaymentPercentand optional payment-termnotesare serialized intoclients.notes as JSON text when provided.
+  **Implementation Note (schema-first)**: In v1, netDaysis stored inclients.payment_terms_days. Optional downpaymentPercentand optional payment-termnotesare serialized intoclients.notes as JSON text when provided.
 - **FR-006**: A client MUST have a classification, with allowed values: Commercial, Industrial, Solar.
 - **FR-007**: Removing a client MUST preserve historical readability for linked quotations and POs (client becomes inactive and is not selectable for new activity).
 
@@ -129,7 +129,7 @@ As a Sales team user, I can log Purchase Orders (POs) with their amount, payment
   - If amount < ₱3,000,000: approval required from Sales Manager role (Sales department).
   - If amount ≥ ₱3,000,000: approvals required from Sales Manager role (Sales department) AND Owner role AND Executive role (Executive department).
 - **FR-011**: System MUST track quotation status at minimum: Draft, Pending Approval, Approved, Rejected.
-**Implementation Note**: “Draft” means quotations.status = 'draft'until the user submits the quotation for approval, at which point the system MUST setquotations.status = 'pending'.
+  **Implementation Note**: “Draft” means quotations.status = 'draft'until the user submits the quotation for approval, at which point the system MUST setquotations.status = 'pending'.
 - **FR-012**: Authorized approvers MUST be able to approve or reject a pending quotation.
 - **FR-012a**: Owner and Executive approvers MUST be able to access the quotation approval view for quotations assigned to them, even if they are not in the Sales department.
 - **FR-013**: System MUST record each approval decision with approver identity and timestamp (and optional note).
@@ -140,7 +140,7 @@ As a Sales team user, I can log Purchase Orders (POs) with their amount, payment
 - **FR-015**: Users MUST be able to log purchase orders with: PO amount, payment terms, sector tagging, and margin information.
 - **FR-015b**: The system MUST capture an optional free-form “sectorTag” as a single text value for a PO; this MUST be stored in purchase_orders.notesand MUST NOT replace the canonicalsector enum used for reporting.
 - **FR-015a**: PO payment terms MUST use the same structured form as client payment terms: `termLabel` (required), `netDays` (required), `downpaymentPercent` (optional), `notes` (optional).
-**Implementation Note (schema-first)**: In v1, netDaysis stored inpurchase_orders.payment_terms_days. Optional downpaymentPercentand optional payment-termnotesare serialized intopurchase_orders.notes as JSON text when provided.
+  **Implementation Note (schema-first)**: In v1, netDaysis stored inpurchase_orders.payment_terms_days. Optional downpaymentPercentand optional payment-termnotesare serialized intopurchase_orders.notes as JSON text when provided.
 - **FR-015c**: A PO MUST be linked to a Client.
 - **FR-016**: For margin, the system MUST support capturing an estimated cost and MUST calculate:
   - Margin Amount = PO Amount − Estimated Cost
@@ -152,7 +152,7 @@ As a Sales team user, I can log Purchase Orders (POs) with their amount, payment
   - Recognized Sale total = sum of total collected amounts across POs
 - **FR-021**: Users MUST be able to view a PO list that shows (per PO) the total amount, total collected amount, payment terms, sector tag, and margin.
 
-### Constitution-Driven Constraints *(mandatory)*
+### Constitution-Driven Constraints _(mandatory)_
 
 - **C-001 (Stack)**: Features MUST use the project's approved technology stack and UI primitives (per the project constitution).
 - **C-002 (Auth/RLS)**: Features involving data access MUST use Supabase Auth and enforce authorization via RLS.
@@ -160,7 +160,7 @@ As a Sales team user, I can log Purchase Orders (POs) with their amount, payment
 - **C-004 (Design)**: UI MUST follow the project's brand tokens and consistent styling.
 - **C-005 (Testing)**: Every story MUST define unit + integration + E2E coverage appropriate to its scope.
 
-### Key Entities *(include if feature involves data)*
+### Key Entities _(include if feature involves data)_
 
 - **Client**: A customer organization receiving quotations and/or issuing purchase orders; includes classification and payment terms.
 - **Client Contact**: A contact person or channel for a client (e.g., name, phone/email), including a primary contact.
@@ -171,7 +171,7 @@ As a Sales team user, I can log Purchase Orders (POs) with their amount, payment
 - **PO Collection**: A recorded collection event against a PO contributing to recognized sales.
 - **Sector Tag**: An optional free-form label stored in purchase_orders.notesfor extra categorization; canonical reporting usessector_enum (Commercial/Industrial/Solar).
 
-## Success Criteria *(mandatory)*
+## Success Criteria _(mandatory)_
 
 ### Measurable Outcomes
 

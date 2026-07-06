@@ -4,8 +4,17 @@ import { updateClientAction } from "@/app/protected/sales/clients/actions";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { fieldClassName } from "@/components/patterns";
 import type { SalesClient } from "@/lib/sales/clients";
 import { useToast } from "@/lib/utils/toast-notification";
+import { cn } from "@/lib/utils";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 
@@ -74,25 +83,7 @@ export function ClientDetailsDialog({
     setFieldErrors({});
   }, [open, client, startInEditMode]);
 
-  useEffect(() => {
-    if (!open) {
-      return;
-    }
-
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") {
-        onOpenChange(false);
-      }
-    };
-
-    window.addEventListener("keydown", onKeyDown);
-
-    return () => {
-      window.removeEventListener("keydown", onKeyDown);
-    };
-  }, [open, onOpenChange]);
-
-  if (!open || !client) {
+  if (!client) {
     return null;
   }
 
@@ -139,39 +130,45 @@ export function ClientDetailsDialog({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-      <div
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="client-details-title"
-        className="w-full max-w-xl rounded-lg border bg-card p-5 shadow-lg"
-      >
-        <div className="mb-4 flex items-start justify-between gap-4">
-          <div>
-            <h2 id="client-details-title" className="text-xl font-semibold">
-              Client Details
-            </h2>
-            <p className="text-sm text-muted-foreground">
-              {isEditing ? "Update client information and save your changes." : "Read-only profile information."}
-            </p>
-          </div>
-          <div className="flex items-center gap-2">
-            {!isEditing ? (
-              <Button type="button" variant="outline" onClick={() => setIsEditing(true)}>
-                Edit Client
-              </Button>
-            ) : null}
-            <Button variant="ghost" onClick={() => onOpenChange(false)} aria-label="Close client details dialog">
-              Close
+    <Dialog
+      open={open}
+      onOpenChange={(next) => {
+        if (!next) onOpenChange(false);
+      }}
+    >
+      <DialogContent className="max-h-[85vh] max-w-xl overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle>Client Details</DialogTitle>
+          <DialogDescription>
+            {isEditing
+              ? "Update client information and save your changes."
+              : "Read-only profile information."}
+          </DialogDescription>
+        </DialogHeader>
+
+        {!isEditing ? (
+          <div className="flex justify-end">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => setIsEditing(true)}
+            >
+              Edit Client
             </Button>
           </div>
-        </div>
+        ) : null}
 
         {isEditing ? (
           <form onSubmit={handleSave} className="grid gap-4">
             <div>
               <Label htmlFor="client-code">Code</Label>
-              <Input id="client-code" value={client.clientCode} readOnly className="mt-1" />
+              <Input
+                id="client-code"
+                value={client.clientCode}
+                readOnly
+                className="mt-1"
+              />
             </div>
 
             <div>
@@ -184,7 +181,9 @@ export function ClientDetailsDialog({
                 }
                 className="mt-1"
               />
-              {fieldErrors.name ? <p className="mt-1 text-xs text-destructive">{fieldErrors.name}</p> : null}
+              {fieldErrors.name ? (
+                <p className="mt-1 text-xs text-destructive">{fieldErrors.name}</p>
+              ) : null}
             </div>
 
             <div className="grid gap-4 md:grid-cols-2">
@@ -194,7 +193,10 @@ export function ClientDetailsDialog({
                   id="client-contact-person"
                   value={formValues.contactPerson}
                   onChange={(event) =>
-                    setFormValues((current) => ({ ...current, contactPerson: event.target.value }))
+                    setFormValues((current) => ({
+                      ...current,
+                      contactPerson: event.target.value,
+                    }))
                   }
                   className="mt-1"
                 />
@@ -210,7 +212,7 @@ export function ClientDetailsDialog({
                       sector: event.target.value as ClientFormValues["sector"],
                     }))
                   }
-                  className="mt-1 flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm"
+                  className={cn(fieldClassName, "mt-1 h-9 py-1")}
                 >
                   <option value="commercial">Commercial</option>
                   <option value="industrial">Industrial</option>
@@ -227,11 +229,16 @@ export function ClientDetailsDialog({
                   type="email"
                   value={formValues.email}
                   onChange={(event) =>
-                    setFormValues((current) => ({ ...current, email: event.target.value }))
+                    setFormValues((current) => ({
+                      ...current,
+                      email: event.target.value,
+                    }))
                   }
                   className="mt-1"
                 />
-                {fieldErrors.email ? <p className="mt-1 text-xs text-destructive">{fieldErrors.email}</p> : null}
+                {fieldErrors.email ? (
+                  <p className="mt-1 text-xs text-destructive">{fieldErrors.email}</p>
+                ) : null}
               </div>
               <div>
                 <Label htmlFor="client-phone">Phone</Label>
@@ -239,11 +246,16 @@ export function ClientDetailsDialog({
                   id="client-phone"
                   value={formValues.phone}
                   onChange={(event) =>
-                    setFormValues((current) => ({ ...current, phone: event.target.value }))
+                    setFormValues((current) => ({
+                      ...current,
+                      phone: event.target.value,
+                    }))
                   }
                   className="mt-1"
                 />
-                {fieldErrors.phone ? <p className="mt-1 text-xs text-destructive">{fieldErrors.phone}</p> : null}
+                {fieldErrors.phone ? (
+                  <p className="mt-1 text-xs text-destructive">{fieldErrors.phone}</p>
+                ) : null}
               </div>
             </div>
 
@@ -253,7 +265,10 @@ export function ClientDetailsDialog({
                 id="client-address"
                 value={formValues.address}
                 onChange={(event) =>
-                  setFormValues((current) => ({ ...current, address: event.target.value }))
+                  setFormValues((current) => ({
+                    ...current,
+                    address: event.target.value,
+                  }))
                 }
                 className="mt-1"
               />
@@ -292,7 +307,7 @@ export function ClientDetailsDialog({
 
             {formError ? <p className="text-sm text-destructive">{formError}</p> : null}
 
-            <div className="flex justify-end gap-2">
+            <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
               <Button type="button" variant="outline" onClick={handleEditCancel}>
                 Cancel
               </Button>
@@ -358,7 +373,7 @@ export function ClientDetailsDialog({
             </div>
           </dl>
         )}
-      </div>
-    </div>
+      </DialogContent>
+    </Dialog>
   );
 }

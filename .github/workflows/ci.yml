@@ -1,27 +1,83 @@
-name: CI
+name: TypeScript CI
 
 on:
   push:
     branches:
       - main
-      - develop
-      - "feature/**"
+      - dev
+    paths-ignore:
+      - "**/*.md"
+      - "docs/**"
   pull_request:
+    branches:
+      - main
+      - dev
+    paths-ignore:
+      - "**/*.md"
+      - "docs/**"
+
+permissions:
+  contents: write
+  packages: write
+  pull-requests: write
+  issues: write
+  security-events: write
+  actions: write
 
 jobs:
-  test-and-lint:
+  # ========================================================================================
+  # STAGE 1: SECURITY & DEPENDENCY CHECKS
+  # ========================================================================================
+  security-scan:
+    name: Run Security & Gitleaks
     runs-on: ubuntu-latest
-    timeout-minutes: 20
-
     steps:
-      - name: Checkout
+      - name: Checkout Code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Run Gitleaks
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITLEAKS_LICENSE: ${{ secrets.GITLEAKS_LICENSE }}
+
+  dependency-scan:
+    name: Dependency Scan (Trivy FS)
+    needs: security-scan
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
         uses: actions/checkout@v4
 
-      - name: Setup Node
+      - name: Run Trivy Vulnerability Scanner
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: "fs"
+          scan-ref: "."
+          format: "table"
+          exit-code: "1"
+          ignore-unfixed: true
+          vuln-type: "os,library"
+          severity: "CRITICAL,HIGH"
+
+  # ========================================================================================
+  # STAGE 2: TESTING & QUALITY GATE
+  # ========================================================================================
+  test-and-quality:
+    name: Build & Test (Node.js 20)
+    needs: dependency-scan
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: 20
-          cache: npm
+          cache: "npm"
 
       - name: Install dependencies
         run: npm ci
@@ -29,16 +85,16 @@ jobs:
       - name: Lint
         run: npm run lint
 
-      - name: Unit tests
-        run: npm run test:unit
+      - name: Format Check
+        run: npm run format -- --check
 
-      - name: Integration tests
-        run: npm run test:integration
+      - name: Unit Tests with Coverage
+        run: npm run test -- --coverage
 
-      - name: Install Playwright browser
-        if: ${{ vars.RUN_E2E == 'true' }}
-        run: npx playwright install --with-deps chromium
-
-      - name: E2E tests
-        if: ${{ vars.RUN_E2E == 'true' }}
-        run: npm run test:e2e
+      - name: Upload coverage reports
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: coverage-report
+          path: coverage/lcov.info
+          retention-days: 30

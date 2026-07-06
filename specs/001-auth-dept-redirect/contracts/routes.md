@@ -1,6 +1,6 @@
 # Contracts: Routes & Navigation
 
-**Feature**: 001-auth-dept-redirect  
+**Feature**: 001-auth-dept-redirect
 **Date**: 2026-04-03
 
 This document defines the user-facing route contract for authentication and department dashboards.
@@ -8,20 +8,24 @@ This document defines the user-facing route contract for authentication and depa
 ## Public (Unauthenticated)
 
 - `GET /auth/login`
+
   - Shows email/password login form.
   - Includes password visibility toggle.
   - Includes Google sign-in entry point.
 
 - `GET /auth/oauth/google`
+
   - Starts Google OAuth sign-in.
   - Redirects the user to Google, then returns to `/auth/confirm?next=/protected`.
 
 - `GET /auth/sign-up`
+
   - Shows email/password sign-up form.
   - Required fields: email, password, department.
   - Includes password visibility toggle.
 
 - `GET /auth/sign-up-success`
+
   - Shows "check your email" confirmation instructions.
 
 - `GET /auth/confirm`
@@ -41,6 +45,7 @@ This document defines the user-facing route contract for authentication and depa
 ## Protected (Authenticated)
 
 - `GET /protected`
+
   - Acts as a redirector.
   - Redirects to `/protected/[department]`.
 

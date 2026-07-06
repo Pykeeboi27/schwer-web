@@ -1,3 +1,4 @@
+import { EmptyState } from "@/components/patterns";
 import type { SectorPerformanceSlice } from "@/lib/sales/dashboard-charts";
 import { formatCurrency } from "@/lib/utils/number-format";
 
@@ -20,9 +21,10 @@ export function SectorPerformanceChart({ slices }: SectorPerformanceChartProps) 
 
   if (slices.length === 0 || total <= 0) {
     return (
-      <div className="rounded-md border border-dashed p-6 text-center text-sm text-muted-foreground">
-        No approved quotations yet to break down by sector.
-      </div>
+      <EmptyState
+        title="No sector data yet"
+        description="No approved quotations yet to break down by sector."
+      />
     );
   }
 
@@ -61,7 +63,10 @@ export function SectorPerformanceChart({ slices }: SectorPerformanceChartProps) 
         {slices.map((slice) => {
           const share = total > 0 ? (slice.totalAmount / total) * 100 : 0;
           return (
-            <li key={slice.sector} className="flex min-w-0 items-center justify-between gap-3">
+            <li
+              key={slice.sector}
+              className="flex min-w-0 items-center justify-between gap-3"
+            >
               <span className="flex min-w-0 items-center gap-2">
                 <span
                   className="inline-block h-3 w-3 shrink-0 rounded-sm"

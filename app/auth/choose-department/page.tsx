@@ -1,3 +1,14 @@
+import { AuthShell } from "@/components/auth/auth-shell";
+import { Button } from "@/components/ui/button";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { fieldClassName } from "@/components/patterns";
+import { cn } from "@/lib/utils";
 import { DEPARTMENTS, isDepartment } from "@/lib/profile/departments";
 import {
   ensureCurrentProfile,
@@ -21,9 +32,7 @@ type ChooseDepartmentPageProps = {
   searchParams?: Promise<{ error?: string; redirectTo?: string }>;
 };
 
-async function ChooseDepartmentContent({
-  searchParams,
-}: ChooseDepartmentPageProps) {
+async function ChooseDepartmentContent({ searchParams }: ChooseDepartmentPageProps) {
   const resolvedSearchParams = searchParams ? await searchParams : undefined;
   const errorMessage = resolvedSearchParams?.error ?? null;
   const redirectTo = resolvedSearchParams?.redirectTo;
@@ -114,43 +123,47 @@ async function ChooseDepartmentContent({
   }
 
   return (
-    <div className="w-full max-w-sm rounded-md border bg-card p-6">
-      <h1 className="text-2xl font-semibold">Choose your department</h1>
-      <p className="mt-2 text-sm text-muted-foreground">
-        Select your department to continue to your dashboard.
-      </p>
+    <Card className="border-none bg-transparent shadow-none">
+      <CardHeader className="px-0">
+        <CardTitle className="text-2xl font-semibold tracking-tight">
+          Choose your department
+        </CardTitle>
+        <CardDescription>
+          Select your department to continue to your dashboard.
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="px-0">
+        <form action={chooseDepartmentAction} className="flex flex-col gap-4">
+          <div className="grid gap-1.5">
+            <label htmlFor="department" className="text-sm font-medium">
+              Department
+            </label>
+            <select
+              id="department"
+              name="department"
+              required
+              defaultValue=""
+              className={cn(fieldClassName, "h-9 py-1 capitalize")}
+            >
+              <option value="" disabled>
+                Select department
+              </option>
+              {DEPARTMENTS.map((department) => (
+                <option key={department} value={department} className="capitalize">
+                  {department}
+                </option>
+              ))}
+            </select>
+          </div>
 
-      <form action={chooseDepartmentAction} className="mt-6 flex flex-col gap-4">
-        <label htmlFor="department" className="text-sm font-medium">
-          Department
-        </label>
-        <select
-          id="department"
-          name="department"
-          required
-          defaultValue=""
-          className="h-9 rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-        >
-          <option value="" disabled>
-            Select department
-          </option>
-          {DEPARTMENTS.map((department) => (
-            <option key={department} value={department} className="capitalize">
-              {department}
-            </option>
-          ))}
-        </select>
+          {errorMessage && <p className="text-sm text-destructive">{errorMessage}</p>}
 
-        {errorMessage && <p className="text-sm text-red-500">{errorMessage}</p>}
-
-        <button
-          type="submit"
-          className="inline-flex h-9 items-center justify-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground"
-        >
-          Continue
-        </button>
-      </form>
-    </div>
+          <Button type="submit" className="w-full">
+            Continue
+          </Button>
+        </form>
+      </CardContent>
+    </Card>
   );
 }
 
@@ -158,10 +171,18 @@ export default function ChooseDepartmentPage({
   searchParams,
 }: ChooseDepartmentPageProps) {
   return (
-    <div className="flex min-h-svh w-full items-center justify-center p-6 md:p-10">
-      <Suspense fallback={<div className="w-full max-w-sm rounded-md border bg-card p-6 text-sm text-muted-foreground">Loading department selector...</div>}>
+    <AuthShell showBackLink={false}>
+      <Suspense
+        fallback={
+          <Card className="border-none bg-transparent shadow-none">
+            <CardContent className="px-0 py-6 text-sm text-muted-foreground">
+              Loading department selector…
+            </CardContent>
+          </Card>
+        }
+      >
         <ChooseDepartmentContent searchParams={searchParams} />
       </Suspense>
-    </div>
+    </AuthShell>
   );
 }

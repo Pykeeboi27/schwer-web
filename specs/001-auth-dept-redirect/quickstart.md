@@ -1,6 +1,6 @@
 # Quickstart: Authentication + Department Dashboard Redirect
 
-**Feature**: 001-auth-dept-redirect  
+**Feature**: 001-auth-dept-redirect
 **Date**: 2026-04-03
 
 ## Prerequisites
@@ -20,15 +20,19 @@ Create/update `.env.local`:
 In Supabase Dashboard:
 
 ### Email/password
+
 - Enable Email auth.
 - Enable **Confirm email** (required by this feature).
 
 ### Google OAuth
+
 - Enable Google provider.
 - Configure OAuth credentials (Client ID/Secret) in Supabase.
 
 ### Redirect URLs
+
 Add your local and production URLs (examples):
+
 - `http://localhost:3000/auth/confirm?next=/protected`
 - `https://<your-domain>/auth/confirm?next=/protected`
 
@@ -38,6 +42,7 @@ Add your local and production URLs (examples):
 - Confirm RLS is enabled (the schema enables it for key tables).
 
 This feature expects:
+
 - `public.profiles` exists (already in `schema.sql`).
 - RLS policies allow users to read their own profile.
 - Additional policy and trigger described in `data-model.md` should be applied when implementing this feature.
@@ -50,6 +55,7 @@ This feature expects:
 ## 5) Manual verification
 
 ### Email/password sign-up
+
 - Go to `/auth/sign-up`
 - Enter email/password and pick a department.
 - Confirm you land on a "check your email" success screen.
@@ -57,11 +63,13 @@ This feature expects:
 - Confirm you are redirected to `/protected/[department]`.
 
 ### Email/password login
+
 - Go to `/auth/login`
 - Log in with a confirmed account.
 - Confirm you are redirected to `/protected/[department]`.
 
 ### Google authentication
+
 - Use "Continue with Google" (routes to `/auth/oauth/google`).
 - If department is missing, confirm the app requires selecting department first.
 - Confirm final redirect is `/protected/[department]`.

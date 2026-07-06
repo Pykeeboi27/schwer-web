@@ -2,6 +2,7 @@ import { fetchQuotationsAction } from "@/app/protected/sales/quotations/actions"
 import { QuotationsTable } from "@/components/tables/quotations-table";
 import { ReadyForPurchaseOrderTable } from "@/components/tables/ready-for-purchase-order-table";
 import { ReadyForQuotationTable } from "@/components/tables/ready-for-quotation-table";
+import { PageHeader, Panel, StatCard } from "@/components/patterns";
 import { getCurrentProfile } from "@/lib/profile/get-current-profile";
 import { getSalesAccessRedirect } from "@/lib/sales/access";
 import { redirect } from "next/navigation";
@@ -21,7 +22,7 @@ export default async function SalesQuotationsPage() {
     profile?.role ?? undefined,
   );
 
-  const quotations = response.success ? response.data ?? [] : [];
+  const quotations = response.success ? (response.data ?? []) : [];
 
   const readyForQuotation = quotations.filter(
     (quotation) => quotation.status === "draft" && quotation.costingApprovedAt !== null,
@@ -49,27 +50,28 @@ export default async function SalesQuotationsPage() {
     (quotation) => !isReadyForPurchaseOrder(quotation),
   );
 
-  const pendingCount = statsQuotations.filter((quotation) => quotation.status === "pending").length;
-  const approvedCount = statsQuotations.filter((quotation) => quotation.status === "approved").length;
-  const rejectedCount = statsQuotations.filter((quotation) => quotation.status === "rejected").length;
+  const pendingCount = statsQuotations.filter(
+    (quotation) => quotation.status === "pending",
+  ).length;
+  const approvedCount = statsQuotations.filter(
+    (quotation) => quotation.status === "approved",
+  ).length;
+  const rejectedCount = statsQuotations.filter(
+    (quotation) => quotation.status === "rejected",
+  ).length;
 
   return (
-    <div className="flex flex-col gap-4">
-      <div className="rounded-md border border-l-4 border-l-primary bg-card p-5 pl-5">
-        <h1 className="text-2xl font-semibold">Quotations</h1>
-        <p className="mt-2 text-sm text-muted-foreground">
-          Quotations originate in engineering and reach this page after executive approves the
-          costing. Add the sales details, then submit through the approval workflow.
-        </p>
-      </div>
+    <div className="flex flex-col gap-6">
+      <PageHeader
+        title="Quotations"
+        description="Quotations originate in engineering and reach this page after executive approves the costing. Add the sales details, then submit through the approval workflow."
+      />
 
       {isSalesDepartment ? (
-        <section className="rounded-md border bg-card p-5">
-          <h2 className="mb-1 text-lg font-semibold">Ready for Quotation</h2>
-          <p className="mb-4 text-sm text-muted-foreground">
-            Costing quotations approved by the executive. Add the margin, payment terms, and lead
-            time, then submit for sales approval.
-          </p>
+        <Panel
+          title="Ready for Quotation"
+          description="Costing quotations approved by the executive. Add the margin, payment terms, and lead time, then submit for sales approval."
+        >
           {response.success ? (
             <ReadyForQuotationTable
               quotations={readyForQuotation}
@@ -81,16 +83,14 @@ export default async function SalesQuotationsPage() {
               {response.error ?? "Failed to load quotations."}
             </p>
           )}
-        </section>
+        </Panel>
       ) : null}
 
       {isSalesDepartment ? (
-        <section className="rounded-md border bg-card p-5">
-          <h2 className="mb-1 text-lg font-semibold">Ready for Purchase Order</h2>
-          <p className="mb-4 text-sm text-muted-foreground">
-            Approved quotations with a recorded client PO. Review the pricing, then convert to a
-            purchase order.
-          </p>
+        <Panel
+          title="Ready for Purchase Order"
+          description="Approved quotations with a recorded client PO. Review the pricing, then convert to a purchase order."
+        >
           {response.success ? (
             <ReadyForPurchaseOrderTable
               quotations={readyForPurchaseOrder}
@@ -102,26 +102,16 @@ export default async function SalesQuotationsPage() {
               {response.error ?? "Failed to load quotations."}
             </p>
           )}
-        </section>
+        </Panel>
       ) : null}
 
-      <section className="grid gap-3 rounded-md border bg-card p-5 sm:grid-cols-3">
-        <div className="rounded-lg border bg-card p-4 shadow-sm">
-          <p className="text-xs uppercase tracking-wide text-muted-foreground">Pending</p>
-          <p className="mt-1 text-xl font-semibold">{pendingCount}</p>
-        </div>
-        <div className="rounded-lg border bg-card p-4 shadow-sm">
-          <p className="text-xs uppercase tracking-wide text-muted-foreground">Approved</p>
-          <p className="mt-1 text-xl font-semibold">{approvedCount}</p>
-        </div>
-        <div className="rounded-lg border bg-card p-4 shadow-sm">
-          <p className="text-xs uppercase tracking-wide text-muted-foreground">Rejected</p>
-          <p className="mt-1 text-xl font-semibold">{rejectedCount}</p>
-        </div>
-      </section>
+      <div className="grid gap-4 sm:grid-cols-3">
+        <StatCard label="Pending" value={pendingCount} />
+        <StatCard label="Approved" value={approvedCount} />
+        <StatCard label="Rejected" value={rejectedCount} />
+      </div>
 
-      <section className="rounded-md border bg-card p-5">
-        <h2 className="mb-3 text-lg font-semibold">Quotations</h2>
+      <Panel title="Quotations">
         {response.success ? (
           <QuotationsTable
             quotations={activeQuotations}
@@ -133,7 +123,7 @@ export default async function SalesQuotationsPage() {
             {response.error ?? "Failed to load quotations."}
           </p>
         )}
-      </section>
+      </Panel>
     </div>
   );
 }

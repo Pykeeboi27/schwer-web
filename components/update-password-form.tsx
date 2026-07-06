@@ -45,14 +45,14 @@ export function UpdatePasswordForm({
 
   return (
     <div className={cn("flex flex-col gap-6", className)} {...props}>
-      <Card className="border-primary/20 bg-background/85 shadow-2xl backdrop-blur-sm">
-        <CardHeader>
-          <CardTitle className="text-2xl tracking-tight">Set new password</CardTitle>
-          <CardDescription>
-            Choose a strong password for your account
-          </CardDescription>
+      <Card className="border-none bg-transparent shadow-none">
+        <CardHeader className="px-0">
+          <CardTitle className="text-2xl font-semibold tracking-tight">
+            Set new password
+          </CardTitle>
+          <CardDescription>Choose a strong password for your account</CardDescription>
         </CardHeader>
-        <CardContent>
+        <CardContent className="px-0">
           <form onSubmit={handleUpdatePassword}>
             <div className="flex flex-col gap-5">
               <div className="grid gap-1.5">
@@ -84,11 +84,7 @@ export function UpdatePasswordForm({
                 </div>
               )}
 
-              <Button
-                type="submit"
-                className="w-full font-semibold transition-all hover:bg-primary/90"
-                disabled={isLoading}
-              >
+              <Button type="submit" className="w-full" disabled={isLoading}>
                 {isLoading ? "Saving…" : "Save new password"}
               </Button>
             </div>

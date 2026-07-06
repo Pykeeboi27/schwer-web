@@ -1,12 +1,11 @@
-import { ExecutiveEmptyState } from "@/components/executive/empty-state";
 import { TargetEditorForm } from "@/components/executive/target-editor-form";
 import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+  EmptyState,
+  PageHeader,
+  Panel,
+  StatCard,
+  StatProgress,
+} from "@/components/patterns";
 import { getExecutiveAccessRedirect, isTargetEditor } from "@/lib/executive/access";
 import { getExecutiveDashboardData } from "@/lib/executive/dashboard";
 import { formatCurrency, formatPercent } from "@/lib/executive/format";
@@ -28,18 +27,16 @@ export default async function ExecutiveDashboardPage() {
   } catch {
     return (
       <div className="flex flex-col gap-6">
-        <Card>
-          <CardHeader>
-            <CardTitle>Executive Dashboard</CardTitle>
-            <CardDescription>Unable to load executive metrics.</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <ExecutiveEmptyState
-              title="Dashboard data unavailable"
-              description="Please refresh the page or try again later."
-            />
-          </CardContent>
-        </Card>
+        <PageHeader
+          title="Executive Dashboard"
+          description="Unable to load executive metrics."
+        />
+        <Panel>
+          <EmptyState
+            title="Dashboard data unavailable"
+            description="Please refresh the page or try again later."
+          />
+        </Panel>
       </div>
     );
   }
@@ -56,92 +53,63 @@ export default async function ExecutiveDashboardPage() {
 
   return (
     <div className="flex flex-col gap-6">
-      {/* Page heading */}
-      <div>
-        <h1 className="text-2xl font-semibold tracking-tight">Executive Dashboard</h1>
-        <p className="text-sm text-muted-foreground mt-1">
-          Company-wide KPI snapshot — year to date.
-        </p>
-      </div>
+      <PageHeader
+        title="Executive Dashboard"
+        description="Company-wide KPI snapshot — year to date."
+      />
 
-      {/* KPI grid */}
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        {/* Revenue YTD */}
-        <Card className="border-l-4 border-l-primary">
-          <CardHeader className="pb-1">
-            <CardDescription className="uppercase tracking-widest text-xs font-medium">
-              Revenue YTD (Booked)
-            </CardDescription>
-            <CardTitle className="text-3xl font-bold tabular-nums">
-              {formatCurrency(revenueYtd)}
-            </CardTitle>
-          </CardHeader>
-          {targetPct !== null && annualTarget !== null ? (
-            <CardContent className="pt-0">
-              <div className="mt-2 h-2 w-full overflow-hidden rounded-full bg-muted">
-                <div
-                  className="h-full rounded-full bg-primary transition-all"
-                  style={{ width: `${targetPct}%` }}
-                />
-              </div>
-              <p className="mt-1.5 text-xs text-muted-foreground">
-                {targetPct}% of {formatCurrency(annualTarget)} annual target
-              </p>
-            </CardContent>
-          ) : null}
-        </Card>
-
-        {/* Annual Target */}
-        <Card>
-          <CardHeader className="pb-1">
-            <CardDescription className="uppercase tracking-widest text-xs font-medium">
-              Annual Target
-            </CardDescription>
-            <CardTitle className="text-3xl font-bold tabular-nums">
-              {annualTarget === null ? (
-                <span className="text-muted-foreground text-xl font-normal">Not set</span>
-              ) : (
-                formatCurrency(annualTarget)
-              )}
-            </CardTitle>
-          </CardHeader>
-        </Card>
-
-        {/* Margin */}
-        <Card>
-          <CardHeader className="pb-1">
-            <CardDescription className="uppercase tracking-widest text-xs font-medium">
-              Avg. Overall Margin (YTD)
-            </CardDescription>
-            <CardTitle className="text-3xl font-bold tabular-nums">
-              {dashboard.kpis.marginYtdWeightedPercent === null ? (
-                <span className="text-muted-foreground text-xl font-normal">N/A</span>
-              ) : (
-                formatPercent(dashboard.kpis.marginYtdWeightedPercent)
-              )}
-            </CardTitle>
-          </CardHeader>
-        </Card>
-      </div>
-
-      {/* Target editor */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Edit Yearly Target</CardTitle>
-          <CardDescription>
-            Set the annual and quarterly sales targets for {currentYear}. Only Target
-            Editors can make changes.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <TargetEditorForm
-            year={currentYear}
-            initialTarget={dashboard.kpis.annualTarget}
-            initialQuarterlyTargets={dashboard.kpis.quarterlyTargets}
-            canEdit={canEditTarget}
+      {/* Lead KPI */}
+      <StatCard
+        label="Revenue YTD (Booked)"
+        value={formatCurrency(revenueYtd)}
+        accent
+        size="hero"
+      >
+        {targetPct !== null && annualTarget !== null ? (
+          <StatProgress
+            percent={targetPct}
+            caption={`${targetPct}% of ${formatCurrency(annualTarget)} annual target`}
+            size="hero"
           />
-        </CardContent>
-      </Card>
+        ) : null}
+      </StatCard>
+
+      {/* Supporting KPIs */}
+      <div className="grid gap-3 sm:grid-cols-2">
+        <StatCard
+          label="Annual Target"
+          value={
+            annualTarget === null ? (
+              <span className="text-xl font-normal text-muted-foreground">Not set</span>
+            ) : (
+              formatCurrency(annualTarget)
+            )
+          }
+        />
+
+        <StatCard
+          label="Avg. Overall Margin (YTD)"
+          value={
+            dashboard.kpis.marginYtdWeightedPercent === null ? (
+              <span className="text-xl font-normal text-muted-foreground">N/A</span>
+            ) : (
+              formatPercent(dashboard.kpis.marginYtdWeightedPercent)
+            )
+          }
+        />
+      </div>
+
+      <Panel
+        title="Edit Yearly Target"
+        description={`Set the annual and quarterly sales targets for ${currentYear}. Only Target Editors can make changes.`}
+      >
+        <TargetEditorForm
+          year={currentYear}
+          initialTarget={dashboard.kpis.annualTarget}
+          initialQuarterlyTargets={dashboard.kpis.quarterlyTargets}
+          canEdit={canEditTarget}
+        />
+      </Panel>
     </div>
   );
 }

@@ -13,14 +13,14 @@ Date: 2026-04-06
 
 ## Desktop and Mobile Matrix
 
-| Area | Desktop (1024+) | Mobile (320/640) | Status | Evidence |
-|------|------------------|------------------|--------|----------|
-| Unauthenticated route guard | Redirects to login | Redirects to login | PASS | `tests/e2e/sales-responsive-verification.spec.ts` |
-| Sidebar behavior | Persistent sidebar visible | Hamburger toggle, overlay close on nav | PASS* | `tests/e2e/sales-responsive-verification.spec.ts` |
-| Clients/Quotations/PO table usability | Table visible and interactive | Horizontal table scroll without page overflow | PASS* | `tests/e2e/sales-responsive-verification.spec.ts` |
-| Dialog behavior | Dialog open/close with Escape | Dialog open/close with Escape and viewport fit checks | PASS* | `tests/e2e/sales-responsive-verification.spec.ts` |
-| Form inputs | Inputs focusable | Touch sizing and focus checks | PASS* | `tests/e2e/sales-responsive-verification.spec.ts` |
-| Full authenticated user journey | Role-based approval chain | Same journey under mobile layout | BLOCKED | Requires role credentials + seeded data |
+| Area                                  | Desktop (1024+)               | Mobile (320/640)                                      | Status  | Evidence                                          |
+| ------------------------------------- | ----------------------------- | ----------------------------------------------------- | ------- | ------------------------------------------------- |
+| Unauthenticated route guard           | Redirects to login            | Redirects to login                                    | PASS    | `tests/e2e/sales-responsive-verification.spec.ts` |
+| Sidebar behavior                      | Persistent sidebar visible    | Hamburger toggle, overlay close on nav                | PASS\*  | `tests/e2e/sales-responsive-verification.spec.ts` |
+| Clients/Quotations/PO table usability | Table visible and interactive | Horizontal table scroll without page overflow         | PASS\*  | `tests/e2e/sales-responsive-verification.spec.ts` |
+| Dialog behavior                       | Dialog open/close with Escape | Dialog open/close with Escape and viewport fit checks | PASS\*  | `tests/e2e/sales-responsive-verification.spec.ts` |
+| Form inputs                           | Inputs focusable              | Touch sizing and focus checks                         | PASS\*  | `tests/e2e/sales-responsive-verification.spec.ts` |
+| Full authenticated user journey       | Role-based approval chain     | Same journey under mobile layout                      | BLOCKED | Requires role credentials + seeded data           |
 
 `*` Authenticated scenarios are skip-gated by credentials in Playwright and pass when credentials are configured.
 

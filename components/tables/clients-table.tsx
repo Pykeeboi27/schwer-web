@@ -3,6 +3,14 @@
 import { ClientDetailsDialog } from "@/components/dialogs/client-details-dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { DataCard, DataField, EmptyState, ResponsiveTable } from "@/components/patterns";
 import type { SalesClient } from "@/lib/sales/clients";
 import { SearchX } from "lucide-react";
 import { useMemo, useState, type KeyboardEvent } from "react";
@@ -62,114 +70,157 @@ export function ClientsTable({ clients }: ClientsTableProps) {
     [clients, normalizedSearch, sectorFilter],
   );
 
+  const openClient = (client: SalesClient, editMode: boolean) => {
+    setOpenInEditMode(editMode);
+    setSelectedClient(client);
+  };
+
+  const emptyState = (
+    <EmptyState
+      icon={SearchX}
+      title={hasActiveFilter ? "No results match your search." : "No clients found."}
+      description={
+        hasActiveFilter
+          ? "Try different search terms or clear the filter to see all clients."
+          : "Create your first client to start tracking sales opportunities."
+      }
+    >
+      {hasActiveFilter ? (
+        <Button type="button" variant="outline" size="sm" onClick={() => setSearch("")}>
+          Clear search
+        </Button>
+      ) : null}
+    </EmptyState>
+  );
+
   return (
     <>
-      <div className="mb-4 flex items-center justify-between gap-3">
+      <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
         <Input
           value={search}
           onChange={(event) => setSearch(event.target.value)}
           placeholder="Search by name, code, contact, email, or phone"
           aria-label="Search clients"
-          className="max-w-md"
+          className="sm:max-w-md"
         />
-        <select
+        <Select
           value={sectorFilter}
-          onChange={(event) => setSectorFilter(event.target.value as SectorFilter)}
-          aria-label="Filter clients by sector"
-          className="h-9 rounded-md border border-input bg-background px-3 text-sm"
+          onValueChange={(value) => setSectorFilter(value as SectorFilter)}
         >
-          <option value="all">All sectors</option>
-          <option value="commercial">Commercial</option>
-          <option value="industrial">Industrial</option>
-          <option value="solar">Solar</option>
-        </select>
+          <SelectTrigger className="sm:w-48" aria-label="Filter clients by sector">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All sectors</SelectItem>
+            <SelectItem value="commercial">Commercial</SelectItem>
+            <SelectItem value="industrial">Industrial</SelectItem>
+            <SelectItem value="solar">Solar</SelectItem>
+          </SelectContent>
+        </Select>
       </div>
 
-      <div className="overflow-x-auto rounded-md border">
-        <table className="w-full min-w-[760px] text-sm">
-          <thead className="bg-muted/40 text-left">
-            <tr>
-              <th className="px-3 py-2 font-medium">Code</th>
-              <th className="px-3 py-2 font-medium">Name</th>
-              <th className="px-3 py-2 font-medium">Sector</th>
-              <th className="px-3 py-2 font-medium">Contact</th>
-              <th className="px-3 py-2 font-medium">Email</th>
-              <th className="px-3 py-2 font-medium">Phone</th>
-              <th className="px-3 py-2 font-medium text-right">Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {filteredClients.length === 0 ? (
+      <ResponsiveTable
+        table={
+          <table className="w-full min-w-[760px] text-sm">
+            <thead className="bg-muted/40 text-left">
               <tr>
-                <td colSpan={7} className="px-3 py-10 text-center text-muted-foreground">
-                  <div className="flex flex-col items-center gap-2">
-                    <SearchX className="h-5 w-5" aria-hidden="true" />
-                    <p className="font-medium text-foreground">
-                      {hasActiveFilter ? "No results match your search." : "No clients found."}
-                    </p>
-                    <p className="text-xs text-muted-foreground">
-                      {hasActiveFilter
-                        ? "Try different search terms or clear the filter to see all clients."
-                        : "Create your first client to start tracking sales opportunities."}
-                    </p>
-                    {hasActiveFilter ? (
+                <th className="px-3 py-2 font-medium">Code</th>
+                <th className="px-3 py-2 font-medium">Name</th>
+                <th className="px-3 py-2 font-medium">Sector</th>
+                <th className="px-3 py-2 font-medium">Contact</th>
+                <th className="px-3 py-2 font-medium">Email</th>
+                <th className="px-3 py-2 font-medium">Phone</th>
+                <th className="px-3 py-2 text-right font-medium">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {filteredClients.length === 0 ? (
+                <tr>
+                  <td colSpan={7}>{emptyState}</td>
+                </tr>
+              ) : (
+                filteredClients.map((client) => (
+                  <tr
+                    key={client.id}
+                    className="cursor-pointer border-t hover:bg-muted/30 focus-visible:bg-muted/40 focus-visible:outline-none"
+                    role="button"
+                    tabIndex={0}
+                    aria-label={`View client details for ${client.companyName}`}
+                    onClick={() => openClient(client, false)}
+                    onKeyDown={(event) =>
+                      onRowKeyDown(event, () => openClient(client, false))
+                    }
+                  >
+                    <td className="px-3 py-2 font-mono text-xs">{client.clientCode}</td>
+                    <td className="px-3 py-2">{client.companyName}</td>
+                    <td className="px-3 py-2 capitalize">{client.sector}</td>
+                    <td className="px-3 py-2">{client.contactPerson ?? "-"}</td>
+                    <td className="px-3 py-2">{client.email ?? "-"}</td>
+                    <td className="px-3 py-2">{client.phone ?? "-"}</td>
+                    <td className="px-3 py-2 text-right">
                       <Button
                         type="button"
-                        variant="outline"
                         size="sm"
-                        onClick={() => setSearch("")}
+                        variant="outline"
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          openClient(client, true);
+                        }}
                       >
-                        Clear search
+                        Edit
                       </Button>
-                    ) : null}
-                  </div>
-                </td>
-              </tr>
-            ) : (
-              filteredClients.map((client) => (
-                <tr
-                  key={client.id}
-                  className="cursor-pointer border-t hover:bg-muted/30 focus-visible:bg-muted/40 focus-visible:outline-none"
-                  role="button"
-                  tabIndex={0}
-                  aria-label={`View client details for ${client.companyName}`}
-                  onClick={() => {
-                    setOpenInEditMode(false);
-                    setSelectedClient(client);
-                  }}
-                  onKeyDown={(event) =>
-                    onRowKeyDown(event, () => {
-                      setOpenInEditMode(false);
-                      setSelectedClient(client);
-                    })
-                  }
-                >
-                  <td className="px-3 py-2 font-mono text-xs">{client.clientCode}</td>
-                  <td className="px-3 py-2">{client.companyName}</td>
-                  <td className="px-3 py-2 capitalize">{client.sector}</td>
-                  <td className="px-3 py-2">{client.contactPerson ?? "-"}</td>
-                  <td className="px-3 py-2">{client.email ?? "-"}</td>
-                  <td className="px-3 py-2">{client.phone ?? "-"}</td>
-                  <td className="px-3 py-2 text-right">
-                    <Button
-                      type="button"
-                      size="sm"
-                      variant="outline"
-                      onClick={(event) => {
-                        event.stopPropagation();
-                        setOpenInEditMode(true);
-                        setSelectedClient(client);
-                      }}
-                    >
-                      Edit
-                    </Button>
-                  </td>
-                </tr>
-              ))
-            )}
-          </tbody>
-        </table>
-      </div>
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        }
+        cards={
+          filteredClients.length === 0 ? (
+            <div className="rounded-lg border">{emptyState}</div>
+          ) : (
+            filteredClients.map((client) => (
+              <DataCard
+                key={client.id}
+                onActivate={() => openClient(client, false)}
+                ariaLabel={`View client details for ${client.companyName}`}
+                header={
+                  <>
+                    <div className="min-w-0">
+                      <p className="truncate font-semibold">{client.companyName}</p>
+                      <p className="font-mono text-xs text-muted-foreground">
+                        {client.clientCode}
+                      </p>
+                    </div>
+                    <span className="shrink-0 rounded-full bg-muted px-2 py-0.5 text-xs capitalize text-muted-foreground">
+                      {client.sector}
+                    </span>
+                  </>
+                }
+                footer={
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    className="w-full"
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      openClient(client, true);
+                    }}
+                  >
+                    Edit
+                  </Button>
+                }
+              >
+                <DataField label="Contact" value={client.contactPerson ?? "-"} />
+                <DataField label="Email" value={client.email ?? "-"} />
+                <DataField label="Phone" value={client.phone ?? "-"} />
+              </DataCard>
+            ))
+          )
+        }
+      />
 
       <ClientDetailsDialog
         open={selectedClient !== null}

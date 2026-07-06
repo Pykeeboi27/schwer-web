@@ -18,7 +18,11 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     }
 
     const buffer = Buffer.from(await file.arrayBuffer());
-    const result = await uploadFileToDrive(buffer, file.name, file.type || "application/octet-stream");
+    const result = await uploadFileToDrive(
+      buffer,
+      file.name,
+      file.type || "application/octet-stream",
+    );
 
     return NextResponse.json(result);
   } catch (error) {

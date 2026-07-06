@@ -5,10 +5,20 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { NumberInput } from "@/components/ui/number-input";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import { fieldClassName, textareaClassName } from "@/components/patterns";
 import { suggestQuotationNumber } from "@/lib/engineering/suggest-quotation-number";
 import { useToast } from "@/lib/utils/toast-notification";
+import { cn } from "@/lib/utils";
 import { useRouter } from "next/navigation";
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 
 type ClientOption = {
   id: string;
@@ -37,7 +47,9 @@ function isHttpUrl(value: string): boolean {
   }
 }
 
-export function CreateCostingQuotationDialog({ clients }: CreateCostingQuotationDialogProps) {
+export function CreateCostingQuotationDialog({
+  clients,
+}: CreateCostingQuotationDialogProps) {
   const router = useRouter();
   const { success, error } = useToast();
   const [open, setOpen] = useState(false);
@@ -51,8 +63,6 @@ export function CreateCostingQuotationDialog({ clients }: CreateCostingQuotation
     [clients],
   );
 
-  const dialogTitleId = useMemo(() => "create-costing-quotation-dialog-title", []);
-
   const closeDialog = () => {
     setOpen(false);
     setIsSubmitting(false);
@@ -60,21 +70,6 @@ export function CreateCostingQuotationDialog({ clients }: CreateCostingQuotation
     setFieldErrors({});
     setQuotationNumber("");
   };
-
-  useEffect(() => {
-    if (!open) {
-      return;
-    }
-
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") {
-        closeDialog();
-      }
-    };
-
-    window.addEventListener("keydown", onKeyDown);
-    return () => window.removeEventListener("keydown", onKeyDown);
-  }, [open]);
 
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -133,159 +128,150 @@ export function CreateCostingQuotationDialog({ clients }: CreateCostingQuotation
   };
 
   return (
-    <>
-      <Button
-        type="button"
-        onClick={() => setOpen(true)}
-        disabled={activeClients.length === 0}
-      >
-        Start Costing Quotation
-      </Button>
+    <Dialog
+      open={open}
+      onOpenChange={(next) => {
+        if (next) setOpen(true);
+        else closeDialog();
+      }}
+    >
+      <DialogTrigger asChild>
+        <Button type="button" disabled={activeClients.length === 0}>
+          Start Costing Quotation
+        </Button>
+      </DialogTrigger>
+      <DialogContent className="max-h-[85vh] max-w-2xl overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle>Start Costing Quotation</DialogTitle>
+          <DialogDescription>
+            Set the cost and attach a Google Drive link before submitting for executive
+            approval.
+          </DialogDescription>
+        </DialogHeader>
 
-      {open ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-          <div
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby={dialogTitleId}
-            className="w-full max-w-2xl rounded-lg border bg-card p-5 shadow-lg"
-          >
-            <div className="mb-4 flex items-start justify-between gap-4">
-              <div>
-                <h2 id={dialogTitleId} className="text-xl font-semibold">
-                  Start Costing Quotation
-                </h2>
-                <p className="text-sm text-muted-foreground">
-                  Set the cost and attach a Google Drive link before submitting for executive
-                  approval.
-                </p>
-              </div>
-              <Button variant="ghost" onClick={closeDialog} aria-label="Close dialog">
-                Close
+        <form onSubmit={handleSubmit} className="grid gap-4 md:grid-cols-2">
+          <div className="md:col-span-2">
+            <Label htmlFor="costing-quotation-number">Quotation ID</Label>
+            <div className="mt-1 flex gap-2">
+              <Input
+                id="costing-quotation-number"
+                value={quotationNumber}
+                onChange={(e) => setQuotationNumber(e.target.value.toUpperCase())}
+                aria-invalid={Boolean(fieldErrors.quotationNumber)}
+                className="uppercase"
+                placeholder="QT-2026-001"
+              />
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setQuotationNumber(suggestQuotationNumber())}
+              >
+                Suggest
               </Button>
             </div>
-
-            <form onSubmit={handleSubmit} className="grid gap-4 md:grid-cols-2">
-              <div className="md:col-span-2">
-                <Label htmlFor="costing-quotation-number">Quotation ID</Label>
-                <div className="mt-1 flex gap-2">
-                  <Input
-                    id="costing-quotation-number"
-                    value={quotationNumber}
-                    onChange={(e) => setQuotationNumber(e.target.value.toUpperCase())}
-                    aria-invalid={Boolean(fieldErrors.quotationNumber)}
-                    className="uppercase"
-                    placeholder="QT-2026-001"
-                  />
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={() => setQuotationNumber(suggestQuotationNumber())}
-                  >
-                    Suggest
-                  </Button>
-                </div>
-                {fieldErrors.quotationNumber ? (
-                  <p className="mt-1 text-xs text-destructive">{fieldErrors.quotationNumber}</p>
-                ) : null}
-              </div>
-
-              <div className="md:col-span-2">
-                <Label htmlFor="costing-client">Client</Label>
-                <select
-                  id="costing-client"
-                  name="clientId"
-                  required
-                  aria-invalid={Boolean(fieldErrors.clientId)}
-                  className="mt-1 flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm"
-                >
-                  <option value="">Select client</option>
-                  {activeClients.map((client) => (
-                    <option key={client.id} value={client.id}>
-                      {client.companyName}
-                    </option>
-                  ))}
-                </select>
-                {fieldErrors.clientId ? (
-                  <p className="mt-1 text-xs text-destructive">{fieldErrors.clientId}</p>
-                ) : null}
-              </div>
-
-              <div className="md:col-span-2">
-                <Label htmlFor="costing-subject">Subject</Label>
-                <Input
-                  id="costing-subject"
-                  name="subject"
-                  required
-                  aria-invalid={Boolean(fieldErrors.subject)}
-                  className="mt-1"
-                  placeholder="Project scope or package"
-                />
-                {fieldErrors.subject ? (
-                  <p className="mt-1 text-xs text-destructive">{fieldErrors.subject}</p>
-                ) : null}
-              </div>
-
-              <div className="md:col-span-2">
-                <Label htmlFor="costing-cost">Direct Cost</Label>
-                <NumberInput
-                  id="costing-cost"
-                  name="cost"
-                  required
-                  aria-invalid={Boolean(fieldErrors.cost)}
-                  className="mt-1"
-                  placeholder="0.00"
-                />
-                {fieldErrors.cost ? (
-                  <p className="mt-1 text-xs text-destructive">{fieldErrors.cost}</p>
-                ) : null}
-              </div>
-
-              <div className="md:col-span-2">
-                <Label htmlFor="costing-drive">Google Drive Link</Label>
-                <Input
-                  id="costing-drive"
-                  name="googleDriveLink"
-                  type="url"
-                  required
-                  aria-invalid={Boolean(fieldErrors.googleDriveLink)}
-                  className="mt-1"
-                  placeholder="https://drive.google.com/..."
-                />
-                {fieldErrors.googleDriveLink ? (
-                  <p className="mt-1 text-xs text-destructive">{fieldErrors.googleDriveLink}</p>
-                ) : null}
-              </div>
-
-              <div className="md:col-span-2">
-                <Label htmlFor="costing-notes">Comments</Label>
-                <textarea
-                  id="costing-notes"
-                  name="notes"
-                  rows={3}
-                  className="mt-1 flex w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
-                  placeholder="Add any commercial notes or comments (optional)"
-                />
-              </div>
-
-              {formError ? (
-                <p className="md:col-span-2 text-sm text-destructive" role="alert">
-                  {formError}
-                </p>
-              ) : null}
-
-              <div className="md:col-span-2 flex justify-end gap-2">
-                <Button type="button" variant="outline" onClick={closeDialog}>
-                  Cancel
-                </Button>
-                <Button type="submit" disabled={isSubmitting}>
-                  {isSubmitting ? "Saving..." : "Create Draft"}
-                </Button>
-              </div>
-            </form>
+            {fieldErrors.quotationNumber ? (
+              <p className="mt-1 text-xs text-destructive">
+                {fieldErrors.quotationNumber}
+              </p>
+            ) : null}
           </div>
-        </div>
-      ) : null}
-    </>
+
+          <div className="md:col-span-2">
+            <Label htmlFor="costing-client">Client</Label>
+            <select
+              id="costing-client"
+              name="clientId"
+              required
+              aria-invalid={Boolean(fieldErrors.clientId)}
+              className={cn(fieldClassName, "mt-1 h-9 py-1")}
+            >
+              <option value="">Select client</option>
+              {activeClients.map((client) => (
+                <option key={client.id} value={client.id}>
+                  {client.companyName}
+                </option>
+              ))}
+            </select>
+            {fieldErrors.clientId ? (
+              <p className="mt-1 text-xs text-destructive">{fieldErrors.clientId}</p>
+            ) : null}
+          </div>
+
+          <div className="md:col-span-2">
+            <Label htmlFor="costing-subject">Subject</Label>
+            <Input
+              id="costing-subject"
+              name="subject"
+              required
+              aria-invalid={Boolean(fieldErrors.subject)}
+              className="mt-1"
+              placeholder="Project scope or package"
+            />
+            {fieldErrors.subject ? (
+              <p className="mt-1 text-xs text-destructive">{fieldErrors.subject}</p>
+            ) : null}
+          </div>
+
+          <div className="md:col-span-2">
+            <Label htmlFor="costing-cost">Direct Cost</Label>
+            <NumberInput
+              id="costing-cost"
+              name="cost"
+              required
+              aria-invalid={Boolean(fieldErrors.cost)}
+              className="mt-1"
+              placeholder="0.00"
+            />
+            {fieldErrors.cost ? (
+              <p className="mt-1 text-xs text-destructive">{fieldErrors.cost}</p>
+            ) : null}
+          </div>
+
+          <div className="md:col-span-2">
+            <Label htmlFor="costing-drive">Google Drive Link</Label>
+            <Input
+              id="costing-drive"
+              name="googleDriveLink"
+              type="url"
+              required
+              aria-invalid={Boolean(fieldErrors.googleDriveLink)}
+              className="mt-1"
+              placeholder="https://drive.google.com/..."
+            />
+            {fieldErrors.googleDriveLink ? (
+              <p className="mt-1 text-xs text-destructive">
+                {fieldErrors.googleDriveLink}
+              </p>
+            ) : null}
+          </div>
+
+          <div className="md:col-span-2">
+            <Label htmlFor="costing-notes">Comments</Label>
+            <textarea
+              id="costing-notes"
+              name="notes"
+              rows={3}
+              className={textareaClassName}
+              placeholder="Add any commercial notes or comments (optional)"
+            />
+          </div>
+
+          {formError ? (
+            <p className="md:col-span-2 text-sm text-destructive" role="alert">
+              {formError}
+            </p>
+          ) : null}
+
+          <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end md:col-span-2">
+            <Button type="button" variant="outline" onClick={closeDialog}>
+              Cancel
+            </Button>
+            <Button type="submit" disabled={isSubmitting}>
+              {isSubmitting ? "Saving..." : "Create Draft"}
+            </Button>
+          </div>
+        </form>
+      </DialogContent>
+    </Dialog>
   );
 }

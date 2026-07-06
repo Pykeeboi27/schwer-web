@@ -1,7 +1,7 @@
 import { ClientDistributionChart } from "@/components/sales/client-distribution-chart";
 import { SectorPerformanceChart } from "@/components/sales/sector-performance-chart";
-import { ExecutiveEmptyState } from "@/components/executive/empty-state";
 import { RevenueTrendChart } from "@/components/executive/revenue-trend-chart";
+import { EmptyState } from "@/components/patterns";
 import {
   Card,
   CardContent,
@@ -61,7 +61,7 @@ export default async function ExecutiveSalesDashboardPage({
             <CardDescription>Unable to load sales metrics.</CardDescription>
           </CardHeader>
           <CardContent>
-            <ExecutiveEmptyState
+            <EmptyState
               title="Sales data unavailable"
               description="Please refresh the page or try again later."
             />
@@ -84,12 +84,31 @@ export default async function ExecutiveSalesDashboardPage({
 
   const hasSalesPerformanceData = dashboard.salesPerformance.length > 0;
 
-  const MONTH_LABELS = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+  const MONTH_LABELS = [
+    "Jan",
+    "Feb",
+    "Mar",
+    "Apr",
+    "May",
+    "Jun",
+    "Jul",
+    "Aug",
+    "Sep",
+    "Oct",
+    "Nov",
+    "Dec",
+  ];
   const trendData =
     selectedPeriod === "quarterly"
-      ? quarterBreakdownRows.map((e) => ({ label: `Q${e.quarter}`, value: e.bookedRevenue }))
+      ? quarterBreakdownRows.map((e) => ({
+          label: `Q${e.quarter}`,
+          value: e.bookedRevenue,
+        }))
       : selectedPeriod === "monthly"
-        ? weekBreakdownRows.map((e) => ({ label: `Wk ${e.week}`, value: e.bookedRevenue }))
+        ? weekBreakdownRows.map((e) => ({
+            label: `Wk ${e.week}`,
+            value: e.bookedRevenue,
+          }))
         : ytdBreakdownRows.map((e) => ({
             label: MONTH_LABELS[e.month - 1] ?? String(e.month),
             value: e.bookedRevenue,
@@ -106,7 +125,10 @@ export default async function ExecutiveSalesDashboardPage({
       </div>
 
       {/* Period filter — segmented control */}
-      <div className="flex items-center gap-0 rounded-lg border bg-card overflow-hidden self-start" aria-label="Period filter">
+      <div
+        className="flex items-center gap-0 rounded-lg border bg-card overflow-hidden self-start"
+        aria-label="Period filter"
+      >
         {PERIOD_FILTERS.map((periodFilter, idx) => {
           const isSelected = periodFilter === selectedPeriod;
           return (
@@ -145,7 +167,7 @@ export default async function ExecutiveSalesDashboardPage({
           {hasBreakdownData ? (
             <RevenueTrendChart data={trendData} />
           ) : (
-            <ExecutiveEmptyState
+            <EmptyState
               title="No breakdown data yet"
               description="No purchase order data is available for the selected period."
             />
@@ -241,7 +263,9 @@ export default async function ExecutiveSalesDashboardPage({
                       {index + 1}
                     </span>
                     <span className="font-medium truncate">{row.ownerName}</span>
-                    <span className="text-right tabular-nums">{formatCurrency(row.bookedRevenue)}</span>
+                    <span className="text-right tabular-nums">
+                      {formatCurrency(row.bookedRevenue)}
+                    </span>
                     <span className="text-right tabular-nums text-muted-foreground">
                       {formatCurrency(row.marginAmount)}
                     </span>
@@ -250,7 +274,7 @@ export default async function ExecutiveSalesDashboardPage({
               </div>
             </div>
           ) : (
-            <ExecutiveEmptyState
+            <EmptyState
               title="No sales performance data yet"
               description="Owner ranking will appear once purchase orders are approved."
             />

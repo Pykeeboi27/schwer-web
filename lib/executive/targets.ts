@@ -51,7 +51,10 @@ export async function getAnnualTarget(year: number): Promise<AnnualTargetRecord 
 }
 
 function fmt(n: number): string {
-  return n.toLocaleString("en-PH", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  return n.toLocaleString("en-PH", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
 }
 
 export async function upsertAnnualTarget(
@@ -70,8 +73,9 @@ export async function upsertAnnualTarget(
 
   if (quarterSum > 0 && targetAmount < quarterSum) {
     throw new Error(
-      `Annual target can't be below the total of existing quarterly targets (₱${fmt(quarterSum)}). ` +
-        `Lower the quarterly targets first.`,
+      `Annual target can't be below the total of existing quarterly targets (₱${fmt(
+        quarterSum,
+      )}). ` + `Lower the quarterly targets first.`,
     );
   }
 
@@ -142,7 +146,9 @@ export async function upsertQuarterlyTarget(
 
   if (newTotal > annual.targetAmount) {
     throw new Error(
-      `Quarterly targets would total ₱${fmt(newTotal)}, which exceeds the annual target of ₱${fmt(annual.targetAmount)}.`,
+      `Quarterly targets would total ₱${fmt(
+        newTotal,
+      )}, which exceeds the annual target of ₱${fmt(annual.targetAmount)}.`,
     );
   }
 
@@ -156,19 +162,24 @@ export async function upsertQuarterlyTarget(
     throw new Error("You must be signed in to update quarterly targets.");
   }
 
-  const { error } = await supabase.from("revenue_targets").upsert(
-    { year, month, sector: null, target_amount: targetAmount, set_by: user.id },
-    { onConflict: "year,month,sector" },
-  );
+  const { error } = await supabase
+    .from("revenue_targets")
+    .upsert(
+      { year, month, sector: null, target_amount: targetAmount, set_by: user.id },
+      { onConflict: "year,month,sector" },
+    );
 
   if (error) {
     throw new Error("Failed to update quarterly target.");
   }
 }
 
-export async function getQuarterlyTargets(
-  year: number,
-): Promise<{ q1: number | null; q2: number | null; q3: number | null; q4: number | null }> {
+export async function getQuarterlyTargets(year: number): Promise<{
+  q1: number | null;
+  q2: number | null;
+  q3: number | null;
+  q4: number | null;
+}> {
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("revenue_targets")

@@ -88,7 +88,9 @@ export async function listCostingQuotations(): Promise<CostingQuotation[]> {
   });
 }
 
-export async function listCostingApprovedHistory(): Promise<CostingApprovedHistoryItem[]> {
+export async function listCostingApprovedHistory(): Promise<
+  CostingApprovedHistoryItem[]
+> {
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("quotations")
@@ -283,10 +285,15 @@ export async function deleteCostingQuotation(quotationId: string): Promise<void>
   }
 
   if (row.prepared_by !== user.id) {
-    throw new Error("Only the costing engineer who created this quotation can delete it.");
+    throw new Error(
+      "Only the costing engineer who created this quotation can delete it.",
+    );
   }
 
-  const { error: deleteError } = await supabase.from("quotations").delete().eq("id", quotationId);
+  const { error: deleteError } = await supabase
+    .from("quotations")
+    .delete()
+    .eq("id", quotationId);
 
   if (deleteError) {
     throw new Error(deleteError.message || "Failed to delete costing quotation.");
@@ -315,7 +322,9 @@ export async function submitCostingForApproval(quotationId: string): Promise<voi
   }
 
   if (row.phase !== "costing") {
-    throw new Error("Only costing-phase quotations can be submitted for costing approval.");
+    throw new Error(
+      "Only costing-phase quotations can be submitted for costing approval.",
+    );
   }
 
   if (row.status !== "draft") {
@@ -323,7 +332,9 @@ export async function submitCostingForApproval(quotationId: string): Promise<voi
   }
 
   if (row.prepared_by !== user.id) {
-    throw new Error("Only the costing engineer who created this quotation can submit it.");
+    throw new Error(
+      "Only the costing engineer who created this quotation can submit it.",
+    );
   }
 
   if (row.cost === null || row.cost === undefined) {
@@ -331,7 +342,9 @@ export async function submitCostingForApproval(quotationId: string): Promise<voi
   }
 
   if (!row.google_drive_link) {
-    throw new Error("A Google Drive link is required before submitting for costing approval.");
+    throw new Error(
+      "A Google Drive link is required before submitting for costing approval.",
+    );
   }
 
   const { error: updateError } = await supabase

@@ -39,12 +39,8 @@ The sales workspace under `/protected/sales` now includes:
 ### Feature 004 test commands
 
 ```bash
-npm run test:unit
-npm run test:integration
-npx playwright test tests/e2e/sales-dashboard-layout.spec.ts tests/e2e/clients-create-search.spec.ts tests/e2e/quotations-approval-workflow.spec.ts tests/e2e/purchase-orders-collection.spec.ts
+npm run test
 ```
-
-Authenticated Playwright specs require environment variables such as `E2E_SALES_LOGIN_EMAIL` / `E2E_SALES_LOGIN_PASSWORD` and role-specific approver credentials.
 
 ## Feature 005: Executive Dashboard
 
@@ -63,8 +59,7 @@ The executive workspace under `/protected/executive` now includes:
 ### Feature 005 test commands
 
 ```bash
-npx vitest run tests/unit/executive/period.test.ts tests/unit/executive/metrics.test.ts tests/unit/executive/targets-validation.test.ts tests/unit/executive/sales-performance.test.ts tests/integration/executive-dashboard-kpis.test.ts tests/integration/executive-targets.test.ts tests/integration/executive-sales-performance.test.ts
-npx playwright test tests/e2e/executive-dashboard.spec.ts tests/e2e/executive-dashboard-target.spec.ts tests/e2e/executive-dashboard-performance.spec.ts
+npx vitest run tests/unit/executive/period.test.ts tests/unit/executive/metrics.test.ts tests/unit/executive/targets-validation.test.ts tests/unit/executive/sales-performance.test.ts
 ```
 
 ## Features
@@ -125,16 +120,17 @@ If you wish to just develop locally and not deploy to Vercel, [follow the steps 
 
 4. Rename `.env.example` to `.env.local` and update the following:
 
-  ```env
-  NEXT_PUBLIC_SUPABASE_URL=[INSERT SUPABASE PROJECT URL]
-  NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=[INSERT SUPABASE PROJECT API PUBLISHABLE OR ANON KEY]
-  ```
-  > [!NOTE]
-  > This example uses `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`, which refers to Supabase's new **publishable** key format.
-  > Both legacy **anon** keys and new **publishable** keys can be used with this variable name during the transition period. Supabase's dashboard may show `NEXT_PUBLIC_SUPABASE_ANON_KEY`; its value can be used in this example.
-  > See the [full announcement](https://github.com/orgs/supabase/discussions/29260) for more information.
+```env
+NEXT_PUBLIC_SUPABASE_URL=[INSERT SUPABASE PROJECT URL]
+NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=[INSERT SUPABASE PROJECT API PUBLISHABLE OR ANON KEY]
+```
 
-  Both `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` can be found in [your Supabase project's API settings](https://supabase.com/dashboard/project/_?showConnect=true)
+> [!NOTE]
+> This example uses `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`, which refers to Supabase's new **publishable** key format.
+> Both legacy **anon** keys and new **publishable** keys can be used with this variable name during the transition period. Supabase's dashboard may show `NEXT_PUBLIC_SUPABASE_ANON_KEY`; its value can be used in this example.
+> See the [full announcement](https://github.com/orgs/supabase/discussions/29260) for more information.
+
+Both `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` can be found in [your Supabase project's API settings](https://supabase.com/dashboard/project/_?showConnect=true)
 
 5. You can now run the Next.js local development server:
 

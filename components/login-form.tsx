@@ -1,9 +1,6 @@
 "use client";
 
-import {
-  loginAction,
-  type LoginActionState,
-} from "@/app/auth/login/actions";
+import { loginAction, type LoginActionState } from "@/app/auth/login/actions";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import {
@@ -65,14 +62,14 @@ export function LoginForm({
 
   return (
     <div className={cn("flex flex-col gap-6", className)} {...props}>
-      <Card className="border-primary/20 bg-background/85 shadow-2xl backdrop-blur-sm">
-        <CardHeader>
-          <CardTitle className="text-2xl tracking-tight">Login</CardTitle>
+      <Card className="border-none bg-transparent shadow-none">
+        <CardHeader className="px-0">
+          <CardTitle className="text-2xl font-semibold tracking-tight">Sign in</CardTitle>
           <CardDescription>
             Enter your credentials to access Schwer Online Management
           </CardDescription>
         </CardHeader>
-        <CardContent>
+        <CardContent className="px-0">
           <form action={formAction}>
             <div className="flex flex-col gap-5">
               <div className="grid gap-1.5">
@@ -121,20 +118,11 @@ export function LoginForm({
                 </div>
               )}
 
-              <Button
-                type="submit"
-                className="w-full font-semibold transition-all hover:bg-primary/90"
-                disabled={isPending}
-              >
-                {isPending ? "Logging in…" : "Login"}
+              <Button type="submit" className="w-full" disabled={isPending}>
+                {isPending ? "Signing in…" : "Sign in"}
               </Button>
 
-              <Button
-                type="button"
-                variant="outline"
-                className="w-full transition-colors hover:bg-muted"
-                asChild
-              >
+              <Button type="button" variant="outline" className="w-full" asChild>
                 <Link href="/auth/oauth/google">Continue with Google</Link>
               </Button>
             </div>

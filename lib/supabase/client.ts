@@ -4,8 +4,5 @@ import { getSupabaseEnv } from "./env";
 export function createClient() {
   const { supabaseUrl, supabasePublishableKey } = getSupabaseEnv();
 
-  return createBrowserClient(
-    supabaseUrl,
-    supabasePublishableKey,
-  );
+  return createBrowserClient(supabaseUrl, supabasePublishableKey);
 }

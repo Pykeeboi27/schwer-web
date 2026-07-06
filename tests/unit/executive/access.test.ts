@@ -56,7 +56,9 @@ describe("executive access redirect helper", () => {
       isExecutiveViewer: false,
     };
 
-    expect(getExecutiveAccessRedirect(profile, "/protected/executive")).toBe("/protected/sales");
+    expect(getExecutiveAccessRedirect(profile, "/protected/executive")).toBe(
+      "/protected/sales",
+    );
   });
 
   it("redirects anonymous users to login", () => {

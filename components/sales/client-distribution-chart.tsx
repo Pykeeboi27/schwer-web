@@ -1,3 +1,4 @@
+import { EmptyState } from "@/components/patterns";
 import type { ClientDistributionBar } from "@/lib/sales/dashboard-charts";
 import { formatCurrency } from "@/lib/utils/number-format";
 
@@ -7,12 +8,16 @@ type ClientDistributionChartProps = {
   limit?: number;
 };
 
-export function ClientDistributionChart({ bars, limit = 8 }: ClientDistributionChartProps) {
+export function ClientDistributionChart({
+  bars,
+  limit = 8,
+}: ClientDistributionChartProps) {
   if (bars.length === 0) {
     return (
-      <div className="rounded-md border border-dashed p-6 text-center text-sm text-muted-foreground">
-        No approved quotations yet to distribute across clients.
-      </div>
+      <EmptyState
+        title="No client distribution yet"
+        description="No approved quotations yet to distribute across clients."
+      />
     );
   }
 
