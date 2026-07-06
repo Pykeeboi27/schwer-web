@@ -1,6 +1,6 @@
 "use client";
 
-import { Sidebar } from "@/components/layouts/Sidebar";
+import { Sidebar } from "@/components/layouts/sidebar";
 import { usePathname } from "next/navigation";
 
 type DashboardLayoutProps = {

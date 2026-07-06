@@ -39,9 +39,13 @@
       "Bash(docker port *)",
       "Bash(curl -s -o /dev/null -w \"landing: %{http_code}\\\\n\" http://localhost:3000/)",
       "Bash(curl -s -o /dev/null -w \"login: %{http_code}\\\\n\" http://localhost:3000/auth/login)",
-      "Bash(curl -s http://localhost:3000/auth/login)"
+      "Bash(curl -s http://localhost:3000/auth/login)",
+      "mcp__ide__getDiagnostics",
+      "Bash(npm install *)"
     ]
   },
   "enableAllProjectMcpServers": true,
-  "enabledMcpjsonServers": ["supabase"]
+  "enabledMcpjsonServers": [
+    "supabase"
+  ]
 }
