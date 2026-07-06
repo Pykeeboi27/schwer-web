@@ -14,6 +14,13 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { NumberInput } from "@/components/ui/number-input";
 import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
   Callout,
   fieldClassName,
   StatusBadge,
@@ -206,26 +213,7 @@ export function QuotationDetailsDialog({
     setClientPoNumber(quotation.clientPoNumber ?? "");
   }, [quotation, open]);
 
-  useEffect(() => {
-    if (!open) {
-      return;
-    }
-
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") {
-        onOpenChange(false);
-        setRejectionReason("");
-      }
-    };
-
-    window.addEventListener("keydown", onKeyDown);
-
-    return () => {
-      window.removeEventListener("keydown", onKeyDown);
-    };
-  }, [open, onOpenChange]);
-
-  if (!open || !quotation) {
+  if (!quotation) {
     return null;
   }
 
@@ -407,32 +395,21 @@ export function QuotationDetailsDialog({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-      <div
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="quotation-details-title"
-        className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-lg border bg-card p-5 shadow-lg"
-      >
-        <div className="mb-4 flex items-start justify-between gap-4">
-          <div>
-            <h2 id="quotation-details-title" className="text-xl font-semibold">
-              Quotation Details
-            </h2>
-            <p className="text-sm text-muted-foreground">
-              {isDraft
-                ? "Add the sales details, then submit for approval."
-                : "Review details and process approval actions."}
-            </p>
-          </div>
-          <Button
-            variant="ghost"
-            onClick={handleClose}
-            aria-label="Close quotation details dialog"
-          >
-            Close
-          </Button>
-        </div>
+    <Dialog
+      open={open}
+      onOpenChange={(next) => {
+        if (!next) handleClose();
+      }}
+    >
+      <DialogContent className="max-h-[90vh] max-w-2xl overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle>Quotation Details</DialogTitle>
+          <DialogDescription>
+            {isDraft
+              ? "Add the sales details, then submit for approval."
+              : "Review details and process approval actions."}
+          </DialogDescription>
+        </DialogHeader>
 
         <dl className="grid gap-3 text-sm">
           <div className="grid grid-cols-[160px_1fr] gap-2">
@@ -921,7 +898,7 @@ export function QuotationDetailsDialog({
             </p>
           ) : null}
         </div>
-      </div>
-    </div>
+      </DialogContent>
+    </Dialog>
   );
 }

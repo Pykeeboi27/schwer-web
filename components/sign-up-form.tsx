@@ -44,12 +44,14 @@ export function SignUpForm({
 
   return (
     <div className={cn("flex flex-col gap-6", className)} {...props}>
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-xl">Sign up</CardTitle>
+      <Card className="border-none bg-transparent shadow-none">
+        <CardHeader className="px-0">
+          <CardTitle className="text-2xl font-semibold tracking-tight">
+            Create account
+          </CardTitle>
           <CardDescription>Create your Schwer Online Management account</CardDescription>
         </CardHeader>
-        <CardContent>
+        <CardContent className="px-0">
           <form action={formAction}>
             <div className="flex flex-col gap-5">
               <div className="grid gap-1.5">
@@ -136,7 +138,7 @@ export function SignUpForm({
               )}
 
               <Button type="submit" className="w-full" disabled={isPending}>
-                {isPending ? "Creating account…" : "Sign up"}
+                {isPending ? "Creating account…" : "Create account"}
               </Button>
             </div>
 
@@ -146,7 +148,7 @@ export function SignUpForm({
                 href="/auth/login"
                 className="font-medium text-foreground underline-offset-4 hover:underline"
               >
-                Login
+                Sign in
               </Link>
             </div>
           </form>

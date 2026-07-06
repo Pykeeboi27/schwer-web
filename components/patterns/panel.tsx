@@ -29,9 +29,9 @@ export function Panel({
   const hasHeader = Boolean(title || description || actions);
 
   return (
-    <section className={cn("rounded-lg border bg-card", className)}>
+    <section className={cn("rounded-lg border bg-card shadow-xs", className)}>
       {hasHeader ? (
-        <div className="flex items-start justify-between gap-3 border-b px-5 py-4">
+        <div className="flex flex-col gap-2 border-b px-4 py-3 sm:flex-row sm:items-start sm:justify-between sm:px-5 sm:py-4">
           <div className="space-y-1">
             {title ? <h2 className="text-base font-semibold">{title}</h2> : null}
             {description ? (
@@ -43,7 +43,7 @@ export function Panel({
           ) : null}
         </div>
       ) : null}
-      <div className={cn(padded && "p-5")}>{children}</div>
+      <div className={cn(padded && "p-4 sm:p-5")}>{children}</div>
     </section>
   );
 }

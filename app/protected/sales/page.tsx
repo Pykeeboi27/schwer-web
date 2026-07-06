@@ -2,7 +2,7 @@ import { getSalesSummary } from "@/lib/sales/summaries";
 import { getSalesDashboardCharts } from "@/lib/sales/dashboard-charts";
 import { SectorPerformanceChart } from "@/components/sales/sector-performance-chart";
 import { ClientDistributionChart } from "@/components/sales/client-distribution-chart";
-import { PageHeader, Panel, StatCard } from "@/components/patterns";
+import { BeamTick, PageHeader, Panel, StatCard } from "@/components/patterns";
 import { getCurrentProfile } from "@/lib/profile/get-current-profile";
 import { getSalesAccessRedirect } from "@/lib/sales/access";
 import { redirect } from "next/navigation";
@@ -35,16 +35,22 @@ export default async function SalesDashboardPage() {
         description="Snapshot of client volume, quotation pipeline, and closed vs recognized sales."
       />
 
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+      <StatCard
+        label="Closed Sales"
+        value={formatCurrency(summary.closedSaleTotal)}
+        accent
+        size="hero"
+      />
+
+      <div className="grid gap-3 sm:grid-cols-2">
         <StatCard label="Active Clients" value={summary.totalClients} />
-        <StatCard label="Closed Sales" value={formatCurrency(summary.closedSaleTotal)} />
         <StatCard
           label="Recognized Sales"
           value={formatCurrency(summary.recognizedSaleTotal)}
         />
       </div>
 
-      <Panel title="Quotations by Status">
+      <Panel title={<BeamTick>Quotations by Status</BeamTick>}>
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
           {[
             { label: "Draft", value: summary.quotations.draft },

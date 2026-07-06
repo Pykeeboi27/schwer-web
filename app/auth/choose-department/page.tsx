@@ -123,14 +123,16 @@ async function ChooseDepartmentContent({ searchParams }: ChooseDepartmentPagePro
   }
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="text-xl">Choose your department</CardTitle>
+    <Card className="border-none bg-transparent shadow-none">
+      <CardHeader className="px-0">
+        <CardTitle className="text-2xl font-semibold tracking-tight">
+          Choose your department
+        </CardTitle>
         <CardDescription>
           Select your department to continue to your dashboard.
         </CardDescription>
       </CardHeader>
-      <CardContent>
+      <CardContent className="px-0">
         <form action={chooseDepartmentAction} className="flex flex-col gap-4">
           <div className="grid gap-1.5">
             <label htmlFor="department" className="text-sm font-medium">
@@ -172,8 +174,8 @@ export default function ChooseDepartmentPage({
     <AuthShell showBackLink={false}>
       <Suspense
         fallback={
-          <Card>
-            <CardContent className="py-6 text-sm text-muted-foreground">
+          <Card className="border-none bg-transparent shadow-none">
+            <CardContent className="px-0 py-6 text-sm text-muted-foreground">
               Loading department selector…
             </CardContent>
           </Card>

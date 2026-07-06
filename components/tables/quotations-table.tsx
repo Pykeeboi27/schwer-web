@@ -2,7 +2,14 @@
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { EmptyState, StatusBadge, statusLabel } from "@/components/patterns";
+import {
+  DataCard,
+  DataField,
+  EmptyState,
+  ResponsiveTable,
+  StatusBadge,
+  statusLabel,
+} from "@/components/patterns";
 import { QuotationDetailsDialog } from "@/components/dialogs/quotation-details-dialog";
 import type { SalesQuotation } from "@/lib/sales/quotations";
 import { FileText, Search } from "lucide-react";
@@ -98,6 +105,18 @@ export function QuotationsTable({
     setSortDirection("desc");
   };
 
+  const emptyState = (
+    <EmptyState
+      icon={FileText}
+      title="No quotations found."
+      description={
+        searchQuery || statusFilter !== "all"
+          ? "Try adjusting your search or filter."
+          : "Submitted quotations will appear here after creation."
+      }
+    />
+  );
+
   return (
     <>
       <div className="mb-4 space-y-3">
@@ -151,62 +170,84 @@ export function QuotationsTable({
         </div>
       </div>
 
-      <div className="overflow-x-auto rounded-md border">
-        <table className="w-full min-w-[760px] text-sm">
-          <thead className="bg-muted/40 text-left">
-            <tr>
-              <th className="px-3 py-2 font-medium">ID</th>
-              <th className="px-3 py-2 font-medium">Client Name</th>
-              <th className="px-3 py-2 font-medium">Amount</th>
-              <th className="px-3 py-2 font-medium">Status</th>
-              <th className="px-3 py-2 font-medium">Date</th>
-            </tr>
-          </thead>
-          <tbody>
-            {filteredAndSorted.length === 0 ? (
+      <ResponsiveTable
+        table={
+          <table className="w-full min-w-[760px] text-sm">
+            <thead className="bg-muted/40 text-left">
               <tr>
-                <td colSpan={5}>
-                  <EmptyState
-                    icon={FileText}
-                    title="No quotations found."
-                    description={
-                      searchQuery || statusFilter !== "all"
-                        ? "Try adjusting your search or filter."
-                        : "Submitted quotations will appear here after creation."
-                    }
-                  />
-                </td>
+                <th className="px-3 py-2 font-medium">ID</th>
+                <th className="px-3 py-2 font-medium">Client Name</th>
+                <th className="px-3 py-2 font-medium">Amount</th>
+                <th className="px-3 py-2 font-medium">Status</th>
+                <th className="px-3 py-2 font-medium">Date</th>
               </tr>
-            ) : (
-              filteredAndSorted.map((quotation) => (
-                <tr
-                  key={quotation.id}
-                  className="cursor-pointer border-t hover:bg-muted/30 focus-visible:bg-muted/40 focus-visible:outline-none"
-                  role="button"
-                  tabIndex={0}
-                  aria-label={`View quotation ${quotation.quotationNumber}`}
-                  onClick={() => setSelectedQuotation(quotation)}
-                  onKeyDown={(event) =>
-                    onRowKeyDown(event, () => setSelectedQuotation(quotation))
-                  }
-                >
-                  <td className="px-3 py-2 font-mono text-xs">
-                    {quotation.quotationNumber}
-                  </td>
-                  <td className="px-3 py-2">{quotation.clientName}</td>
-                  <td className="px-3 py-2">{formatCurrency(quotation.amount)}</td>
-                  <td className="px-3 py-2">
-                    <StatusBadge status={quotation.status} />
-                  </td>
-                  <td className="px-3 py-2">
-                    {new Date(quotation.createdAt).toLocaleDateString()}
-                  </td>
+            </thead>
+            <tbody>
+              {filteredAndSorted.length === 0 ? (
+                <tr>
+                  <td colSpan={5}>{emptyState}</td>
                 </tr>
-              ))
-            )}
-          </tbody>
-        </table>
-      </div>
+              ) : (
+                filteredAndSorted.map((quotation) => (
+                  <tr
+                    key={quotation.id}
+                    className="cursor-pointer border-t hover:bg-muted/30 focus-visible:bg-muted/40 focus-visible:outline-none"
+                    role="button"
+                    tabIndex={0}
+                    aria-label={`View quotation ${quotation.quotationNumber}`}
+                    onClick={() => setSelectedQuotation(quotation)}
+                    onKeyDown={(event) =>
+                      onRowKeyDown(event, () => setSelectedQuotation(quotation))
+                    }
+                  >
+                    <td className="px-3 py-2 font-mono text-xs">
+                      {quotation.quotationNumber}
+                    </td>
+                    <td className="px-3 py-2">{quotation.clientName}</td>
+                    <td className="px-3 py-2">{formatCurrency(quotation.amount)}</td>
+                    <td className="px-3 py-2">
+                      <StatusBadge status={quotation.status} />
+                    </td>
+                    <td className="px-3 py-2">
+                      {new Date(quotation.createdAt).toLocaleDateString()}
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        }
+        cards={
+          filteredAndSorted.length === 0 ? (
+            <div className="rounded-lg border">{emptyState}</div>
+          ) : (
+            filteredAndSorted.map((quotation) => (
+              <DataCard
+                key={quotation.id}
+                onActivate={() => setSelectedQuotation(quotation)}
+                ariaLabel={`View quotation ${quotation.quotationNumber}`}
+                header={
+                  <>
+                    <div className="min-w-0">
+                      <p className="truncate font-semibold">{quotation.clientName}</p>
+                      <p className="font-mono text-xs text-muted-foreground">
+                        {quotation.quotationNumber}
+                      </p>
+                    </div>
+                    <StatusBadge status={quotation.status} />
+                  </>
+                }
+              >
+                <DataField label="Amount" value={formatCurrency(quotation.amount)} />
+                <DataField
+                  label="Date"
+                  value={new Date(quotation.createdAt).toLocaleDateString()}
+                />
+              </DataCard>
+            ))
+          )
+        }
+      />
 
       <QuotationDetailsDialog
         open={selectedQuotation !== null}

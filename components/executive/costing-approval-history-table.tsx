@@ -1,4 +1,10 @@
-import { EmptyState, StatusBadge } from "@/components/patterns";
+import {
+  DataCard,
+  DataField,
+  EmptyState,
+  ResponsiveTable,
+  StatusBadge,
+} from "@/components/patterns";
 import type { CostingApprovalHistoryItem } from "@/lib/executive/costing-approvals";
 
 type CostingApprovalHistoryTableProps = {
@@ -27,45 +33,80 @@ export function CostingApprovalHistoryTable({ items }: CostingApprovalHistoryTab
   }
 
   return (
-    <div className="overflow-x-auto rounded-md border">
-      <table className="w-full min-w-[1000px] text-sm">
-        <thead className="bg-muted/40 text-left">
-          <tr>
-            <th className="px-3 py-2 font-medium">Quotation</th>
-            <th className="px-3 py-2 font-medium">Client</th>
-            <th className="px-3 py-2 font-medium">Subject</th>
-            <th className="px-3 py-2 font-medium">Amount</th>
-            <th className="px-3 py-2 font-medium">Cost</th>
-            <th className="px-3 py-2 font-medium">Prepared By</th>
-            <th className="px-3 py-2 font-medium">Decision</th>
-            <th className="px-3 py-2 font-medium">Rejection Reason</th>
-            <th className="px-3 py-2 font-medium">Date</th>
-          </tr>
-        </thead>
-        <tbody>
-          {items.map((item) => (
-            <tr key={item.quotationId} className="border-t align-top">
-              <td className="px-3 py-2 font-mono text-xs">{item.quotationNumber}</td>
-              <td className="px-3 py-2">{item.clientName}</td>
-              <td className="px-3 py-2">{item.subject || "-"}</td>
-              <td className="px-3 py-2">{formatCurrency(item.amount)}</td>
-              <td className="px-3 py-2">
-                {item.cost === null ? "-" : formatCurrency(item.cost)}
-              </td>
-              <td className="px-3 py-2">{item.preparedByName}</td>
-              <td className="px-3 py-2">
-                <StatusBadge status={item.decision} />
-              </td>
-              <td className="px-3 py-2 text-xs text-muted-foreground">
-                {item.rejectionReason ?? "-"}
-              </td>
-              <td className="px-3 py-2 text-muted-foreground">
-                {formatDate(item.resolvedAt)}
-              </td>
+    <ResponsiveTable
+      table={
+        <table className="w-full min-w-[1000px] text-sm">
+          <thead className="bg-muted/40 text-left">
+            <tr>
+              <th className="px-3 py-2 font-medium">Quotation</th>
+              <th className="px-3 py-2 font-medium">Client</th>
+              <th className="px-3 py-2 font-medium">Subject</th>
+              <th className="px-3 py-2 font-medium">Amount</th>
+              <th className="px-3 py-2 font-medium">Cost</th>
+              <th className="px-3 py-2 font-medium">Prepared By</th>
+              <th className="px-3 py-2 font-medium">Decision</th>
+              <th className="px-3 py-2 font-medium">Rejection Reason</th>
+              <th className="px-3 py-2 font-medium">Date</th>
             </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
+          </thead>
+          <tbody>
+            {items.map((item) => (
+              <tr key={item.quotationId} className="border-t align-top">
+                <td className="px-3 py-2 font-mono text-xs">{item.quotationNumber}</td>
+                <td className="px-3 py-2">{item.clientName}</td>
+                <td className="px-3 py-2">{item.subject || "-"}</td>
+                <td className="px-3 py-2">{formatCurrency(item.amount)}</td>
+                <td className="px-3 py-2">
+                  {item.cost === null ? "-" : formatCurrency(item.cost)}
+                </td>
+                <td className="px-3 py-2">{item.preparedByName}</td>
+                <td className="px-3 py-2">
+                  <StatusBadge status={item.decision} />
+                </td>
+                <td className="px-3 py-2 text-xs text-muted-foreground">
+                  {item.rejectionReason ?? "-"}
+                </td>
+                <td className="px-3 py-2 text-muted-foreground">
+                  {formatDate(item.resolvedAt)}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      }
+      cards={items.map((item) => (
+        <DataCard
+          key={item.quotationId}
+          header={
+            <>
+              <div className="min-w-0">
+                <p className="truncate font-semibold">{item.clientName}</p>
+                <p className="font-mono text-xs text-muted-foreground">
+                  {item.quotationNumber}
+                </p>
+              </div>
+              <StatusBadge status={item.decision} />
+            </>
+          }
+        >
+          <DataField label="Subject" value={item.subject || "-"} />
+          <DataField label="Amount" value={formatCurrency(item.amount)} />
+          <DataField
+            label="Cost"
+            value={item.cost === null ? "-" : formatCurrency(item.cost)}
+          />
+          <DataField label="Prepared By" value={item.preparedByName} />
+          {item.rejectionReason ? (
+            <DataField
+              label="Rejection Reason"
+              value={
+                <span className="text-muted-foreground">{item.rejectionReason}</span>
+              }
+            />
+          ) : null}
+          <DataField label="Date" value={formatDate(item.resolvedAt)} />
+        </DataCard>
+      ))}
+    />
   );
 }

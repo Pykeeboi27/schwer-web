@@ -11,6 +11,23 @@ export default {
   ],
   theme: {
     extend: {
+      fontFamily: {
+        sans: [
+          "var(--font-geist-sans)",
+          "ui-sans-serif",
+          "system-ui",
+          "-apple-system",
+          "Segoe UI",
+          "Roboto",
+          "Helvetica Neue",
+          "Arial",
+          "sans-serif",
+        ],
+      },
+      boxShadow: {
+        xs: "0 1px 2px 0 hsl(var(--foreground) / 0.04)",
+        sm: "0 1px 2px 0 hsl(var(--foreground) / 0.05), 0 1px 3px 0 hsl(var(--foreground) / 0.04)",
+      },
       colors: {
         background: "hsl(var(--background))",
         foreground: "hsl(var(--foreground))",

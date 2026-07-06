@@ -9,6 +9,13 @@ import {
 import { RecordCollectionDialog } from "@/components/dialogs/record-collection-dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { StatusBadge } from "@/components/patterns";
 import type { SalesPoPayment, SalesPurchaseOrder } from "@/lib/sales/purchase-orders";
 import { formatCurrency } from "@/lib/utils/number-format";
@@ -110,22 +117,9 @@ export function PurchaseOrderDetailsDialog({
     }
     setEditClientPoNumber(purchaseOrder?.clientPoNumber ?? "");
     setEditQuotationReference(purchaseOrder?.quotationReference ?? "");
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") {
-        setRecordDialogOpen(false);
-        onOpenChange(false);
-      }
-    };
-    window.addEventListener("keydown", onKeyDown);
-    return () => window.removeEventListener("keydown", onKeyDown);
-  }, [
-    open,
-    onOpenChange,
-    purchaseOrder?.clientPoNumber,
-    purchaseOrder?.quotationReference,
-  ]);
+  }, [open, purchaseOrder?.clientPoNumber, purchaseOrder?.quotationReference]);
 
-  if (!open || !purchaseOrder) {
+  if (!purchaseOrder) {
     return null;
   }
 
@@ -175,30 +169,19 @@ export function PurchaseOrderDetailsDialog({
 
   return (
     <>
-      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-        <div
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="purchase-order-details-title"
-          className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-lg border bg-card p-5 shadow-lg"
-        >
-          <div className="mb-4 flex items-start justify-between gap-4">
-            <div>
-              <h2 id="purchase-order-details-title" className="text-xl font-semibold">
-                Purchase Order Details
-              </h2>
-              <p className="text-sm text-muted-foreground">
-                Converted from quotation; routed through the PO approval workflow.
-              </p>
-            </div>
-            <Button
-              variant="ghost"
-              onClick={handleClose}
-              aria-label="Close purchase order details dialog"
-            >
-              Close
-            </Button>
-          </div>
+      <Dialog
+        open={open}
+        onOpenChange={(next) => {
+          if (!next) handleClose();
+        }}
+      >
+        <DialogContent className="max-h-[90vh] max-w-2xl overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Purchase Order Details</DialogTitle>
+            <DialogDescription>
+              Converted from quotation; routed through the PO approval workflow.
+            </DialogDescription>
+          </DialogHeader>
 
           <dl className="grid gap-3 text-sm">
             <div className="grid grid-cols-[160px_1fr] gap-2">
@@ -381,8 +364,8 @@ export function PurchaseOrderDetailsDialog({
               </div>
             </div>
           ) : null}
-        </div>
-      </div>
+        </DialogContent>
+      </Dialog>
 
       <RecordCollectionDialog
         open={recordDialogOpen}

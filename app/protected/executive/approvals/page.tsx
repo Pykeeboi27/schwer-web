@@ -1,12 +1,6 @@
 import { ExecutiveApprovalsTable } from "@/components/executive/approvals-table";
 import { ExecutivePoApprovalsTable } from "@/components/executive/po-approvals-table";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+import { PageHeader, Panel } from "@/components/patterns";
 import { getExecutiveAccessRedirect } from "@/lib/executive/access";
 import { getCurrentProfile } from "@/lib/profile/get-current-profile";
 import { listPendingApprovalsForCurrentUser } from "@/lib/sales/quotations";
@@ -40,40 +34,28 @@ export default async function ExecutiveApprovalsPage() {
   );
 
   return (
-    <div className="flex flex-col gap-4">
-      <Card>
-        <CardHeader>
-          <CardTitle>Executive Approvals</CardTitle>
-          <CardDescription>
-            Review high-value quotations from Sales that require owner or executive
-            approval.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="text-sm text-muted-foreground">
-          Quotations with an amount of 3,000,000 or above are listed here when assigned to
-          your account.
-        </CardContent>
-      </Card>
-
-      <ExecutiveApprovalsTable
-        items={executiveApprovals}
-        currentUserRole={profile?.role ?? null}
+    <div className="flex flex-col gap-6">
+      <PageHeader
+        title="Executive Approvals"
+        description="Review high-value quotations from Sales that require owner or executive approval. Quotations of ₱3,000,000 or above appear here when assigned to your account."
       />
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Purchase Order Approvals</CardTitle>
-          <CardDescription>
-            High-value purchase orders converted from approved quotations that require
-            owner or executive approval.
-          </CardDescription>
-        </CardHeader>
-      </Card>
+      <Panel title="Pending Quotations">
+        <ExecutiveApprovalsTable
+          items={executiveApprovals}
+          currentUserRole={profile?.role ?? null}
+        />
+      </Panel>
 
-      <ExecutivePoApprovalsTable
-        items={executivePoApprovals}
-        currentUserRole={profile?.role ?? null}
-      />
+      <Panel
+        title="Purchase Order Approvals"
+        description="High-value purchase orders converted from approved quotations that require owner or executive approval."
+      >
+        <ExecutivePoApprovalsTable
+          items={executivePoApprovals}
+          currentUserRole={profile?.role ?? null}
+        />
+      </Panel>
     </div>
   );
 }

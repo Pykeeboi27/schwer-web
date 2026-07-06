@@ -2,7 +2,7 @@
 
 import { QuotationDetailsDialog } from "@/components/dialogs/quotation-details-dialog";
 import { Input } from "@/components/ui/input";
-import { EmptyState } from "@/components/patterns";
+import { DataCard, DataField, EmptyState, ResponsiveTable } from "@/components/patterns";
 import type { SalesQuotation } from "@/lib/sales/quotations";
 import { Inbox, Search } from "lucide-react";
 import { useMemo, useState, type KeyboardEvent } from "react";
@@ -69,6 +69,22 @@ export function ReadyForQuotationTable({
     );
   }, [quotations, searchQuery]);
 
+  const emptyState = (
+    <EmptyState
+      icon={Inbox}
+      title={
+        searchQuery
+          ? "No quotations match your search."
+          : "No quotations awaiting sales details yet."
+      }
+      description={
+        searchQuery
+          ? undefined
+          : "Costing quotations approved by the executive will appear here."
+      }
+    />
+  );
+
   return (
     <>
       <div className="mb-4">
@@ -83,76 +99,111 @@ export function ReadyForQuotationTable({
         </div>
       </div>
 
-      <div className="overflow-x-auto rounded-md border">
-        <table className="w-full min-w-[1100px] text-sm">
-          <thead className="bg-muted/40 text-left">
-            <tr>
-              <th className="px-3 py-2 font-medium">Quotation</th>
-              <th className="px-3 py-2 font-medium">Client</th>
-              <th className="px-3 py-2 font-medium">Subject</th>
-              <th className="px-3 py-2 font-medium">Amount</th>
-              <th className="px-3 py-2 font-medium">Cost</th>
-              <th className="px-3 py-2 font-medium">Margin %</th>
-              <th className="px-3 py-2 font-medium">Payment Terms</th>
-              <th className="px-3 py-2 font-medium">Lead Time</th>
-              <th className="px-3 py-2 font-medium">Approved At</th>
-            </tr>
-          </thead>
-          <tbody>
-            {filtered.length === 0 ? (
+      <ResponsiveTable
+        table={
+          <table className="w-full min-w-[1100px] text-sm">
+            <thead className="bg-muted/40 text-left">
               <tr>
-                <td colSpan={9}>
-                  <EmptyState
-                    icon={Inbox}
-                    title={
-                      searchQuery
-                        ? "No quotations match your search."
-                        : "No quotations awaiting sales details yet."
-                    }
-                    description={
-                      searchQuery
-                        ? undefined
-                        : "Costing quotations approved by the executive will appear here."
-                    }
-                  />
-                </td>
+                <th className="px-3 py-2 font-medium">Quotation</th>
+                <th className="px-3 py-2 font-medium">Client</th>
+                <th className="px-3 py-2 font-medium">Subject</th>
+                <th className="px-3 py-2 font-medium">Amount</th>
+                <th className="px-3 py-2 font-medium">Cost</th>
+                <th className="px-3 py-2 font-medium">Margin %</th>
+                <th className="px-3 py-2 font-medium">Payment Terms</th>
+                <th className="px-3 py-2 font-medium">Lead Time</th>
+                <th className="px-3 py-2 font-medium">Approved At</th>
               </tr>
-            ) : (
-              filtered.map((quotation) => (
-                <tr
-                  key={quotation.id}
-                  className="cursor-pointer border-t hover:bg-muted/30 focus-visible:bg-muted/40 focus-visible:outline-none"
-                  role="button"
-                  tabIndex={0}
-                  aria-label={`Open sales details for quotation ${quotation.quotationNumber}`}
-                  onClick={() => setSelectedQuotation(quotation)}
-                  onKeyDown={(event) =>
-                    onRowKeyDown(event, () => setSelectedQuotation(quotation))
-                  }
-                >
-                  <td className="px-3 py-2 font-mono text-xs">
-                    {quotation.quotationNumber}
-                  </td>
-                  <td className="px-3 py-2">{quotation.clientName}</td>
-                  <td className="px-3 py-2">{quotation.subject || "-"}</td>
-                  <td className="px-3 py-2">{formatCurrency(quotation.amount)}</td>
-                  <td className="px-3 py-2">
-                    {quotation.cost === null ? "-" : formatCurrency(quotation.cost)}
-                  </td>
-                  <td className="px-3 py-2">
-                    {formatPercent(quotation.salesMarginPercent)}
-                  </td>
-                  <td className="px-3 py-2">{quotation.paymentTerms ?? "—"}</td>
-                  <td className="px-3 py-2">{formatLeadTime(quotation.leadTimeDays)}</td>
-                  <td className="px-3 py-2 text-muted-foreground">
-                    {formatDate(quotation.costingApprovedAt)}
-                  </td>
+            </thead>
+            <tbody>
+              {filtered.length === 0 ? (
+                <tr>
+                  <td colSpan={9}>{emptyState}</td>
                 </tr>
-              ))
-            )}
-          </tbody>
-        </table>
-      </div>
+              ) : (
+                filtered.map((quotation) => (
+                  <tr
+                    key={quotation.id}
+                    className="cursor-pointer border-t hover:bg-muted/30 focus-visible:bg-muted/40 focus-visible:outline-none"
+                    role="button"
+                    tabIndex={0}
+                    aria-label={`Open sales details for quotation ${quotation.quotationNumber}`}
+                    onClick={() => setSelectedQuotation(quotation)}
+                    onKeyDown={(event) =>
+                      onRowKeyDown(event, () => setSelectedQuotation(quotation))
+                    }
+                  >
+                    <td className="px-3 py-2 font-mono text-xs">
+                      {quotation.quotationNumber}
+                    </td>
+                    <td className="px-3 py-2">{quotation.clientName}</td>
+                    <td className="px-3 py-2">{quotation.subject || "-"}</td>
+                    <td className="px-3 py-2">{formatCurrency(quotation.amount)}</td>
+                    <td className="px-3 py-2">
+                      {quotation.cost === null ? "-" : formatCurrency(quotation.cost)}
+                    </td>
+                    <td className="px-3 py-2">
+                      {formatPercent(quotation.salesMarginPercent)}
+                    </td>
+                    <td className="px-3 py-2">{quotation.paymentTerms ?? "—"}</td>
+                    <td className="px-3 py-2">
+                      {formatLeadTime(quotation.leadTimeDays)}
+                    </td>
+                    <td className="px-3 py-2 text-muted-foreground">
+                      {formatDate(quotation.costingApprovedAt)}
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        }
+        cards={
+          filtered.length === 0 ? (
+            <div className="rounded-lg border">{emptyState}</div>
+          ) : (
+            filtered.map((quotation) => (
+              <DataCard
+                key={quotation.id}
+                onActivate={() => setSelectedQuotation(quotation)}
+                ariaLabel={`Open sales details for quotation ${quotation.quotationNumber}`}
+                header={
+                  <>
+                    <div className="min-w-0">
+                      <p className="truncate font-semibold">{quotation.clientName}</p>
+                      <p className="font-mono text-xs text-muted-foreground">
+                        {quotation.quotationNumber}
+                      </p>
+                    </div>
+                    <span className="shrink-0 font-semibold">
+                      {formatCurrency(quotation.amount)}
+                    </span>
+                  </>
+                }
+              >
+                <DataField label="Subject" value={quotation.subject || "-"} />
+                <DataField
+                  label="Cost"
+                  value={quotation.cost === null ? "-" : formatCurrency(quotation.cost)}
+                />
+                <DataField
+                  label="Margin %"
+                  value={formatPercent(quotation.salesMarginPercent)}
+                />
+                <DataField label="Payment Terms" value={quotation.paymentTerms ?? "—"} />
+                <DataField
+                  label="Lead Time"
+                  value={formatLeadTime(quotation.leadTimeDays)}
+                />
+                <DataField
+                  label="Approved At"
+                  value={formatDate(quotation.costingApprovedAt)}
+                />
+              </DataCard>
+            ))
+          )
+        }
+      />
 
       <QuotationDetailsDialog
         open={selectedQuotation !== null}

@@ -26,9 +26,15 @@ export default async function EngineeringDashboardPage() {
         description="Start quotations with cost data and a Google Drive link, then submit them for executive costing approval."
       />
 
-      <div className="grid gap-4 sm:grid-cols-3">
+      <StatCard
+        label="Pending Costing Approval"
+        value={pendingCount}
+        accent
+        size="hero"
+      />
+
+      <div className="grid gap-3 sm:grid-cols-2">
         <StatCard label="Drafts" value={draftCount} />
-        <StatCard label="Pending Costing Approval" value={pendingCount} />
         <StatCard label="Returned for Edits" value={rejectedDrafts} />
       </div>
     </div>

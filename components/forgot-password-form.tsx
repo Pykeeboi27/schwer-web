@@ -46,12 +46,14 @@ export function ForgotPasswordForm({
   return (
     <div className={cn("flex flex-col gap-6", className)} {...props}>
       {success ? (
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-xl">Check your email</CardTitle>
+        <Card className="border-none bg-transparent shadow-none">
+          <CardHeader className="px-0">
+            <CardTitle className="text-2xl font-semibold tracking-tight">
+              Check your email
+            </CardTitle>
             <CardDescription>Password reset instructions sent</CardDescription>
           </CardHeader>
-          <CardContent>
+          <CardContent className="px-0">
             <p className="text-sm text-muted-foreground">
               If you registered using your email and password, you will receive a password
               reset email shortly.
@@ -61,20 +63,22 @@ export function ForgotPasswordForm({
                 href="/auth/login"
                 className="font-medium text-foreground underline-offset-4 hover:underline"
               >
-                Back to login
+                Back to sign in
               </Link>
             </div>
           </CardContent>
         </Card>
       ) : (
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-xl">Reset password</CardTitle>
+        <Card className="border-none bg-transparent shadow-none">
+          <CardHeader className="px-0">
+            <CardTitle className="text-2xl font-semibold tracking-tight">
+              Reset password
+            </CardTitle>
             <CardDescription>
               Enter your email and we&apos;ll send you a reset link
             </CardDescription>
           </CardHeader>
-          <CardContent>
+          <CardContent className="px-0">
             <form onSubmit={handleForgotPassword}>
               <div className="flex flex-col gap-5">
                 <div className="grid gap-1.5">
@@ -106,7 +110,7 @@ export function ForgotPasswordForm({
                   href="/auth/login"
                   className="font-medium text-foreground underline-offset-4 hover:underline"
                 >
-                  Login
+                  Sign in
                 </Link>
               </div>
             </form>

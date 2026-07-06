@@ -7,7 +7,13 @@ import {
 import { EditCostingQuotationDialog } from "@/components/dialogs/edit-costing-quotation-dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { EmptyState, StatusBadge } from "@/components/patterns";
+import {
+  DataCard,
+  DataField,
+  EmptyState,
+  ResponsiveTable,
+  StatusBadge,
+} from "@/components/patterns";
 import type { CostingQuotation } from "@/lib/engineering/costing-quotations";
 import { useToast } from "@/lib/utils/toast-notification";
 import { ExternalLink, FileText, Search } from "lucide-react";
@@ -123,6 +129,72 @@ export function CostingQuotationsTable({
     router.refresh();
   };
 
+  const emptyState = (
+    <EmptyState
+      icon={FileText}
+      title="No costing quotations found."
+      description={
+        searchQuery || statusFilter !== "all"
+          ? "Try adjusting your search or filter."
+          : undefined
+      }
+    />
+  );
+
+  const driveLink = (link: string | null) =>
+    link ? (
+      <a
+        href={link}
+        target="_blank"
+        rel="noreferrer"
+        className="inline-flex items-center gap-1 text-primary hover:underline"
+        aria-label="Open Google Drive link"
+      >
+        <ExternalLink className="h-3.5 w-3.5" /> Open
+      </a>
+    ) : (
+      <span className="text-muted-foreground">-</span>
+    );
+
+  const renderActions = (q: CostingQuotation) => {
+    const isMine = q.preparedBy === currentUserId;
+    const isEditable = isMine && q.status === "draft";
+    const isPending = q.status === "pending";
+    const isBusy = busyId === q.id;
+
+    if (isPending) {
+      return <span className="text-xs text-muted-foreground">Awaiting executive</span>;
+    }
+
+    if (!isEditable) {
+      return <span className="text-xs text-muted-foreground">View only</span>;
+    }
+
+    return (
+      <div className="flex flex-wrap gap-2">
+        <Button
+          size="sm"
+          variant="outline"
+          onClick={() => setEditing(q)}
+          disabled={isBusy}
+        >
+          Edit
+        </Button>
+        <Button size="sm" onClick={() => handleSubmit(q)} disabled={isBusy}>
+          {isBusy ? "Saving..." : "Submit for Approval"}
+        </Button>
+        <Button
+          size="sm"
+          variant="ghost"
+          onClick={() => handleDelete(q)}
+          disabled={isBusy}
+        >
+          Delete
+        </Button>
+      </div>
+    );
+  };
+
   return (
     <>
       <div className="mb-4 space-y-3">
@@ -151,42 +223,27 @@ export function CostingQuotationsTable({
         </div>
       </div>
 
-      <div className="overflow-x-auto rounded-md border">
-        <table className="w-full min-w-[920px] text-sm">
-          <thead className="bg-muted/40 text-left">
-            <tr>
-              <th className="px-3 py-2 font-medium">ID</th>
-              <th className="px-3 py-2 font-medium">Client</th>
-              <th className="px-3 py-2 font-medium">Subject</th>
-              <th className="px-3 py-2 font-medium">Direct Cost</th>
-              <th className="px-3 py-2 font-medium">Drive</th>
-              <th className="px-3 py-2 font-medium">Status</th>
-              <th className="px-3 py-2 font-medium">Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {filtered.length === 0 ? (
+      <ResponsiveTable
+        table={
+          <table className="w-full min-w-[920px] text-sm">
+            <thead className="bg-muted/40 text-left">
               <tr>
-                <td colSpan={7}>
-                  <EmptyState
-                    icon={FileText}
-                    title="No costing quotations found."
-                    description={
-                      searchQuery || statusFilter !== "all"
-                        ? "Try adjusting your search or filter."
-                        : undefined
-                    }
-                  />
-                </td>
+                <th className="px-3 py-2 font-medium">ID</th>
+                <th className="px-3 py-2 font-medium">Client</th>
+                <th className="px-3 py-2 font-medium">Subject</th>
+                <th className="px-3 py-2 font-medium">Direct Cost</th>
+                <th className="px-3 py-2 font-medium">Drive</th>
+                <th className="px-3 py-2 font-medium">Status</th>
+                <th className="px-3 py-2 font-medium">Actions</th>
               </tr>
-            ) : (
-              filtered.map((q) => {
-                const isMine = q.preparedBy === currentUserId;
-                const isEditable = isMine && q.status === "draft";
-                const isPending = q.status === "pending";
-                const isBusy = busyId === q.id;
-
-                return (
+            </thead>
+            <tbody>
+              {filtered.length === 0 ? (
+                <tr>
+                  <td colSpan={7}>{emptyState}</td>
+                </tr>
+              ) : (
+                filtered.map((q) => (
                   <tr key={q.id} className="border-t align-top">
                     <td className="px-3 py-2 font-mono text-xs">{q.quotationNumber}</td>
                     <td className="px-3 py-2">{q.clientName}</td>
@@ -194,21 +251,7 @@ export function CostingQuotationsTable({
                     <td className="px-3 py-2">
                       {q.cost === null ? "-" : formatCurrency(q.cost)}
                     </td>
-                    <td className="px-3 py-2">
-                      {q.googleDriveLink ? (
-                        <a
-                          href={q.googleDriveLink}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="inline-flex items-center gap-1 text-primary hover:underline"
-                          aria-label="Open Google Drive link"
-                        >
-                          <ExternalLink className="h-3.5 w-3.5" /> Open
-                        </a>
-                      ) : (
-                        <span className="text-muted-foreground">-</span>
-                      )}
-                    </td>
+                    <td className="px-3 py-2">{driveLink(q.googleDriveLink)}</td>
                     <td className="px-3 py-2">
                       <div className="flex flex-col gap-1">
                         <StatusBadge status={costingBadgeStatus(q)} />
@@ -219,48 +262,52 @@ export function CostingQuotationsTable({
                         ) : null}
                       </div>
                     </td>
-                    <td className="px-3 py-2">
-                      {isPending ? (
-                        <span className="text-xs text-muted-foreground">
-                          Awaiting executive
-                        </span>
-                      ) : isEditable ? (
-                        <div className="flex flex-wrap gap-2">
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => setEditing(q)}
-                            disabled={isBusy}
-                          >
-                            Edit
-                          </Button>
-                          <Button
-                            size="sm"
-                            onClick={() => handleSubmit(q)}
-                            disabled={isBusy}
-                          >
-                            {isBusy ? "Saving..." : "Submit for Approval"}
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            onClick={() => handleDelete(q)}
-                            disabled={isBusy}
-                          >
-                            Delete
-                          </Button>
-                        </div>
-                      ) : (
-                        <span className="text-xs text-muted-foreground">View only</span>
-                      )}
-                    </td>
+                    <td className="px-3 py-2">{renderActions(q)}</td>
                   </tr>
-                );
-              })
-            )}
-          </tbody>
-        </table>
-      </div>
+                ))
+              )}
+            </tbody>
+          </table>
+        }
+        cards={
+          filtered.length === 0 ? (
+            <div className="rounded-lg border">{emptyState}</div>
+          ) : (
+            filtered.map((q) => (
+              <DataCard
+                key={q.id}
+                header={
+                  <>
+                    <div className="min-w-0">
+                      <p className="truncate font-semibold">{q.clientName}</p>
+                      <p className="font-mono text-xs text-muted-foreground">
+                        {q.quotationNumber}
+                      </p>
+                    </div>
+                    <StatusBadge status={costingBadgeStatus(q)} />
+                  </>
+                }
+                footer={renderActions(q)}
+              >
+                <DataField label="Subject" value={q.subject} />
+                <DataField
+                  label="Direct Cost"
+                  value={q.cost === null ? "-" : formatCurrency(q.cost)}
+                />
+                <DataField label="Drive" value={driveLink(q.googleDriveLink)} />
+                {q.costingRejectionReason ? (
+                  <DataField
+                    label="Returned"
+                    value={
+                      <span className="text-destructive">{q.costingRejectionReason}</span>
+                    }
+                  />
+                ) : null}
+              </DataCard>
+            ))
+          )
+        }
+      />
 
       <EditCostingQuotationDialog
         open={editing !== null}

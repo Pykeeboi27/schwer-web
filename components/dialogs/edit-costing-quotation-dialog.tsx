@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { NumberInput } from "@/components/ui/number-input";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Callout, fieldClassName, textareaClassName } from "@/components/patterns";
 import type { CostingQuotation } from "@/lib/engineering/costing-quotations";
 import { suggestQuotationNumber } from "@/lib/engineering/suggest-quotation-number";
@@ -58,8 +59,6 @@ export function EditCostingQuotationDialog({
     quotation?.quotationNumber ?? "",
   );
 
-  const dialogTitleId = useMemo(() => "edit-costing-quotation-dialog-title", []);
-
   const activeClients = useMemo(
     () => clients.filter((c) => c.isActive || c.id === quotation?.clientId),
     [clients, quotation],
@@ -73,18 +72,9 @@ export function EditCostingQuotationDialog({
       return;
     }
     setQuotationNumber(quotation?.quotationNumber ?? "");
+  }, [open, quotation?.quotationNumber]);
 
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") {
-        onOpenChange(false);
-      }
-    };
-
-    window.addEventListener("keydown", onKeyDown);
-    return () => window.removeEventListener("keydown", onKeyDown);
-  }, [open, onOpenChange, quotation?.quotationNumber]);
-
-  if (!open || !quotation) {
+  if (!quotation) {
     return null;
   }
 
@@ -146,30 +136,19 @@ export function EditCostingQuotationDialog({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-      <div
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby={dialogTitleId}
-        className="w-full max-w-2xl rounded-lg border bg-card p-5 shadow-lg"
-      >
-        <div className="mb-4 flex items-start justify-between gap-4">
-          <div>
-            <h2 id={dialogTitleId} className="text-xl font-semibold">
-              Edit Costing Quotation
-            </h2>
-          </div>
-          <Button
-            variant="ghost"
-            onClick={() => onOpenChange(false)}
-            aria-label="Close dialog"
-          >
-            Close
-          </Button>
-        </div>
+    <Dialog
+      open={open}
+      onOpenChange={(next) => {
+        if (!next) onOpenChange(false);
+      }}
+    >
+      <DialogContent className="max-h-[85vh] max-w-2xl overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle>Edit Costing Quotation</DialogTitle>
+        </DialogHeader>
 
         {quotation.costingRejectionReason ? (
-          <Callout tone="destructive" title="Rejected by executive" className="mb-4">
+          <Callout tone="destructive" title="Rejected by executive">
             <p className="text-foreground">{quotation.costingRejectionReason}</p>
           </Callout>
         ) : null}
@@ -289,7 +268,7 @@ export function EditCostingQuotationDialog({
             </p>
           ) : null}
 
-          <div className="md:col-span-2 flex justify-end gap-2">
+          <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end md:col-span-2">
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
               Cancel
             </Button>
@@ -298,7 +277,7 @@ export function EditCostingQuotationDialog({
             </Button>
           </div>
         </form>
-      </div>
-    </div>
+      </DialogContent>
+    </Dialog>
   );
 }

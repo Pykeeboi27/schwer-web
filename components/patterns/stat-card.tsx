@@ -8,6 +8,9 @@ type StatCardProps = {
   children?: ReactNode;
   /** Draws a subtle left rule in the brand color to mark the lead KPI. */
   accent?: boolean;
+  /** "hero" promotes this to the single lead metric on a dashboard — bigger
+   * value, thicker accent bar. Defaults to today's standard tier-2 card. */
+  size?: "default" | "hero";
   className?: string;
 };
 
@@ -16,18 +19,43 @@ type StatCardProps = {
  * label over a large tabular number. Canonical across the sales, executive, and
  * engineering overviews — no more three-different-ways KPI cards.
  */
-export function StatCard({ label, value, children, accent, className }: StatCardProps) {
+export function StatCard({
+  label,
+  value,
+  children,
+  accent,
+  size = "default",
+  className,
+}: StatCardProps) {
+  const isHero = size === "hero";
+
   return (
     <div
       className={cn(
-        "rounded-lg border bg-card p-5",
-        accent && "border-l-4 border-l-primary",
+        "rounded-lg border bg-card shadow-xs",
+        isHero ? "p-5 sm:p-6" : "p-4 sm:p-5",
+        accent &&
+          (isHero ? "border-l-[6px] border-l-primary" : "border-l-4 border-l-primary"),
         className,
       )}
     >
-      <p className="text-sm text-muted-foreground">{label}</p>
-      <p className="mt-2 text-3xl font-semibold tabular-nums">{value}</p>
-      {children ? <div className="mt-3">{children}</div> : null}
+      <p
+        className={cn(
+          "text-sm text-muted-foreground",
+          isHero && "text-sm font-medium uppercase tracking-wide",
+        )}
+      >
+        {label}
+      </p>
+      <p
+        className={cn(
+          "mt-2 font-semibold tabular-nums",
+          isHero ? "text-4xl sm:text-5xl" : "text-3xl",
+        )}
+      >
+        {value}
+      </p>
+      {children ? <div className={cn(isHero ? "mt-4" : "mt-3")}>{children}</div> : null}
     </div>
   );
 }
@@ -36,20 +64,32 @@ type StatProgressProps = {
   /** 0–100. */
   percent: number;
   caption?: ReactNode;
+  size?: "default" | "hero";
 };
 
 /** Progress meter for the lead KPI (e.g. revenue vs. annual target). */
-export function StatProgress({ percent, caption }: StatProgressProps) {
+export function StatProgress({ percent, caption, size = "default" }: StatProgressProps) {
   const clamped = Math.max(0, Math.min(100, percent));
+  const isHero = size === "hero";
+
   return (
     <div>
-      <div className="h-2 w-full overflow-hidden rounded-full bg-muted">
+      <div
+        className={cn(
+          "w-full overflow-hidden rounded-full bg-muted",
+          isHero ? "h-2.5" : "h-2",
+        )}
+      >
         <div
           className="h-full rounded-full bg-primary"
           style={{ width: `${clamped}%` }}
         />
       </div>
-      {caption ? <p className="mt-1.5 text-xs text-muted-foreground">{caption}</p> : null}
+      {caption ? (
+        <p className={cn("mt-1.5 text-muted-foreground", isHero ? "text-sm" : "text-xs")}>
+          {caption}
+        </p>
+      ) : null}
     </div>
   );
 }

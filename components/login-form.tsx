@@ -62,14 +62,14 @@ export function LoginForm({
 
   return (
     <div className={cn("flex flex-col gap-6", className)} {...props}>
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-xl">Login</CardTitle>
+      <Card className="border-none bg-transparent shadow-none">
+        <CardHeader className="px-0">
+          <CardTitle className="text-2xl font-semibold tracking-tight">Sign in</CardTitle>
           <CardDescription>
             Enter your credentials to access Schwer Online Management
           </CardDescription>
         </CardHeader>
-        <CardContent>
+        <CardContent className="px-0">
           <form action={formAction}>
             <div className="flex flex-col gap-5">
               <div className="grid gap-1.5">
@@ -119,7 +119,7 @@ export function LoginForm({
               )}
 
               <Button type="submit" className="w-full" disabled={isPending}>
-                {isPending ? "Logging in…" : "Login"}
+                {isPending ? "Signing in…" : "Sign in"}
               </Button>
 
               <Button type="button" variant="outline" className="w-full" asChild>

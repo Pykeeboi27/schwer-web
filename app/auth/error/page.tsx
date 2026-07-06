@@ -39,11 +39,13 @@ export default function Page({
 }) {
   return (
     <AuthShell>
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-xl">Sorry, something went wrong.</CardTitle>
+      <Card className="border-none bg-transparent shadow-none">
+        <CardHeader className="px-0">
+          <CardTitle className="text-2xl font-semibold tracking-tight">
+            Sorry, something went wrong.
+          </CardTitle>
         </CardHeader>
-        <CardContent>
+        <CardContent className="px-0">
           <Suspense
             fallback={
               <p className="text-sm text-muted-foreground">Loading error details…</p>

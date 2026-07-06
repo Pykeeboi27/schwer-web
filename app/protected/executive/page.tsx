@@ -1,6 +1,11 @@
-import { ExecutiveEmptyState } from "@/components/executive/empty-state";
 import { TargetEditorForm } from "@/components/executive/target-editor-form";
-import { PageHeader, Panel, StatCard, StatProgress } from "@/components/patterns";
+import {
+  EmptyState,
+  PageHeader,
+  Panel,
+  StatCard,
+  StatProgress,
+} from "@/components/patterns";
 import { getExecutiveAccessRedirect, isTargetEditor } from "@/lib/executive/access";
 import { getExecutiveDashboardData } from "@/lib/executive/dashboard";
 import { formatCurrency, formatPercent } from "@/lib/executive/format";
@@ -27,7 +32,7 @@ export default async function ExecutiveDashboardPage() {
           description="Unable to load executive metrics."
         />
         <Panel>
-          <ExecutiveEmptyState
+          <EmptyState
             title="Dashboard data unavailable"
             description="Please refresh the page or try again later."
           />
@@ -53,17 +58,24 @@ export default async function ExecutiveDashboardPage() {
         description="Company-wide KPI snapshot — year to date."
       />
 
-      {/* KPI grid */}
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        <StatCard label="Revenue YTD (Booked)" value={formatCurrency(revenueYtd)} accent>
-          {targetPct !== null && annualTarget !== null ? (
-            <StatProgress
-              percent={targetPct}
-              caption={`${targetPct}% of ${formatCurrency(annualTarget)} annual target`}
-            />
-          ) : null}
-        </StatCard>
+      {/* Lead KPI */}
+      <StatCard
+        label="Revenue YTD (Booked)"
+        value={formatCurrency(revenueYtd)}
+        accent
+        size="hero"
+      >
+        {targetPct !== null && annualTarget !== null ? (
+          <StatProgress
+            percent={targetPct}
+            caption={`${targetPct}% of ${formatCurrency(annualTarget)} annual target`}
+            size="hero"
+          />
+        ) : null}
+      </StatCard>
 
+      {/* Supporting KPIs */}
+      <div className="grid gap-3 sm:grid-cols-2">
         <StatCard
           label="Annual Target"
           value={

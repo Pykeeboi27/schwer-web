@@ -10,10 +10,12 @@ type DashboardLayoutProps = {
 
 export function DashboardLayout({ children, sidebar }: DashboardLayoutProps) {
   const pathname = usePathname();
-  const isSalesRoute = pathname.startsWith("/protected/sales");
-  const isExecutiveRoute = pathname.startsWith("/protected/executive");
+  const isModuleRoute =
+    pathname.startsWith("/protected/sales") ||
+    pathname.startsWith("/protected/executive") ||
+    pathname.startsWith("/protected/engineering");
 
-  if (!isSalesRoute && !isExecutiveRoute) {
+  if (!isModuleRoute) {
     return (
       <div className="mx-auto flex w-full max-w-5xl flex-col gap-6 p-4 sm:p-6 lg:p-8">
         {children}
@@ -22,7 +24,7 @@ export function DashboardLayout({ children, sidebar }: DashboardLayoutProps) {
   }
 
   return (
-    <div className="mx-auto flex w-full max-w-7xl gap-5 p-4 sm:p-6 lg:p-8 md:gap-8">
+    <div className="mx-auto flex w-full max-w-7xl gap-6 p-4 sm:p-6 lg:p-8 lg:gap-8">
       {sidebar ?? <Sidebar />}
       <div className="min-w-0 flex-1">{children}</div>
     </div>

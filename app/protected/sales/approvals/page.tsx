@@ -1,12 +1,6 @@
 import { ExecutiveApprovalsTable } from "@/components/executive/approvals-table";
 import { ExecutivePoApprovalsTable } from "@/components/executive/po-approvals-table";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+import { PageHeader, Panel } from "@/components/patterns";
 import { getCurrentProfile } from "@/lib/profile/get-current-profile";
 import { getSalesAccessRedirect } from "@/lib/sales/access";
 import { listPendingApprovalsForCurrentUser } from "@/lib/sales/quotations";
@@ -39,44 +33,31 @@ export default async function SalesApprovalsPage() {
   );
 
   return (
-    <div className="flex flex-col gap-4">
-      <div className="rounded-md border border-l-4 border-l-primary bg-card p-5 pl-5">
-        <h1 className="text-2xl font-semibold">Quotation Approvals</h1>
-        <p className="mt-2 text-sm text-muted-foreground">
-          Quotations submitted by the sales team for your review. Approve to advance
-          through the workflow, or reject to return them for correction.
-        </p>
-      </div>
+    <div className="flex flex-col gap-6">
+      <PageHeader
+        title="Quotation Approvals"
+        description="Quotations submitted by the sales team for your review. Approve to advance through the workflow, or reject to return them for correction."
+      />
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Pending Quotations</CardTitle>
-          <CardDescription>
-            Quotations awaiting your approval as sales manager.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <ExecutiveApprovalsTable
-            items={salesManagerApprovals}
-            currentUserRole={profile?.role ?? null}
-          />
-        </CardContent>
-      </Card>
+      <Panel
+        title="Pending Quotations"
+        description="Quotations awaiting your approval as sales manager."
+      >
+        <ExecutiveApprovalsTable
+          items={salesManagerApprovals}
+          currentUserRole={profile?.role ?? null}
+        />
+      </Panel>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Pending Purchase Orders</CardTitle>
-          <CardDescription>
-            Purchase orders awaiting your approval as sales manager.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <ExecutivePoApprovalsTable
-            items={salesManagerPoApprovals}
-            currentUserRole={profile?.role ?? null}
-          />
-        </CardContent>
-      </Card>
+      <Panel
+        title="Pending Purchase Orders"
+        description="Purchase orders awaiting your approval as sales manager."
+      >
+        <ExecutivePoApprovalsTable
+          items={salesManagerPoApprovals}
+          currentUserRole={profile?.role ?? null}
+        />
+      </Panel>
     </div>
   );
 }

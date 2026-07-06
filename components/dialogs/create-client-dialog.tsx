@@ -4,12 +4,20 @@ import { createClientAction } from "@/app/protected/sales/clients/actions";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
 import { fieldClassName } from "@/components/patterns";
 import { generateClientCode } from "@/lib/utils/client-code-generator";
 import { useToast } from "@/lib/utils/toast-notification";
 import { cn } from "@/lib/utils";
 import { useRouter } from "next/navigation";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useRef, useState } from "react";
 
 type CreateClientDialogProps = {
   onCreated?: () => void;
@@ -46,8 +54,6 @@ export function CreateClientDialog({
   const [birLinkFallback, setBirLinkFallback] = useState("");
   const birLinkRef = useRef<HTMLInputElement>(null);
 
-  const dialogTitleId = useMemo(() => "create-client-dialog-title", []);
-
   const closeDialog = () => {
     setOpen(false);
     setFormError(null);
@@ -64,19 +70,6 @@ export function CreateClientDialog({
     setClientCode(generateClientCode());
     setOpen(true);
   };
-
-  useEffect(() => {
-    if (!open) return;
-
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") {
-        closeDialog();
-      }
-    };
-
-    window.addEventListener("keydown", onKeyDown);
-    return () => window.removeEventListener("keydown", onKeyDown);
-  }, [open]);
 
   const handleGenerateCode = () => {
     setClientCode(generateClientCode());
@@ -163,226 +156,211 @@ export function CreateClientDialog({
   };
 
   return (
-    <>
-      <Button onClick={openDialog}>Create Client</Button>
+    <Dialog
+      open={open}
+      onOpenChange={(next) => {
+        if (next) openDialog();
+        else closeDialog();
+      }}
+    >
+      <DialogTrigger asChild>
+        <Button>Create Client</Button>
+      </DialogTrigger>
+      <DialogContent className="max-h-[85vh] max-w-2xl overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle>Create Client</DialogTitle>
+          <DialogDescription>
+            Fill out client details and generate a unique client code.
+          </DialogDescription>
+        </DialogHeader>
 
-      {open ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-          <div
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby={dialogTitleId}
-            className="w-full max-w-2xl rounded-lg border bg-card p-5 shadow-lg"
-          >
-            <div className="mb-4 flex items-start justify-between gap-4">
-              <div>
-                <h2 id={dialogTitleId} className="text-xl font-semibold">
-                  Create Client
-                </h2>
-                <p className="text-sm text-muted-foreground">
-                  Fill out client details and generate a unique client code.
-                </p>
-              </div>
-              <Button
-                variant="ghost"
-                onClick={closeDialog}
-                aria-label="Close create client dialog"
-              >
-                Close
+        <form onSubmit={handleSubmit} className="grid gap-4 md:grid-cols-2">
+          <div className="md:col-span-2">
+            <Label htmlFor="code">Client Code</Label>
+            <div className="mt-1 flex gap-2">
+              <Input id="code" value={clientCode} readOnly />
+              <Button type="button" variant="outline" onClick={handleGenerateCode}>
+                Generate Code
               </Button>
             </div>
-
-            <form onSubmit={handleSubmit} className="grid gap-4 md:grid-cols-2">
-              <div className="md:col-span-2">
-                <Label htmlFor="code">Client Code</Label>
-                <div className="mt-1 flex gap-2">
-                  <Input id="code" value={clientCode} readOnly />
-                  <Button type="button" variant="outline" onClick={handleGenerateCode}>
-                    Generate Code
-                  </Button>
-                </div>
-              </div>
-
-              <div className="md:col-span-2">
-                <Label htmlFor="name">Client Name</Label>
-                <Input
-                  id="name"
-                  name="name"
-                  required
-                  className="mt-1"
-                  placeholder="Schwer Trading"
-                  onBlur={(e) => checkDuplicateName(e.target.value)}
-                  onChange={() => setNameDupError(null)}
-                />
-                {nameDupError ? (
-                  <p className="mt-1 text-xs text-destructive">{nameDupError}</p>
-                ) : fieldErrors.name ? (
-                  <p className="mt-1 text-xs text-destructive">{fieldErrors.name}</p>
-                ) : null}
-              </div>
-
-              <div>
-                <Label htmlFor="contactPerson">Contact Person</Label>
-                <Input
-                  id="contactPerson"
-                  name="contactPerson"
-                  required
-                  className="mt-1"
-                  placeholder="Juan Dela Cruz"
-                />
-                {fieldErrors.contactPerson ? (
-                  <p className="mt-1 text-xs text-destructive">
-                    {fieldErrors.contactPerson}
-                  </p>
-                ) : null}
-              </div>
-
-              <div>
-                <Label htmlFor="sector">Sector</Label>
-                <select
-                  id="sector"
-                  name="sector"
-                  defaultValue="commercial"
-                  className={cn(fieldClassName, "mt-1 h-9 py-1")}
-                >
-                  <option value="commercial">Commercial</option>
-                  <option value="industrial">Industrial</option>
-                  <option value="solar">Solar</option>
-                </select>
-              </div>
-
-              <div>
-                <Label htmlFor="email">Email</Label>
-                <Input
-                  id="email"
-                  name="email"
-                  type="email"
-                  required
-                  className="mt-1"
-                  placeholder="client@example.com"
-                />
-                {fieldErrors.email ? (
-                  <p className="mt-1 text-xs text-destructive">{fieldErrors.email}</p>
-                ) : null}
-              </div>
-
-              <div>
-                <Label htmlFor="phone">Phone</Label>
-                <Input
-                  id="phone"
-                  name="phone"
-                  required
-                  className="mt-1"
-                  placeholder="0917-555-1234"
-                />
-                {fieldErrors.phone ? (
-                  <p className="mt-1 text-xs text-destructive">{fieldErrors.phone}</p>
-                ) : null}
-              </div>
-
-              <div className="md:col-span-2">
-                <Label htmlFor="address">Address</Label>
-                <Input
-                  id="address"
-                  name="address"
-                  required
-                  className="mt-1"
-                  placeholder="City, Province"
-                />
-                {fieldErrors.address ? (
-                  <p className="mt-1 text-xs text-destructive">{fieldErrors.address}</p>
-                ) : null}
-              </div>
-
-              <div>
-                <Label htmlFor="tin">TIN</Label>
-                <Input
-                  id="tin"
-                  name="tin"
-                  required
-                  className="mt-1"
-                  placeholder="000-000-000-00000"
-                  value={tin}
-                  onChange={(e) => setTin(formatTin(e.target.value))}
-                  inputMode="numeric"
-                />
-                {fieldErrors.tin ? (
-                  <p className="mt-1 text-xs text-destructive">{fieldErrors.tin}</p>
-                ) : null}
-              </div>
-
-              <div>
-                <Label htmlFor="birDocument">BIR Registration</Label>
-                {birUploadedName ? (
-                  <div className="mt-1 flex items-center gap-2 text-sm">
-                    <a
-                      href={birLinkRef.current?.value}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="text-primary underline"
-                    >
-                      {birUploadedName}
-                    </a>
-                    <button
-                      type="button"
-                      className="text-xs text-muted-foreground underline"
-                      onClick={() => {
-                        setBirUploadedName(null);
-                        if (birLinkRef.current) birLinkRef.current.value = "";
-                      }}
-                    >
-                      Remove
-                    </button>
-                  </div>
-                ) : birNotConfigured ? (
-                  <>
-                    <Input
-                      id="birRegistrationLink"
-                      name="birRegistrationLink"
-                      type="url"
-                      className="mt-1"
-                      placeholder="https://drive.google.com/..."
-                      value={birLinkFallback}
-                      onChange={(e) => setBirLinkFallback(e.target.value)}
-                    />
-                    <p className="mt-1 text-xs text-muted-foreground">
-                      Drive upload not configured — paste the link manually.
-                    </p>
-                  </>
-                ) : (
-                  <div className="mt-1">
-                    <input
-                      id="birDocument"
-                      type="file"
-                      accept="application/pdf,image/*"
-                      className="w-full text-sm"
-                      disabled={birUploading}
-                      onChange={handleBirFileChange}
-                    />
-                    {birUploading ? (
-                      <p className="mt-1 text-xs text-muted-foreground">Uploading...</p>
-                    ) : null}
-                  </div>
-                )}
-                <input type="hidden" name="birRegistrationLink" ref={birLinkRef} />
-              </div>
-
-              {formError ? (
-                <p className="md:col-span-2 text-sm text-destructive">{formError}</p>
-              ) : null}
-
-              <div className="md:col-span-2 flex justify-end gap-2">
-                <Button type="button" variant="outline" onClick={closeDialog}>
-                  Cancel
-                </Button>
-                <Button type="submit" disabled={isSubmitting || !!nameDupError}>
-                  {isSubmitting ? "Saving..." : "Create Client"}
-                </Button>
-              </div>
-            </form>
           </div>
-        </div>
-      ) : null}
-    </>
+
+          <div className="md:col-span-2">
+            <Label htmlFor="name">Client Name</Label>
+            <Input
+              id="name"
+              name="name"
+              required
+              className="mt-1"
+              placeholder="Schwer Trading"
+              onBlur={(e) => checkDuplicateName(e.target.value)}
+              onChange={() => setNameDupError(null)}
+            />
+            {nameDupError ? (
+              <p className="mt-1 text-xs text-destructive">{nameDupError}</p>
+            ) : fieldErrors.name ? (
+              <p className="mt-1 text-xs text-destructive">{fieldErrors.name}</p>
+            ) : null}
+          </div>
+
+          <div>
+            <Label htmlFor="contactPerson">Contact Person</Label>
+            <Input
+              id="contactPerson"
+              name="contactPerson"
+              required
+              className="mt-1"
+              placeholder="Juan Dela Cruz"
+            />
+            {fieldErrors.contactPerson ? (
+              <p className="mt-1 text-xs text-destructive">{fieldErrors.contactPerson}</p>
+            ) : null}
+          </div>
+
+          <div>
+            <Label htmlFor="sector">Sector</Label>
+            <select
+              id="sector"
+              name="sector"
+              defaultValue="commercial"
+              className={cn(fieldClassName, "mt-1 h-9 py-1")}
+            >
+              <option value="commercial">Commercial</option>
+              <option value="industrial">Industrial</option>
+              <option value="solar">Solar</option>
+            </select>
+          </div>
+
+          <div>
+            <Label htmlFor="email">Email</Label>
+            <Input
+              id="email"
+              name="email"
+              type="email"
+              required
+              className="mt-1"
+              placeholder="client@example.com"
+            />
+            {fieldErrors.email ? (
+              <p className="mt-1 text-xs text-destructive">{fieldErrors.email}</p>
+            ) : null}
+          </div>
+
+          <div>
+            <Label htmlFor="phone">Phone</Label>
+            <Input
+              id="phone"
+              name="phone"
+              required
+              className="mt-1"
+              placeholder="0917-555-1234"
+            />
+            {fieldErrors.phone ? (
+              <p className="mt-1 text-xs text-destructive">{fieldErrors.phone}</p>
+            ) : null}
+          </div>
+
+          <div className="md:col-span-2">
+            <Label htmlFor="address">Address</Label>
+            <Input
+              id="address"
+              name="address"
+              required
+              className="mt-1"
+              placeholder="City, Province"
+            />
+            {fieldErrors.address ? (
+              <p className="mt-1 text-xs text-destructive">{fieldErrors.address}</p>
+            ) : null}
+          </div>
+
+          <div>
+            <Label htmlFor="tin">TIN</Label>
+            <Input
+              id="tin"
+              name="tin"
+              required
+              className="mt-1"
+              placeholder="000-000-000-00000"
+              value={tin}
+              onChange={(e) => setTin(formatTin(e.target.value))}
+              inputMode="numeric"
+            />
+            {fieldErrors.tin ? (
+              <p className="mt-1 text-xs text-destructive">{fieldErrors.tin}</p>
+            ) : null}
+          </div>
+
+          <div>
+            <Label htmlFor="birDocument">BIR Registration</Label>
+            {birUploadedName ? (
+              <div className="mt-1 flex items-center gap-2 text-sm">
+                <a
+                  href={birLinkRef.current?.value}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="text-primary underline"
+                >
+                  {birUploadedName}
+                </a>
+                <button
+                  type="button"
+                  className="text-xs text-muted-foreground underline"
+                  onClick={() => {
+                    setBirUploadedName(null);
+                    if (birLinkRef.current) birLinkRef.current.value = "";
+                  }}
+                >
+                  Remove
+                </button>
+              </div>
+            ) : birNotConfigured ? (
+              <>
+                <Input
+                  id="birRegistrationLink"
+                  name="birRegistrationLink"
+                  type="url"
+                  className="mt-1"
+                  placeholder="https://drive.google.com/..."
+                  value={birLinkFallback}
+                  onChange={(e) => setBirLinkFallback(e.target.value)}
+                />
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Drive upload not configured — paste the link manually.
+                </p>
+              </>
+            ) : (
+              <div className="mt-1">
+                <input
+                  id="birDocument"
+                  type="file"
+                  accept="application/pdf,image/*"
+                  className="w-full text-sm"
+                  disabled={birUploading}
+                  onChange={handleBirFileChange}
+                />
+                {birUploading ? (
+                  <p className="mt-1 text-xs text-muted-foreground">Uploading...</p>
+                ) : null}
+              </div>
+            )}
+            <input type="hidden" name="birRegistrationLink" ref={birLinkRef} />
+          </div>
+
+          {formError ? (
+            <p className="md:col-span-2 text-sm text-destructive">{formError}</p>
+          ) : null}
+
+          <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end md:col-span-2">
+            <Button type="button" variant="outline" onClick={closeDialog}>
+              Cancel
+            </Button>
+            <Button type="submit" disabled={isSubmitting || !!nameDupError}>
+              {isSubmitting ? "Saving..." : "Create Client"}
+            </Button>
+          </div>
+        </form>
+      </DialogContent>
+    </Dialog>
   );
 }

@@ -3,7 +3,14 @@
 import { PurchaseOrderDetailsDialog } from "@/components/dialogs/purchase-order-details-dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { EmptyState, StatusBadge, statusLabel } from "@/components/patterns";
+import {
+  DataCard,
+  DataField,
+  EmptyState,
+  ResponsiveTable,
+  StatusBadge,
+  statusLabel,
+} from "@/components/patterns";
 import type { SalesPoPayment, SalesPurchaseOrder } from "@/lib/sales/purchase-orders";
 import { FileText, Search } from "lucide-react";
 import { useMemo, useState, type KeyboardEvent } from "react";
@@ -59,6 +66,14 @@ function onRowKeyDown(
   }
 }
 
+function progressOf(purchaseOrder: SalesPurchaseOrder): number {
+  if (purchaseOrder.poAmount <= 0) return 0;
+  return Math.min(
+    100,
+    Math.round((purchaseOrder.recognizedAmount / purchaseOrder.poAmount) * 100),
+  );
+}
+
 export function PurchaseOrdersTable({
   purchaseOrders,
   payments,
@@ -106,6 +121,18 @@ export function PurchaseOrdersTable({
     setSortBy(targetSortBy);
     setSortDirection("desc");
   };
+
+  const emptyState = (
+    <EmptyState
+      icon={FileText}
+      title="No purchase orders found."
+      description={
+        searchQuery || approvalFilter !== "all"
+          ? "Try adjusting your search or filter."
+          : "Convert an approved quotation to create a purchase order."
+      }
+    />
+  );
 
   return (
     <>
@@ -160,45 +187,28 @@ export function PurchaseOrdersTable({
         </div>
       </div>
 
-      <div className="overflow-x-auto rounded-md border">
-        <table className="w-full min-w-[920px] text-sm">
-          <thead className="bg-muted/40 text-left">
-            <tr>
-              <th className="px-3 py-2 font-medium">Quotation #</th>
-              <th className="px-3 py-2 font-medium">Client Name</th>
-              <th className="px-3 py-2 font-medium">Total Amount</th>
-              <th className="px-3 py-2 font-medium">Collected Amount</th>
-              <th className="px-3 py-2 font-medium">Progress</th>
-              <th className="px-3 py-2 font-medium">Approval</th>
-              <th className="px-3 py-2 font-medium">Payment</th>
-              <th className="px-3 py-2 font-medium">Date</th>
-            </tr>
-          </thead>
-          <tbody>
-            {filteredAndSorted.length === 0 ? (
+      <ResponsiveTable
+        table={
+          <table className="w-full min-w-[920px] text-sm">
+            <thead className="bg-muted/40 text-left">
               <tr>
-                <td colSpan={8}>
-                  <EmptyState
-                    icon={FileText}
-                    title="No purchase orders found."
-                    description={
-                      searchQuery || approvalFilter !== "all"
-                        ? "Try adjusting your search or filter."
-                        : "Convert an approved quotation to create a purchase order."
-                    }
-                  />
-                </td>
+                <th className="px-3 py-2 font-medium">Quotation #</th>
+                <th className="px-3 py-2 font-medium">Client Name</th>
+                <th className="px-3 py-2 font-medium">Total Amount</th>
+                <th className="px-3 py-2 font-medium">Collected Amount</th>
+                <th className="px-3 py-2 font-medium">Progress</th>
+                <th className="px-3 py-2 font-medium">Approval</th>
+                <th className="px-3 py-2 font-medium">Payment</th>
+                <th className="px-3 py-2 font-medium">Date</th>
               </tr>
-            ) : (
-              filteredAndSorted.map((purchaseOrder) => {
-                const progressPercent = Math.min(
-                  100,
-                  Math.round(
-                    (purchaseOrder.recognizedAmount / purchaseOrder.poAmount) * 100,
-                  ),
-                );
-
-                return (
+            </thead>
+            <tbody>
+              {filteredAndSorted.length === 0 ? (
+                <tr>
+                  <td colSpan={8}>{emptyState}</td>
+                </tr>
+              ) : (
+                filteredAndSorted.map((purchaseOrder) => (
                   <tr
                     key={purchaseOrder.id}
                     className="cursor-pointer border-t hover:bg-muted/30 focus-visible:bg-muted/40 focus-visible:outline-none"
@@ -231,7 +241,7 @@ export function PurchaseOrdersTable({
                         <div className="h-2 rounded-full bg-muted">
                           <div
                             className="h-2 rounded-full bg-primary"
-                            style={{ width: `${progressPercent}%` }}
+                            style={{ width: `${progressOf(purchaseOrder)}%` }}
                           />
                         </div>
                       </div>
@@ -248,12 +258,63 @@ export function PurchaseOrdersTable({
                         : "—"}
                     </td>
                   </tr>
-                );
-              })
-            )}
-          </tbody>
-        </table>
-      </div>
+                ))
+              )}
+            </tbody>
+          </table>
+        }
+        cards={
+          filteredAndSorted.length === 0 ? (
+            <div className="rounded-lg border">{emptyState}</div>
+          ) : (
+            filteredAndSorted.map((purchaseOrder) => (
+              <DataCard
+                key={purchaseOrder.id}
+                onActivate={() => setSelectedPurchaseOrderId(purchaseOrder.id)}
+                ariaLabel={`View purchase order ${purchaseOrder.poNumber}`}
+                header={
+                  <>
+                    <div className="min-w-0">
+                      <p className="truncate font-semibold">{purchaseOrder.clientName}</p>
+                      <p className="font-mono text-xs text-muted-foreground">
+                        {purchaseOrder.poNumber}
+                      </p>
+                    </div>
+                    <div className="flex shrink-0 flex-col items-end gap-1">
+                      <StatusBadge status={purchaseOrder.status} />
+                      <StatusBadge status={purchaseOrder.paymentStatus} />
+                    </div>
+                  </>
+                }
+                footer={
+                  <div>
+                    <p className="mb-1 text-xs text-muted-foreground">
+                      Collected {formatCurrency(purchaseOrder.recognizedAmount)} of{" "}
+                      {formatCurrency(purchaseOrder.poAmount)}
+                    </p>
+                    <div className="h-2 rounded-full bg-muted">
+                      <div
+                        className="h-2 rounded-full bg-primary"
+                        style={{ width: `${progressOf(purchaseOrder)}%` }}
+                      />
+                    </div>
+                  </div>
+                }
+              >
+                <DataField label="Total" value={formatCurrency(purchaseOrder.poAmount)} />
+                <DataField
+                  label="Date"
+                  value={
+                    purchaseOrder.approvedAt
+                      ? new Date(purchaseOrder.approvedAt).toLocaleDateString()
+                      : "—"
+                  }
+                />
+              </DataCard>
+            ))
+          )
+        }
+      />
 
       <PurchaseOrderDetailsDialog
         open={selectedPurchaseOrder !== null}

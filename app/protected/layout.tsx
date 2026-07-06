@@ -6,19 +6,28 @@ import { AuthButton } from "@/components/auth-button";
 import { ThemeSwitcher } from "@/components/theme-switcher";
 import { hasEnvVars } from "@/lib/utils";
 import { SidebarSlot } from "@/components/layouts/sidebar-slot";
+import { MobileNavSlot } from "@/components/layouts/mobile-nav-slot";
 import Link from "next/link";
 import { Suspense } from "react";
 
 export default function ProtectedLayout({ children }: { children: React.ReactNode }) {
   return (
-    <main className="min-h-screen flex flex-col">
-      <div className="flex-1 w-full flex flex-col">
-        <nav className="w-full flex justify-center border-b border-b-foreground/10 h-16">
-          <div className="w-full max-w-7xl flex justify-between items-center p-3 px-5 text-sm">
-            <div className="flex gap-5 items-center font-semibold">
-              <Link href={"/"} className="inline-flex items-center gap-3">
-                <SchwerLogo className="h-7" />
-                Schwer Online Management
+    <main className="flex min-h-screen flex-col">
+      <div className="flex w-full flex-1 flex-col">
+        <nav className="sticky top-0 z-30 flex h-16 w-full justify-center border-b bg-background/80 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+          <div className="flex w-full max-w-7xl items-center justify-between gap-3 px-4 sm:px-6">
+            <div className="flex min-w-0 items-center gap-1">
+              <Suspense fallback={null}>
+                <MobileNavSlot />
+              </Suspense>
+              <Link
+                href={"/"}
+                className="inline-flex min-w-0 items-center gap-2.5 font-semibold"
+              >
+                <SchwerLogo className="h-7 shrink-0" />
+                <span className="truncate text-sm sm:text-base">
+                  Schwer Online Management
+                </span>
               </Link>
             </div>
             {!hasEnvVars ? (

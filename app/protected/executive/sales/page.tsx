@@ -1,7 +1,7 @@
 import { ClientDistributionChart } from "@/components/sales/client-distribution-chart";
 import { SectorPerformanceChart } from "@/components/sales/sector-performance-chart";
-import { ExecutiveEmptyState } from "@/components/executive/empty-state";
 import { RevenueTrendChart } from "@/components/executive/revenue-trend-chart";
+import { EmptyState } from "@/components/patterns";
 import {
   Card,
   CardContent,
@@ -61,7 +61,7 @@ export default async function ExecutiveSalesDashboardPage({
             <CardDescription>Unable to load sales metrics.</CardDescription>
           </CardHeader>
           <CardContent>
-            <ExecutiveEmptyState
+            <EmptyState
               title="Sales data unavailable"
               description="Please refresh the page or try again later."
             />
@@ -167,7 +167,7 @@ export default async function ExecutiveSalesDashboardPage({
           {hasBreakdownData ? (
             <RevenueTrendChart data={trendData} />
           ) : (
-            <ExecutiveEmptyState
+            <EmptyState
               title="No breakdown data yet"
               description="No purchase order data is available for the selected period."
             />
@@ -274,7 +274,7 @@ export default async function ExecutiveSalesDashboardPage({
               </div>
             </div>
           ) : (
-            <ExecutiveEmptyState
+            <EmptyState
               title="No sales performance data yet"
               description="Owner ranking will appear once purchase orders are approved."
             />
