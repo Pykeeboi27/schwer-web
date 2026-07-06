@@ -41,11 +41,10 @@
       "Bash(curl -s -o /dev/null -w \"login: %{http_code}\\\\n\" http://localhost:3000/auth/login)",
       "Bash(curl -s http://localhost:3000/auth/login)",
       "mcp__ide__getDiagnostics",
-      "Bash(npm install *)"
+      "Bash(npm install *)",
+      "Bash(py *)"
     ]
   },
   "enableAllProjectMcpServers": true,
-  "enabledMcpjsonServers": [
-    "supabase"
-  ]
+  "enabledMcpjsonServers": ["supabase"]
 }
