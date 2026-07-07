@@ -1,0 +1,285 @@
+import { describe, expect, it, vi } from "vitest";
+
+import { createSupabaseMock, type SupabaseMock } from "./helpers/supabase-mock";
+
+let mockClient: SupabaseMock = createSupabaseMock();
+
+vi.mock("@/lib/supabase/server", () => ({
+  createClient: async () => mockClient,
+}));
+
+import {
+  approveQuotationApproval,
+  findApproversForRole,
+  findPendingApprovalForRole,
+  rejectQuotationApproval,
+  resubmitQuotationForApproval,
+  submitQuotationForApproval,
+  updateSalesQuotationDetails,
+} from "@/lib/sales/quotations";
+
+const ok = { data: null, error: null };
+const fail = { data: null, error: { message: "boom" } };
+const user = { id: "u1" };
+
+const detailsInput = {
+  quotationId: "q1",
+  marginPercentage: 10,
+  bankPercentage: 5,
+  sopPercentage: 2,
+  googleDriveLink: null,
+  paymentTerms: "net30",
+  paymentTermsCustom: null,
+  leadTimeDays: 14,
+  notes: null,
+};
+
+describe("updateSalesQuotationDetails", () => {
+  it("requires an authenticated user", async () => {
+    mockClient = createSupabaseMock({ user: null });
+    await expect(updateSalesQuotationDetails(detailsInput)).rejects.toThrow(
+      /must be signed in/,
+    );
+  });
+
+  it("throws when the quotation is missing", async () => {
+    mockClient = createSupabaseMock({ user, tables: { quotations: fail } });
+    await expect(updateSalesQuotationDetails(detailsInput)).rejects.toThrow(
+      /Quotation was not found/,
+    );
+  });
+
+  it("rejects quotations outside the sales phase", async () => {
+    mockClient = createSupabaseMock({
+      user,
+      tables: { quotations: { data: { id: "q1", phase: "engineering" }, error: null } },
+    });
+    await expect(updateSalesQuotationDetails(detailsInput)).rejects.toThrow(
+      /not yet in the sales phase/,
+    );
+  });
+
+  it("blocks edits when not a draft and not re-opened for a PO", async () => {
+    mockClient = createSupabaseMock({
+      user,
+      tables: {
+        quotations: {
+          data: {
+            id: "q1",
+            phase: "sales",
+            status: "approved",
+            cost: "1000000",
+            client_confirmed_at: null,
+            converted_po_id: null,
+          },
+          error: null,
+        },
+      },
+    });
+    await expect(updateSalesQuotationDetails(detailsInput)).rejects.toThrow(
+      /can only be edited/,
+    );
+  });
+
+  it("updates a draft quotation", async () => {
+    mockClient = createSupabaseMock({
+      user,
+      tables: {
+        quotations: [
+          {
+            data: {
+              id: "q1",
+              phase: "sales",
+              status: "draft",
+              cost: "1000000",
+              client_confirmed_at: null,
+              converted_po_id: null,
+            },
+            error: null,
+          },
+          ok,
+        ],
+      },
+    });
+    await expect(updateSalesQuotationDetails(detailsInput)).resolves.toBeUndefined();
+  });
+
+  it("allows edits on a quotation re-opened for a client PO", async () => {
+    mockClient = createSupabaseMock({
+      user,
+      tables: {
+        quotations: [
+          {
+            data: {
+              id: "q1",
+              phase: "sales",
+              status: "approved",
+              cost: "1000000",
+              client_confirmed_at: "2026-01-01",
+              converted_po_id: null,
+            },
+            error: null,
+          },
+          ok,
+        ],
+      },
+    });
+    await expect(updateSalesQuotationDetails(detailsInput)).resolves.toBeUndefined();
+  });
+});
+
+describe("findApproversForRole", () => {
+  it("returns approver ids", async () => {
+    mockClient = createSupabaseMock({
+      tables: { profiles: { data: [{ id: "a1" }, { id: "a2" }], error: null } },
+    });
+    await expect(findApproversForRole("owner")).resolves.toEqual([
+      { id: "a1" },
+      { id: "a2" },
+    ]);
+  });
+
+  it("throws when no active approver exists", async () => {
+    mockClient = createSupabaseMock({ tables: { profiles: { data: [], error: null } } });
+    await expect(findApproversForRole("sales_manager")).rejects.toThrow(
+      /No active approver/,
+    );
+  });
+});
+
+describe("findPendingApprovalForRole", () => {
+  it("requires an authenticated user", async () => {
+    mockClient = createSupabaseMock({ user: null });
+    await expect(
+      findPendingApprovalForRole({ quotationId: "q1", role: "owner" }),
+    ).rejects.toThrow(/must be signed in/);
+  });
+
+  it("returns the approval id when a pending assignment exists", async () => {
+    mockClient = createSupabaseMock({
+      user,
+      tables: { quotation_approvals: { data: { id: "ap1" }, error: null } },
+    });
+    await expect(
+      findPendingApprovalForRole({ quotationId: "q1", role: "owner" }),
+    ).resolves.toEqual({ approvalId: "ap1" });
+  });
+
+  it("returns null when there is no pending assignment", async () => {
+    mockClient = createSupabaseMock({
+      user,
+      tables: { quotation_approvals: { data: null, error: null } },
+    });
+    await expect(
+      findPendingApprovalForRole({ quotationId: "q1", role: "owner" }),
+    ).resolves.toBeNull();
+  });
+
+  it("throws when the lookup errors", async () => {
+    mockClient = createSupabaseMock({ user, tables: { quotation_approvals: fail } });
+    await expect(
+      findPendingApprovalForRole({ quotationId: "q1", role: "owner" }),
+    ).rejects.toThrow(/verify approval assignment/);
+  });
+});
+
+describe("submitQuotationForApproval", () => {
+  const draftRow = {
+    id: "q1",
+    amount: "1000000",
+    status: "draft",
+    phase: "sales",
+    sales_margin_percent: "10",
+    payment_terms: "net30",
+    lead_time_days: 14,
+  };
+
+  it("rejects incomplete quotations", async () => {
+    mockClient = createSupabaseMock({
+      user,
+      tables: {
+        quotations: {
+          data: { ...draftRow, sales_margin_percent: null },
+          error: null,
+        },
+      },
+    });
+    await expect(submitQuotationForApproval("q1")).rejects.toThrow(
+      /Margin, payment terms, and lead time are required/,
+    );
+  });
+
+  it("rejects non-draft quotations", async () => {
+    mockClient = createSupabaseMock({
+      user,
+      tables: { quotations: { data: { ...draftRow, status: "pending" }, error: null } },
+    });
+    await expect(submitQuotationForApproval("q1")).rejects.toThrow(
+      /Only draft quotations/,
+    );
+  });
+
+  it("creates approvals and marks the quotation pending", async () => {
+    mockClient = createSupabaseMock({
+      user,
+      tables: {
+        quotations: [{ data: draftRow, error: null }, ok],
+        profiles: { data: [{ id: "mgr1" }], error: null },
+        quotation_approvals: ok,
+      },
+    });
+    await expect(submitQuotationForApproval("q1")).resolves.toBeUndefined();
+  });
+});
+
+describe("approve / reject quotation approval", () => {
+  it("approveQuotationApproval resolves and surfaces errors", async () => {
+    mockClient = createSupabaseMock({ tables: { quotation_approvals: ok } });
+    await expect(
+      approveQuotationApproval({ approvalId: "ap1" }),
+    ).resolves.toBeUndefined();
+
+    mockClient = createSupabaseMock({ tables: { quotation_approvals: fail } });
+    await expect(approveQuotationApproval({ approvalId: "ap1" })).rejects.toThrow("boom");
+  });
+
+  it("rejectQuotationApproval resolves and surfaces errors", async () => {
+    mockClient = createSupabaseMock({ tables: { quotation_approvals: ok } });
+    await expect(
+      rejectQuotationApproval({ approvalId: "ap1", reason: "too low" }),
+    ).resolves.toBeUndefined();
+
+    mockClient = createSupabaseMock({ tables: { quotation_approvals: fail } });
+    await expect(
+      rejectQuotationApproval({ approvalId: "ap1", reason: "too low" }),
+    ).rejects.toThrow("boom");
+  });
+});
+
+describe("resubmitQuotationForApproval", () => {
+  it("throws when the quotation is missing", async () => {
+    mockClient = createSupabaseMock({ tables: { quotations: fail } });
+    await expect(resubmitQuotationForApproval("q1")).rejects.toThrow(/not found/);
+  });
+
+  it("only allows resubmitting rejected quotations", async () => {
+    mockClient = createSupabaseMock({
+      tables: { quotations: { data: { id: "q1", status: "draft" }, error: null } },
+    });
+    await expect(resubmitQuotationForApproval("q1")).rejects.toThrow(
+      /Only rejected quotations/,
+    );
+  });
+
+  it("returns a rejected quotation to draft", async () => {
+    mockClient = createSupabaseMock({
+      tables: {
+        quotations: [
+          { data: { id: "q1", status: "rejected", created_by: "u1" }, error: null },
+          ok,
+        ],
+      },
+    });
+    await expect(resubmitQuotationForApproval("q1")).resolves.toBeUndefined();
+  });
+});
