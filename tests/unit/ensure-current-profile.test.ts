@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { ensureCurrentProfile } from "@/lib/profile/ensure-current-profile";
 
-const mockGetUser = vi.fn();
+const mockGetClaims = vi.fn();
 const mockSelect = vi.fn();
 const mockEq = vi.fn();
 const mockMaybeSingle = vi.fn();
@@ -11,7 +11,7 @@ vi.mock("@/lib/supabase/server", () => {
   return {
     createClient: async () => ({
       auth: {
-        getUser: mockGetUser,
+        getClaims: mockGetClaims,
       },
       from: () => ({
         select: mockSelect,
@@ -22,7 +22,7 @@ vi.mock("@/lib/supabase/server", () => {
 
 describe("ensureCurrentProfile unit", () => {
   beforeEach(() => {
-    mockGetUser.mockReset();
+    mockGetClaims.mockReset();
     mockSelect.mockReset();
     mockEq.mockReset();
     mockMaybeSingle.mockReset();
@@ -36,10 +36,10 @@ describe("ensureCurrentProfile unit", () => {
   });
 
   it("returns mapped profile data", async () => {
-    mockGetUser.mockResolvedValue({
+    mockGetClaims.mockResolvedValue({
       data: {
-        user: {
-          id: "u1",
+        claims: {
+          sub: "u1",
           email: "user@example.com",
         },
       },

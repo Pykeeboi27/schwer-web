@@ -121,10 +121,6 @@ export function LoginForm({
               <Button type="submit" className="w-full" disabled={isPending}>
                 {isPending ? "Signing in…" : "Sign in"}
               </Button>
-
-              <Button type="button" variant="outline" className="w-full" asChild>
-                <Link href="/auth/oauth/google">Continue with Google</Link>
-              </Button>
             </div>
 
             <div className="mt-5 text-center text-sm text-muted-foreground">

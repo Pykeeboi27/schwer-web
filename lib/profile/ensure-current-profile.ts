@@ -45,19 +45,24 @@ function toCurrentProfile(data: {
 
 export async function ensureCurrentProfile(): Promise<CurrentProfile | null> {
   const supabase = await createClient();
-  const {
-    data: { user },
-    error: userError,
-  } = await supabase.auth.getUser();
 
-  if (userError || !user) {
+  // Use getClaims() (local JWT verification) instead of getUser() (network
+  // round-trip to the auth server). The proxy middleware has already validated
+  // the session before the page renders, so the local claims are trustworthy.
+  const { data, error: claimsError } = await supabase.auth.getClaims();
+  const claims = data?.claims;
+
+  if (claimsError || !claims?.sub) {
     return null;
   }
+
+  const userId = claims.sub as string;
+  const userEmail = typeof claims.email === "string" ? claims.email : null;
 
   const { data: profile, error: profileError } = await supabase
     .from("profiles")
     .select("id, email, department, is_active, role, is_executive_viewer")
-    .eq("id", user.id)
+    .eq("id", userId)
     .maybeSingle();
 
   if (profileError) {
@@ -68,14 +73,14 @@ export async function ensureCurrentProfile(): Promise<CurrentProfile | null> {
     return toCurrentProfile(profile);
   }
 
-  if (!user.email) {
+  if (!userEmail) {
     throw new EnsureCurrentProfileError();
   }
 
   const { error: upsertError } = await supabase.from("profiles").upsert(
     {
-      id: user.id,
-      email: user.email,
+      id: userId,
+      email: userEmail,
     },
     {
       onConflict: "id",
@@ -89,7 +94,7 @@ export async function ensureCurrentProfile(): Promise<CurrentProfile | null> {
   const { data: repairedProfile, error: repairedProfileError } = await supabase
     .from("profiles")
     .select("id, email, department, is_active, role, is_executive_viewer")
-    .eq("id", user.id)
+    .eq("id", userId)
     .single();
 
   if (repairedProfileError || !repairedProfile) {
