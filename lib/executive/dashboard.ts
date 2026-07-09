@@ -1,3 +1,5 @@
+import { cache } from "react";
+
 import { isExecutiveDashboardViewer } from "@/lib/executive/access";
 import {
   buildMonthBuckets,
@@ -99,23 +101,32 @@ function getDayFromPoDate(dateValue: string | null): number | null {
   return day;
 }
 
-export const executiveDashboardQueries = {
-  async fetchPurchaseOrderRows(
-    range: PurchaseOrderRange,
-  ): Promise<PurchaseOrderMetricRow[]> {
+// Request-scoped memoization keyed on the primitive date bounds. The executive
+// dashboard requests the same YTD range from several branches (KPI, revenue
+// breakdown, PO summary, sales performance); keying on strings — rather than the
+// fresh range object each caller passes — lets `cache()` dedupe them into a
+// single `purchase_orders` scan per distinct range.
+const fetchPurchaseOrderRowsCached = cache(
+  async (startDate: string, endDate: string): Promise<PurchaseOrderMetricRow[]> => {
     const supabase = await createClient();
     const { data, error } = await supabase
       .from("purchase_orders")
       .select("po_amount, margin_amount, po_date:approved_at, created_by")
       .eq("status", "approved")
-      .gte("approved_at", range.startDate)
-      .lte("approved_at", `${range.endDate}T23:59:59.999Z`);
+      .gte("approved_at", startDate)
+      .lte("approved_at", `${endDate}T23:59:59.999Z`);
 
     if (error) {
       throw new Error("Failed to load executive dashboard purchase orders.");
     }
 
     return (data ?? []) as PurchaseOrderMetricRow[];
+  },
+);
+
+export const executiveDashboardQueries = {
+  fetchPurchaseOrderRows(range: PurchaseOrderRange): Promise<PurchaseOrderMetricRow[]> {
+    return fetchPurchaseOrderRowsCached(range.startDate, range.endDate);
   },
 
   async fetchAnnualTarget(year: number): Promise<number | null> {

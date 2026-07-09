@@ -2,7 +2,6 @@
 
 import { signUpAction, type SignUpActionState } from "@/app/auth/sign-up/actions";
 import { DEPARTMENTS } from "@/lib/profile/departments";
-import { fieldClassName } from "@/components/patterns";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import {
@@ -14,6 +13,13 @@ import {
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Eye, EyeOff } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -67,22 +73,22 @@ export function SignUpForm({
 
               <div className="grid gap-1.5">
                 <Label htmlFor="department">Department</Label>
-                <select
-                  id="department"
-                  name="department"
-                  required
-                  defaultValue=""
-                  className={cn(fieldClassName, "h-9 py-1")}
-                >
-                  <option value="" disabled>
-                    Select department
-                  </option>
-                  {DEPARTMENTS.map((department) => (
-                    <option key={department} value={department} className="capitalize">
-                      {department}
-                    </option>
-                  ))}
-                </select>
+                <Select name="department" required>
+                  <SelectTrigger id="department" className="capitalize">
+                    <SelectValue placeholder="Select department" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {DEPARTMENTS.map((department) => (
+                      <SelectItem
+                        key={department}
+                        value={department}
+                        className="capitalize"
+                      >
+                        {department}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
 
               <div className="grid gap-1.5">

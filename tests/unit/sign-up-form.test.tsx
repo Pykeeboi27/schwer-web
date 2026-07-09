@@ -1,4 +1,5 @@
 import { fireEvent, render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 
 import { SignUpForm } from "@/components/sign-up-form";
@@ -19,15 +20,15 @@ vi.mock("react", async (importOriginal) => {
 });
 
 describe("SignUpForm", () => {
-  it("shows department options from enum list", () => {
+  it("shows department options from enum list", async () => {
+    const user = userEvent.setup();
     render(<SignUpForm />);
 
-    const department = screen.getByLabelText("Department") as HTMLSelectElement;
-    const options = Array.from(department.options).map((option) => option.value);
+    await user.click(screen.getByLabelText("Department"));
 
-    expect(options).toContain("hr");
-    expect(options).toContain("engineering");
-    expect(options).toContain("executive");
+    expect(screen.getByRole("option", { name: "hr" })).toBeInTheDocument();
+    expect(screen.getByRole("option", { name: "engineering" })).toBeInTheDocument();
+    expect(screen.getByRole("option", { name: "executive" })).toBeInTheDocument();
   });
 
   it("toggles password and repeat password visibility", () => {
