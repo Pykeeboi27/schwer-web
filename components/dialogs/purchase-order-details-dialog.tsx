@@ -183,6 +183,21 @@ export function PurchaseOrderDetailsDialog({
             </DialogDescription>
           </DialogHeader>
 
+          <div className="flex justify-end">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() =>
+                window.open(
+                  `/protected/sales/purchase-orders/${purchaseOrder.id}/worksheet`,
+                  "_blank",
+                )
+              }
+            >
+              Print Worksheet
+            </Button>
+          </div>
+
           <dl className="grid gap-3 text-sm">
             <div className="grid grid-cols-[160px_1fr] gap-2">
               <dt className="text-muted-foreground">PO #</dt>
