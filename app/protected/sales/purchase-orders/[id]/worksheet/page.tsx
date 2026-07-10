@@ -31,7 +31,7 @@ export default async function PurchaseOrderWorksheetPage({ params }: WorksheetPa
   return (
     <div className="fixed inset-0 z-50 overflow-auto bg-white text-black">
       <style>{`
-        @page { size: A4; margin: 12mm; }
+        @page { size: A4 landscape; margin: 8mm; }
         @media print {
           html, body { background: white; }
         }
@@ -47,7 +47,7 @@ export default async function PurchaseOrderWorksheetPage({ params }: WorksheetPa
         <PrintButton />
       </div>
 
-      <div className="mx-auto max-w-4xl p-4 sm:p-8">
+      <div className="mx-auto max-w-[297mm] p-4 sm:p-8">
         <SalesWorksheet data={data} />
       </div>
     </div>
