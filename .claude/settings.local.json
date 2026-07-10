@@ -42,7 +42,8 @@
       "Bash(curl -s http://localhost:3000/auth/login)",
       "mcp__ide__getDiagnostics",
       "Bash(npm install *)",
-      "Bash(py *)"
+      "Bash(py *)",
+      "PowerShell(Out-Null *)"
     ]
   },
   "enableAllProjectMcpServers": true,
