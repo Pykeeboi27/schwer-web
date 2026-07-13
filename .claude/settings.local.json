@@ -49,9 +49,12 @@
       "PowerShell(npm run *)",
       "PowerShell(Rename-Item *)",
       "PowerShell(git stash *)",
-      "PowerShell(Get-Content .env | ForEach-Object { \\($_ -split '='\\)[0] })"
+      "PowerShell(Get-Content .env | ForEach-Object { ($_ -split '=')[0] })",
+      "PowerShell(git *)"
     ]
   },
   "enableAllProjectMcpServers": true,
-  "enabledMcpjsonServers": ["supabase"]
+  "enabledMcpjsonServers": [
+    "supabase"
+  ]
 }
