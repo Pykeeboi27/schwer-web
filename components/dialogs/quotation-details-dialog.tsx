@@ -22,7 +22,7 @@ import {
 } from "@/components/ui/dialog";
 import {
   Callout,
-  fieldClassName,
+  selectFieldClassName,
   StatusBadge,
   textareaClassName,
 } from "@/components/patterns";
@@ -592,7 +592,7 @@ export function QuotationDetailsDialog({
                   id="sales-payment-terms"
                   value={paymentTermsSelect}
                   onChange={(event) => setPaymentTermsSelect(event.target.value)}
-                  className={cn(fieldClassName, "mt-1 h-9 py-1")}
+                  className={cn(selectFieldClassName, "mt-1 h-9 py-1")}
                 >
                   <option value="">Select payment terms</option>
                   {PAYMENT_TERMS_OPTIONS.map((option) => (

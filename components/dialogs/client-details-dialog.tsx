@@ -1,6 +1,11 @@
 "use client";
 
 import { updateClientAction } from "@/app/protected/sales/clients/actions";
+import {
+  addClientContactAction,
+  fetchClientContactsAction,
+  setPrimaryContactAction,
+} from "@/app/protected/sales/actions";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -11,8 +16,8 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { fieldClassName } from "@/components/patterns";
-import type { SalesClient } from "@/lib/sales/clients";
+import { selectFieldClassName } from "@/components/patterns";
+import type { SalesClient, SalesClientContact } from "@/lib/sales/clients";
 import { useToast } from "@/lib/utils/toast-notification";
 import { cn } from "@/lib/utils";
 import { useRouter } from "next/navigation";
@@ -72,6 +77,20 @@ export function ClientDetailsDialog({
     sector: "commercial",
   });
 
+  const [contacts, setContacts] = useState<SalesClientContact[]>([]);
+  const [contactsLoading, setContactsLoading] = useState(false);
+  const [isAddingContact, setIsAddingContact] = useState(false);
+  const [contactFormError, setContactFormError] = useState<string | null>(null);
+  const [updatingPrimaryId, setUpdatingPrimaryId] = useState<string | null>(null);
+  const [newContact, setNewContact] = useState({
+    fullName: "",
+    position: "",
+    phone: "",
+    mobile: "",
+    email: "",
+    isPrimary: false,
+  });
+
   useEffect(() => {
     if (!open || !client) {
       return;
@@ -81,11 +100,108 @@ export function ClientDetailsDialog({
     setIsEditing(startInEditMode);
     setFormError(null);
     setFieldErrors({});
+    setNewContact({
+      fullName: "",
+      position: "",
+      phone: "",
+      mobile: "",
+      email: "",
+      isPrimary: false,
+    });
+    setContactFormError(null);
   }, [open, client, startInEditMode]);
+
+  useEffect(() => {
+    if (!open || !client) {
+      return;
+    }
+
+    let cancelled = false;
+    setContactsLoading(true);
+
+    fetchClientContactsAction(client.id).then((response) => {
+      if (cancelled) return;
+      setContacts(response.data);
+      setContactsLoading(false);
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [open, client]);
 
   if (!client) {
     return null;
   }
+
+  const reloadContacts = async () => {
+    const response = await fetchClientContactsAction(client.id);
+    setContacts(response.data);
+  };
+
+  const handleAddContact = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    setContactFormError(null);
+
+    if (!newContact.fullName.trim()) {
+      setContactFormError("Contact name is required.");
+      return;
+    }
+
+    setIsAddingContact(true);
+
+    const formData = new FormData();
+    formData.set("clientId", client.id);
+    formData.set("fullName", newContact.fullName.trim());
+    formData.set("position", newContact.position.trim());
+    formData.set("phone", newContact.phone.trim());
+    formData.set("mobile", newContact.mobile.trim());
+    formData.set("email", newContact.email.trim());
+    if (newContact.isPrimary) {
+      formData.set("isPrimary", "on");
+    }
+
+    const response = await addClientContactAction(formData);
+
+    if (!response.ok) {
+      const message = response.error ?? "Failed to add contact.";
+      setContactFormError(message);
+      error(message);
+      setIsAddingContact(false);
+      return;
+    }
+
+    success("Contact added.");
+    setNewContact({
+      fullName: "",
+      position: "",
+      phone: "",
+      mobile: "",
+      email: "",
+      isPrimary: false,
+    });
+    await reloadContacts();
+    setIsAddingContact(false);
+  };
+
+  const handleMakePrimary = async (contactId: string) => {
+    setUpdatingPrimaryId(contactId);
+    const formData = new FormData();
+    formData.set("clientId", client.id);
+    formData.set("contactId", contactId);
+
+    const response = await setPrimaryContactAction(formData);
+
+    if (!response.ok) {
+      error(response.error ?? "Failed to set primary contact.");
+      setUpdatingPrimaryId(null);
+      return;
+    }
+
+    success("Primary contact updated.");
+    await reloadContacts();
+    setUpdatingPrimaryId(null);
+  };
 
   const handleEditCancel = () => {
     setFormValues(toFormValues(client));
@@ -188,7 +304,7 @@ export function ClientDetailsDialog({
 
             <div className="grid gap-4 md:grid-cols-2">
               <div>
-                <Label htmlFor="client-contact-person">Contact</Label>
+                <Label htmlFor="client-contact-person">Contact (notes)</Label>
                 <Input
                   id="client-contact-person"
                   value={formValues.contactPerson}
@@ -212,7 +328,7 @@ export function ClientDetailsDialog({
                       sector: event.target.value as ClientFormValues["sector"],
                     }))
                   }
-                  className={cn(fieldClassName, "mt-1 h-9 py-1")}
+                  className={cn(selectFieldClassName, "mt-1 h-9 py-1")}
                 >
                   <option value="commercial">Commercial</option>
                   <option value="industrial">Industrial</option>
@@ -331,7 +447,7 @@ export function ClientDetailsDialog({
               <dd className="capitalize">{client.sector}</dd>
             </div>
             <div className="grid grid-cols-[140px_1fr] gap-2">
-              <dt className="text-muted-foreground">Contact</dt>
+              <dt className="text-muted-foreground">Contact (notes)</dt>
               <dd>{client.contactPerson ?? "Not provided"}</dd>
             </div>
             <div className="grid grid-cols-[140px_1fr] gap-2">
@@ -373,6 +489,164 @@ export function ClientDetailsDialog({
             </div>
           </dl>
         )}
+
+        <div className="border-t pt-4">
+          <h3 className="text-sm font-semibold">Contacts</h3>
+          <p className="mt-1 text-xs text-muted-foreground">
+            The primary contact here is what appears on the PO worksheet — the
+            &ldquo;Contact (notes)&rdquo; field above does not.
+          </p>
+
+          {contactsLoading ? (
+            <p className="mt-3 text-sm text-muted-foreground">Loading contacts...</p>
+          ) : contacts.length === 0 ? (
+            <p className="mt-3 text-sm text-muted-foreground">No contacts yet.</p>
+          ) : (
+            <ul className="mt-3 grid gap-2">
+              {contacts.map((contact) => (
+                <li
+                  key={contact.id}
+                  className="flex items-start justify-between gap-3 rounded-md border p-2.5 text-sm"
+                >
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <span className="font-medium">{contact.fullName}</span>
+                      {contact.isPrimary ? (
+                        <span className="rounded-full bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary">
+                          Primary
+                        </span>
+                      ) : null}
+                    </div>
+                    {contact.position ? (
+                      <p className="text-muted-foreground">{contact.position}</p>
+                    ) : null}
+                    <p className="text-muted-foreground">
+                      {[contact.mobile, contact.phone, contact.email]
+                        .filter(Boolean)
+                        .join(" · ") || "No contact details"}
+                    </p>
+                  </div>
+                  {!contact.isPrimary ? (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      disabled={updatingPrimaryId === contact.id}
+                      onClick={() => handleMakePrimary(contact.id)}
+                    >
+                      {updatingPrimaryId === contact.id ? "Saving..." : "Make Primary"}
+                    </Button>
+                  ) : null}
+                </li>
+              ))}
+            </ul>
+          )}
+
+          <form onSubmit={handleAddContact} className="mt-4 grid gap-3">
+            <div className="grid gap-3 md:grid-cols-2">
+              <div>
+                <Label htmlFor="new-contact-name">Contact Name</Label>
+                <Input
+                  id="new-contact-name"
+                  value={newContact.fullName}
+                  onChange={(event) =>
+                    setNewContact((current) => ({
+                      ...current,
+                      fullName: event.target.value,
+                    }))
+                  }
+                  className="mt-1"
+                  placeholder="Full name"
+                />
+              </div>
+              <div>
+                <Label htmlFor="new-contact-position">Position</Label>
+                <Input
+                  id="new-contact-position"
+                  value={newContact.position}
+                  onChange={(event) =>
+                    setNewContact((current) => ({
+                      ...current,
+                      position: event.target.value,
+                    }))
+                  }
+                  className="mt-1"
+                  placeholder="e.g. Purchasing Manager"
+                />
+              </div>
+            </div>
+
+            <div className="grid gap-3 md:grid-cols-3">
+              <div>
+                <Label htmlFor="new-contact-mobile">Mobile</Label>
+                <Input
+                  id="new-contact-mobile"
+                  value={newContact.mobile}
+                  onChange={(event) =>
+                    setNewContact((current) => ({
+                      ...current,
+                      mobile: event.target.value,
+                    }))
+                  }
+                  className="mt-1"
+                />
+              </div>
+              <div>
+                <Label htmlFor="new-contact-phone">Phone</Label>
+                <Input
+                  id="new-contact-phone"
+                  value={newContact.phone}
+                  onChange={(event) =>
+                    setNewContact((current) => ({
+                      ...current,
+                      phone: event.target.value,
+                    }))
+                  }
+                  className="mt-1"
+                />
+              </div>
+              <div>
+                <Label htmlFor="new-contact-email">Email</Label>
+                <Input
+                  id="new-contact-email"
+                  type="email"
+                  value={newContact.email}
+                  onChange={(event) =>
+                    setNewContact((current) => ({
+                      ...current,
+                      email: event.target.value,
+                    }))
+                  }
+                  className="mt-1"
+                />
+              </div>
+            </div>
+
+            <label className="flex items-center gap-2 text-sm">
+              <input
+                type="checkbox"
+                checked={newContact.isPrimary}
+                onChange={(event) =>
+                  setNewContact((current) => ({
+                    ...current,
+                    isPrimary: event.target.checked,
+                  }))
+                }
+              />
+              Set as primary contact
+            </label>
+
+            {contactFormError ? (
+              <p className="text-sm text-destructive">{contactFormError}</p>
+            ) : null}
+
+            <div className="flex justify-end">
+              <Button type="submit" variant="outline" disabled={isAddingContact}>
+                {isAddingContact ? "Adding..." : "Add Contact"}
+              </Button>
+            </div>
+          </form>
+        </div>
       </DialogContent>
     </Dialog>
   );

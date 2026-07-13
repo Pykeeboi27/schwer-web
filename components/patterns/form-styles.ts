@@ -8,3 +8,14 @@ export const fieldClassName =
 
 /** Textarea variant — same as {@link fieldClassName} with a comfortable default top margin. */
 export const textareaClassName = `mt-1 ${fieldClassName}`;
+
+/**
+ * Native `<select>` variant. `fieldClassName`'s transparent background is fine
+ * for text inputs (the surrounding dialog shows through), but a native
+ * `<select>`'s dropdown list is rendered by the browser outside the app's DOM —
+ * without an explicit background it falls back to the browser default (usually
+ * opaque white), while the text color still inherits the app's theme. In dark
+ * mode that produced white text on a white popup. Force both colors instead of
+ * leaving the background transparent.
+ */
+export const selectFieldClassName = `${fieldClassName} bg-background text-foreground`;

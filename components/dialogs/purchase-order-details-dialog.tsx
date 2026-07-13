@@ -189,12 +189,12 @@ export function PurchaseOrderDetailsDialog({
               variant="outline"
               onClick={() =>
                 window.open(
-                  `/protected/sales/purchase-orders/${purchaseOrder.id}/worksheet`,
+                  `/api/sales/purchase-orders/${purchaseOrder.id}/worksheet`,
                   "_blank",
                 )
               }
             >
-              Print Worksheet
+              Download Worksheet
             </Button>
           </div>
 

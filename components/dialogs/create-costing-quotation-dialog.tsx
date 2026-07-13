@@ -13,7 +13,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import { fieldClassName, textareaClassName } from "@/components/patterns";
+import { selectFieldClassName, textareaClassName } from "@/components/patterns";
 import { suggestQuotationNumber } from "@/lib/engineering/suggest-quotation-number";
 import { useToast } from "@/lib/utils/toast-notification";
 import { cn } from "@/lib/utils";
@@ -183,7 +183,7 @@ export function CreateCostingQuotationDialog({
               name="clientId"
               required
               aria-invalid={Boolean(fieldErrors.clientId)}
-              className={cn(fieldClassName, "mt-1 h-9 py-1")}
+              className={cn(selectFieldClassName, "mt-1 h-9 py-1")}
             >
               <option value="">Select client</option>
               {activeClients.map((client) => (

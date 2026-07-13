@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { NumberInput } from "@/components/ui/number-input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Callout, fieldClassName, textareaClassName } from "@/components/patterns";
+import { Callout, selectFieldClassName, textareaClassName } from "@/components/patterns";
 import type { CostingQuotation } from "@/lib/engineering/costing-quotations";
 import { suggestQuotationNumber } from "@/lib/engineering/suggest-quotation-number";
 import { useToast } from "@/lib/utils/toast-notification";
@@ -188,7 +188,7 @@ export function EditCostingQuotationDialog({
               required
               defaultValue={quotation.clientId}
               aria-invalid={Boolean(fieldErrors.clientId)}
-              className={cn(fieldClassName, "mt-1 h-9 py-1")}
+              className={cn(selectFieldClassName, "mt-1 h-9 py-1")}
             >
               <option value="">Select client</option>
               {activeClients.map((client) => (

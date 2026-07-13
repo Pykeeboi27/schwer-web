@@ -12,7 +12,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import { fieldClassName } from "@/components/patterns";
+import { selectFieldClassName } from "@/components/patterns";
 import { generateClientCode } from "@/lib/utils/client-code-generator";
 import { useToast } from "@/lib/utils/toast-notification";
 import { cn } from "@/lib/utils";
@@ -223,7 +223,7 @@ export function CreateClientDialog({
               id="sector"
               name="sector"
               defaultValue="commercial"
-              className={cn(fieldClassName, "mt-1 h-9 py-1")}
+              className={cn(selectFieldClassName, "mt-1 h-9 py-1")}
             >
               <option value="commercial">Commercial</option>
               <option value="industrial">Industrial</option>
