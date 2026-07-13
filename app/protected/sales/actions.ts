@@ -5,10 +5,12 @@ import {
   buildPaymentTermsNotes,
   createSalesClient,
   inactivateSalesClient,
+  listClientContacts,
   parseOptionalDownpaymentPercent,
   parsePaymentNetDays,
   parseSector,
   setClientPrimaryContact,
+  type SalesClientContact,
   updateSalesClient,
 } from "@/lib/sales/clients";
 import {
@@ -104,6 +106,27 @@ export async function inactivateClientAction(
     return { ok: true, error: null };
   } catch (error) {
     return actionFailure(error, "Failed to inactivate client.");
+  }
+}
+
+export type FetchClientContactsResult = {
+  ok: boolean;
+  error: string | null;
+  data: SalesClientContact[];
+};
+
+export async function fetchClientContactsAction(
+  clientId: string,
+): Promise<FetchClientContactsResult> {
+  try {
+    const contacts = await listClientContacts(clientId);
+    return { ok: true, error: null, data: contacts };
+  } catch (error) {
+    return {
+      ok: false,
+      error: error instanceof Error ? error.message : "Failed to load contacts.",
+      data: [],
+    };
   }
 }
 

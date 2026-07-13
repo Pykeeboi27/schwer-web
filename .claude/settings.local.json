@@ -43,9 +43,17 @@
       "mcp__ide__getDiagnostics",
       "Bash(npm install *)",
       "Bash(py *)",
-      "PowerShell(Out-Null *)"
+      "PowerShell(Out-Null *)",
+      "Skill(artifact-design)",
+      "Artifact",
+      "PowerShell(npm run *)",
+      "PowerShell(Rename-Item *)",
+      "PowerShell(git stash *)",
+      "PowerShell(Get-Content .env | ForEach-Object { \\($_ -split '='\\)[0] })"
     ]
   },
   "enableAllProjectMcpServers": true,
-  "enabledMcpjsonServers": ["supabase"]
+  "enabledMcpjsonServers": [
+    "supabase"
+  ]
 }

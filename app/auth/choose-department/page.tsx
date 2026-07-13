@@ -7,7 +7,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { fieldClassName } from "@/components/patterns";
+import { selectFieldClassName } from "@/components/patterns";
 import { cn } from "@/lib/utils";
 import { DEPARTMENTS, isDepartment } from "@/lib/profile/departments";
 import {
@@ -143,7 +143,7 @@ async function ChooseDepartmentContent({ searchParams }: ChooseDepartmentPagePro
               name="department"
               required
               defaultValue=""
-              className={cn(fieldClassName, "h-9 py-1 capitalize")}
+              className={cn(selectFieldClassName, "h-9 py-1 capitalize")}
             >
               <option value="" disabled>
                 Select department

@@ -49,7 +49,8 @@ CREATE TYPE approval_status_enum AS ENUM (
   'pending',
   'approved',
   'rejected',
-  'cancelled'
+  'cancelled',
+  'closed'
 );
 
 CREATE TYPE payment_status_enum AS ENUM (
@@ -368,6 +369,9 @@ CREATE TABLE IF NOT EXISTS public.purchase_orders (
   -- Phase 2 additions: approval lifecycle + sales pricing snapshot.
   status               approval_status_enum NOT NULL DEFAULT 'pending',
   client_po_number     TEXT,
+  -- Free-text reference (e.g. internal project code, or original quotation
+  -- number for manually created POs not linked via converted_po_id).
+  quotation_reference  TEXT,
   margin_percentage    NUMERIC(6, 2),
   bank_percentage      NUMERIC(6, 2),
   bank_amount          NUMERIC(15, 2),

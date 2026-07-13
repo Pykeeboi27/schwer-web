@@ -1,13 +1,17 @@
+import { parseClientContactNotes } from "@/lib/sales/clients";
 import { createClient } from "@/lib/supabase/server";
 
 /**
  * Flat, print-ready view of a purchase order for the Sales Worksheet
  * (paper form) print page. Assembled from purchase_orders plus its related
- * client, primary client contact, source quotation, and creating profile —
- * none of which purchase_orders carries directly.
+ * client, source quotation, and creating profile — none of which
+ * purchase_orders carries directly.
  *
- * Note: `clients` has no contact_person/phone/email columns in production,
- * so contact person/number come solely from the primary client_contacts row.
+ * Contact person/number come from the client's own contact fields (stored in
+ * `clients.notes`, see `parseClientContactNotes`) rather than the
+ * `client_contacts` directory table — that table holds additional contacts a
+ * client dialog can manage, but the worksheet always uses the client's
+ * primary contact info directly.
  */
 export type PurchaseOrderWorksheetData = {
   id: string;
@@ -45,8 +49,8 @@ export async function getPurchaseOrderWorksheetData(
     .select(
       `id, po_number, client_po_number, quotation_reference, subject, po_amount,
        payment_terms, payment_terms_custom, lead_time_days, po_date, expected_completion,
-       notes, sector, created_at, client_id, created_by,
-       clients:client_id ( company_name, address, city, province, tin ),
+       notes, sector, created_at, created_by,
+       clients:client_id ( company_name, address, city, province, tin, notes ),
        quotations:quotation_id ( quotation_number ),
        creator:created_by ( full_name )`,
     )
@@ -64,13 +68,7 @@ export async function getPurchaseOrderWorksheetData(
   const client = Array.isArray(po.clients) ? po.clients[0] : po.clients;
   const quotation = Array.isArray(po.quotations) ? po.quotations[0] : po.quotations;
   const creator = Array.isArray(po.creator) ? po.creator[0] : po.creator;
-
-  const { data: primaryContact } = await supabase
-    .from("client_contacts")
-    .select("full_name, phone, mobile")
-    .eq("client_id", po.client_id)
-    .eq("is_primary", true)
-    .maybeSingle();
+  const clientContact = parseClientContactNotes(client?.notes ?? null);
 
   const paymentTerms =
     po.payment_terms === "Other" ? po.payment_terms_custom : po.payment_terms;
@@ -96,7 +94,7 @@ export async function getPurchaseOrderWorksheetData(
     clientName: client?.company_name ?? "",
     clientAddress: joinAddress([client?.address, client?.city, client?.province]),
     clientTin: client?.tin ?? null,
-    contactPersonName: primaryContact?.full_name ?? null,
-    contactNumber: primaryContact?.mobile ?? primaryContact?.phone ?? null,
+    contactPersonName: clientContact.contactPerson,
+    contactNumber: clientContact.phone ?? clientContact.email ?? null,
   };
 }
