@@ -1,10 +1,15 @@
-import { ExecutiveApprovalsTable } from "@/components/executive/approvals-table";
-import { ExecutivePoApprovalsTable } from "@/components/executive/po-approvals-table";
+import { fetchQuotationsAction } from "@/app/protected/sales/quotations/actions";
+import { fetchPurchaseOrdersAction } from "@/app/protected/sales/purchase-orders/actions";
+import { QuotationsTable } from "@/components/tables/quotations-table";
+import { PurchaseOrdersTable } from "@/components/tables/purchase-orders-table";
 import { PageHeader, Panel } from "@/components/patterns";
 import { getCurrentProfile } from "@/lib/profile/get-current-profile";
 import { getSalesAccessRedirect } from "@/lib/sales/access";
 import { listPendingApprovalsForCurrentUser } from "@/lib/sales/quotations";
-import { listPendingPoApprovalsForCurrentUser } from "@/lib/sales/purchase-orders";
+import {
+  listPendingPoApprovalsForCurrentUser,
+  listPoPayments,
+} from "@/lib/sales/purchase-orders";
 import { redirect } from "next/navigation";
 
 export default async function SalesApprovalsPage() {
@@ -19,10 +24,14 @@ export default async function SalesApprovalsPage() {
     redirect("/protected/sales/quotations");
   }
 
-  const [pendingApprovals, pendingPoApprovals] = await Promise.all([
-    listPendingApprovalsForCurrentUser(),
-    listPendingPoApprovalsForCurrentUser(),
-  ]);
+  const [pendingApprovals, pendingPoApprovals, quotationsResponse, poResponse, payments] =
+    await Promise.all([
+      listPendingApprovalsForCurrentUser(),
+      listPendingPoApprovalsForCurrentUser(),
+      fetchQuotationsAction(profile?.department ?? undefined, profile?.role ?? undefined),
+      fetchPurchaseOrdersAction(profile?.department ?? undefined),
+      listPoPayments(),
+    ]);
 
   const salesManagerApprovals = pendingApprovals.filter(
     (item) => item.approverRole === "sales_manager",
@@ -30,6 +39,24 @@ export default async function SalesApprovalsPage() {
 
   const salesManagerPoApprovals = pendingPoApprovals.filter(
     (item) => item.approverRole === "sales_manager",
+  );
+
+  // Cross-reference the thin pending-approval worklist against the full
+  // records so the table/dialog can show complete detail (client, pricing
+  // breakdown, payment terms, etc.) instead of just quotation #/subject/amount.
+  const pendingQuotationIds = new Set(
+    salesManagerApprovals.map((item) => item.quotationId),
+  );
+  const pendingPoIds = new Set(salesManagerPoApprovals.map((item) => item.poId));
+
+  const quotations = quotationsResponse.success ? (quotationsResponse.data ?? []) : [];
+  const purchaseOrders = poResponse.success ? (poResponse.data ?? []) : [];
+
+  const pendingQuotationsForApproval = quotations.filter((quotation) =>
+    pendingQuotationIds.has(quotation.id),
+  );
+  const pendingPurchaseOrdersForApproval = purchaseOrders.filter((purchaseOrder) =>
+    pendingPoIds.has(purchaseOrder.id),
   );
 
   return (
@@ -41,20 +68,23 @@ export default async function SalesApprovalsPage() {
 
       <Panel
         title="Pending Quotations"
-        description="Quotations awaiting your approval as sales manager."
+        description="Quotations awaiting your approval as sales manager. Click one to review full details, then approve or reject."
       >
-        <ExecutiveApprovalsTable
-          items={salesManagerApprovals}
+        <QuotationsTable
+          quotations={pendingQuotationsForApproval}
+          currentUserId={profile?.id ?? ""}
           currentUserRole={profile?.role ?? null}
         />
       </Panel>
 
       <Panel
         title="Pending Purchase Orders"
-        description="Purchase orders awaiting your approval as sales manager."
+        description="Purchase orders awaiting your approval as sales manager. Click one to review full details, then approve or reject."
       >
-        <ExecutivePoApprovalsTable
-          items={salesManagerPoApprovals}
+        <PurchaseOrdersTable
+          purchaseOrders={pendingPurchaseOrdersForApproval}
+          payments={payments}
+          currentUserId={profile?.id ?? ""}
           currentUserRole={profile?.role ?? null}
         />
       </Panel>
