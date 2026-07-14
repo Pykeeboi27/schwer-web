@@ -1,18 +1,16 @@
+"use client";
+
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { DataCard, DataField, EmptyState, ResponsiveTable } from "@/components/patterns";
 import type { CostingApprovedHistoryItem } from "@/lib/engineering/costing-quotations";
+import { formatCurrency } from "@/lib/utils/number-format";
 import { ExternalLink } from "lucide-react";
+import type { KeyboardEvent } from "react";
+import { useState } from "react";
 
 type CostingHistoryTableProps = {
   items: CostingApprovedHistoryItem[];
 };
-
-function formatCurrency(amount: number): string {
-  return new Intl.NumberFormat("en-PH", {
-    style: "currency",
-    currency: "PHP",
-    maximumFractionDigits: 2,
-  }).format(amount);
-}
 
 function formatDate(iso: string): string {
   return new Date(iso).toLocaleDateString("en-PH", {
@@ -22,81 +20,119 @@ function formatDate(iso: string): string {
   });
 }
 
+function driveLink(link: string | null) {
+  return link ? (
+    <a
+      href={link}
+      target="_blank"
+      rel="noreferrer"
+      className="inline-flex items-center gap-1 text-primary hover:underline"
+      aria-label="Open Google Drive link"
+    >
+      <ExternalLink className="h-3.5 w-3.5" /> Open
+    </a>
+  ) : (
+    <span className="text-muted-foreground">-</span>
+  );
+}
+
+function onRowKeyDown(event: KeyboardEvent<HTMLTableRowElement>, onActivate: () => void) {
+  if (event.key === "Enter" || event.key === " ") {
+    event.preventDefault();
+    onActivate();
+  }
+}
+
 export function CostingHistoryTable({ items }: CostingHistoryTableProps) {
+  const [viewing, setViewing] = useState<CostingApprovedHistoryItem | null>(null);
+
   if (items.length === 0) {
     return <EmptyState title="No approved costing quotations yet." />;
   }
 
-  const driveLink = (link: string | null) =>
-    link ? (
-      <a
-        href={link}
-        target="_blank"
-        rel="noreferrer"
-        className="inline-flex items-center gap-1 text-primary hover:underline"
-        aria-label="Open Google Drive link"
-      >
-        <ExternalLink className="h-3.5 w-3.5" /> Open
-      </a>
-    ) : (
-      <span className="text-muted-foreground">-</span>
-    );
-
   return (
-    <ResponsiveTable
-      table={
-        <table className="w-full min-w-[860px] text-sm">
-          <thead className="bg-muted/40 text-left">
-            <tr>
-              <th className="px-3 py-2 font-medium">Quotation</th>
-              <th className="px-3 py-2 font-medium">Client</th>
-              <th className="px-3 py-2 font-medium">Subject</th>
-              <th className="px-3 py-2 font-medium">Direct Cost</th>
-              <th className="px-3 py-2 font-medium">Drive</th>
-              <th className="px-3 py-2 font-medium">Approved At</th>
-            </tr>
-          </thead>
-          <tbody>
-            {items.map((item) => (
-              <tr key={item.quotationId} className="border-t">
-                <td className="px-3 py-2 font-mono text-xs">{item.quotationNumber}</td>
-                <td className="px-3 py-2">{item.clientName}</td>
-                <td className="px-3 py-2">{item.subject || "-"}</td>
-                <td className="px-3 py-2">
-                  {item.cost === null ? "-" : formatCurrency(item.cost)}
-                </td>
-                <td className="px-3 py-2">{driveLink(item.googleDriveLink)}</td>
-                <td className="px-3 py-2 text-muted-foreground">
-                  {formatDate(item.approvedAt)}
-                </td>
+    <>
+      <ResponsiveTable
+        table={
+          <table className="w-full min-w-[680px] text-sm">
+            <thead className="bg-muted/40 text-left">
+              <tr>
+                <th className="px-3 py-2 font-medium">Client</th>
+                <th className="px-3 py-2 font-medium">Subject</th>
+                <th className="px-3 py-2 font-medium">Direct Cost</th>
+                <th className="px-3 py-2 font-medium">Approved</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
-      }
-      cards={items.map((item) => (
-        <DataCard
-          key={item.quotationId}
-          header={
+            </thead>
+            <tbody>
+              {items.map((item) => (
+                <tr
+                  key={item.quotationId}
+                  role="button"
+                  tabIndex={0}
+                  aria-label={`View ${item.quotationNumber}`}
+                  onClick={() => setViewing(item)}
+                  onKeyDown={(event) => onRowKeyDown(event, () => setViewing(item))}
+                  className="cursor-pointer border-t transition-colors hover:bg-muted/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset"
+                >
+                  <td className="px-3 py-2">{item.clientName}</td>
+                  <td className="px-3 py-2">{item.subject || "-"}</td>
+                  <td className="px-3 py-2">{formatCurrency(item.cost)}</td>
+                  <td className="px-3 py-2 text-muted-foreground">
+                    {formatDate(item.approvedAt)}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        }
+        cards={items.map((item) => (
+          <DataCard
+            key={item.quotationId}
+            onActivate={() => setViewing(item)}
+            ariaLabel={`View ${item.quotationNumber}`}
+            header={<p className="truncate font-semibold">{item.clientName}</p>}
+          >
+            <DataField label="Subject" value={item.subject || "-"} />
+            <DataField label="Direct Cost" value={formatCurrency(item.cost)} />
+            <DataField label="Approved" value={formatDate(item.approvedAt)} />
+          </DataCard>
+        ))}
+      />
+
+      <Dialog
+        open={viewing !== null}
+        onOpenChange={(next) => {
+          if (!next) setViewing(null);
+        }}
+      >
+        <DialogContent className="max-w-md">
+          {viewing ? (
             <>
-              <div className="min-w-0">
-                <p className="truncate font-semibold">{item.clientName}</p>
-                <p className="font-mono text-xs text-muted-foreground">
-                  {item.quotationNumber}
-                </p>
-              </div>
-              {driveLink(item.googleDriveLink)}
+              <DialogHeader>
+                <DialogTitle className="font-mono text-base">
+                  {viewing.quotationNumber}
+                </DialogTitle>
+              </DialogHeader>
+              <dl className="grid grid-cols-[120px_1fr] gap-x-3 gap-y-2 text-sm">
+                <dt className="text-muted-foreground">Client</dt>
+                <dd className="font-medium">{viewing.clientName}</dd>
+
+                <dt className="text-muted-foreground">Subject</dt>
+                <dd className="font-medium">{viewing.subject || "-"}</dd>
+
+                <dt className="text-muted-foreground">Direct Cost</dt>
+                <dd className="font-medium">{formatCurrency(viewing.cost)}</dd>
+
+                <dt className="text-muted-foreground">Google Drive</dt>
+                <dd className="font-medium">{driveLink(viewing.googleDriveLink)}</dd>
+
+                <dt className="text-muted-foreground">Approved At</dt>
+                <dd className="font-medium">{formatDate(viewing.approvedAt)}</dd>
+              </dl>
             </>
-          }
-        >
-          <DataField label="Subject" value={item.subject || "-"} />
-          <DataField
-            label="Direct Cost"
-            value={item.cost === null ? "-" : formatCurrency(item.cost)}
-          />
-          <DataField label="Approved At" value={formatDate(item.approvedAt)} />
-        </DataCard>
-      ))}
-    />
+          ) : null}
+        </DialogContent>
+      </Dialog>
+    </>
   );
 }
