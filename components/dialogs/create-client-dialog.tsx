@@ -12,10 +12,15 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import { selectFieldClassName } from "@/components/patterns";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { generateClientCode } from "@/lib/utils/client-code-generator";
 import { useToast } from "@/lib/utils/toast-notification";
-import { cn } from "@/lib/utils";
 import { useRouter } from "next/navigation";
 import { useRef, useState } from "react";
 
@@ -219,16 +224,16 @@ export function CreateClientDialog({
 
           <div>
             <Label htmlFor="sector">Sector</Label>
-            <select
-              id="sector"
-              name="sector"
-              defaultValue="commercial"
-              className={cn(selectFieldClassName, "mt-1 h-9 py-1")}
-            >
-              <option value="commercial">Commercial</option>
-              <option value="industrial">Industrial</option>
-              <option value="solar">Solar</option>
-            </select>
+            <Select name="sector" defaultValue="commercial">
+              <SelectTrigger id="sector" className="mt-1">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="commercial">Commercial</SelectItem>
+                <SelectItem value="industrial">Industrial</SelectItem>
+                <SelectItem value="solar">Solar</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
 
           <div>

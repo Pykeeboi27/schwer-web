@@ -64,8 +64,8 @@ export function LoginForm({
     <div className={cn("flex flex-col gap-6", className)} {...props}>
       <Card className="border-none bg-transparent shadow-none">
         <CardHeader className="px-0">
-          <CardTitle className="text-2xl font-semibold tracking-tight">Sign in</CardTitle>
-          <CardDescription>
+          <CardTitle className="text-3xl font-semibold tracking-tight">Sign in</CardTitle>
+          <CardDescription className="text-base">
             Enter your credentials to access Schwer Online Management
           </CardDescription>
         </CardHeader>
@@ -73,22 +73,27 @@ export function LoginForm({
           <form action={formAction}>
             <div className="flex flex-col gap-5">
               <div className="grid gap-1.5">
-                <Label htmlFor="email">Email</Label>
+                <Label htmlFor="email" className="text-base">
+                  Email
+                </Label>
                 <Input
                   id="email"
                   name="email"
                   type="email"
                   placeholder="m@example.com"
                   required
+                  className="md:text-base"
                 />
               </div>
 
               <div className="grid gap-1.5">
                 <div className="flex items-center justify-between">
-                  <Label htmlFor="password">Password</Label>
+                  <Label htmlFor="password" className="text-base">
+                    Password
+                  </Label>
                   <Link
                     href="/auth/forgot-password"
-                    className="text-xs text-muted-foreground underline-offset-4 transition-colors hover:text-foreground hover:underline"
+                    className="text-sm text-muted-foreground underline-offset-4 transition-colors hover:text-foreground hover:underline"
                   >
                     Forgot password?
                   </Link>
@@ -99,7 +104,7 @@ export function LoginForm({
                     name="password"
                     type={isPasswordVisible ? "text" : "password"}
                     required
-                    className="pr-10"
+                    className="pr-10 md:text-base"
                   />
                   <button
                     type="button"
@@ -118,12 +123,12 @@ export function LoginForm({
                 </div>
               )}
 
-              <Button type="submit" className="w-full" disabled={isPending}>
+              <Button type="submit" className="w-full text-base" disabled={isPending}>
                 {isPending ? "Signing in…" : "Sign in"}
               </Button>
             </div>
 
-            <div className="mt-5 text-center text-sm text-muted-foreground">
+            <div className="mt-5 text-center text-base text-muted-foreground">
               Don&apos;t have an account?{" "}
               <Link
                 href="/auth/sign-up"

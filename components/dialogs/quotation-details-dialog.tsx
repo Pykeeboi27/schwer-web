@@ -20,16 +20,17 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { Callout, StatusBadge, textareaClassName } from "@/components/patterns";
 import {
-  Callout,
-  selectFieldClassName,
-  StatusBadge,
-  textareaClassName,
-} from "@/components/patterns";
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { computeSalesPricing, computeVatBreakdown } from "@/lib/sales/pricing";
 import type { SalesQuotation } from "@/lib/sales/quotations";
 import { formatCurrency } from "@/lib/utils/number-format";
-import { cn } from "@/lib/utils";
 import { useToast } from "@/lib/utils/toast-notification";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
@@ -588,19 +589,21 @@ export function QuotationDetailsDialog({
               </div>
               <div>
                 <Label htmlFor="sales-payment-terms">Payment Terms</Label>
-                <select
-                  id="sales-payment-terms"
-                  value={paymentTermsSelect}
-                  onChange={(event) => setPaymentTermsSelect(event.target.value)}
-                  className={cn(selectFieldClassName, "mt-1 h-9 py-1")}
+                <Select
+                  value={paymentTermsSelect || undefined}
+                  onValueChange={(value) => setPaymentTermsSelect(value)}
                 >
-                  <option value="">Select payment terms</option>
-                  {PAYMENT_TERMS_OPTIONS.map((option) => (
-                    <option key={option} value={option}>
-                      {option}
-                    </option>
-                  ))}
-                </select>
+                  <SelectTrigger id="sales-payment-terms" className="mt-1">
+                    <SelectValue placeholder="Select payment terms" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {PAYMENT_TERMS_OPTIONS.map((option) => (
+                      <SelectItem key={option} value={option}>
+                        {option}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
             </div>
 

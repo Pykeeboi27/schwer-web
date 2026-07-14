@@ -7,8 +7,13 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { selectFieldClassName } from "@/components/patterns";
-import { cn } from "@/lib/utils";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { DEPARTMENTS, isDepartment } from "@/lib/profile/departments";
 import {
   ensureCurrentProfile,
@@ -138,22 +143,24 @@ async function ChooseDepartmentContent({ searchParams }: ChooseDepartmentPagePro
             <label htmlFor="department" className="text-sm font-medium">
               Department
             </label>
-            <select
-              id="department"
-              name="department"
-              required
-              defaultValue=""
-              className={cn(selectFieldClassName, "h-9 py-1 capitalize")}
-            >
-              <option value="" disabled>
-                Select department
-              </option>
-              {DEPARTMENTS.map((department) => (
-                <option key={department} value={department} className="capitalize">
-                  {department}
-                </option>
-              ))}
-            </select>
+            <Select name="department" required>
+              <SelectTrigger id="department" className="capitalize">
+                <SelectValue placeholder="Select department" />
+              </SelectTrigger>
+              <SelectContent>
+                {DEPARTMENTS.filter((department) => department !== "executive").map(
+                  (department) => (
+                    <SelectItem
+                      key={department}
+                      value={department}
+                      className="capitalize"
+                    >
+                      {department}
+                    </SelectItem>
+                  ),
+                )}
+              </SelectContent>
+            </Select>
           </div>
 
           {errorMessage && <p className="text-sm text-destructive">{errorMessage}</p>}

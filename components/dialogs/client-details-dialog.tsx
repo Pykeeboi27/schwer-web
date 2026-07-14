@@ -16,10 +16,15 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { selectFieldClassName } from "@/components/patterns";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import type { SalesClient, SalesClientContact } from "@/lib/sales/clients";
 import { useToast } from "@/lib/utils/toast-notification";
-import { cn } from "@/lib/utils";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 
@@ -319,21 +324,24 @@ export function ClientDetailsDialog({
               </div>
               <div>
                 <Label htmlFor="client-sector">Sector</Label>
-                <select
-                  id="client-sector"
+                <Select
                   value={formValues.sector}
-                  onChange={(event) =>
+                  onValueChange={(value) =>
                     setFormValues((current) => ({
                       ...current,
-                      sector: event.target.value as ClientFormValues["sector"],
+                      sector: value as ClientFormValues["sector"],
                     }))
                   }
-                  className={cn(selectFieldClassName, "mt-1 h-9 py-1")}
                 >
-                  <option value="commercial">Commercial</option>
-                  <option value="industrial">Industrial</option>
-                  <option value="solar">Solar</option>
-                </select>
+                  <SelectTrigger id="client-sector" className="mt-1">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="commercial">Commercial</SelectItem>
+                    <SelectItem value="industrial">Industrial</SelectItem>
+                    <SelectItem value="solar">Solar</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
             </div>
 

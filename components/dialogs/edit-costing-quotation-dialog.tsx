@@ -6,11 +6,17 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { NumberInput } from "@/components/ui/number-input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Callout, selectFieldClassName, textareaClassName } from "@/components/patterns";
+import { Callout, textareaClassName } from "@/components/patterns";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import type { CostingQuotation } from "@/lib/engineering/costing-quotations";
 import { suggestQuotationNumber } from "@/lib/engineering/suggest-quotation-number";
 import { useToast } from "@/lib/utils/toast-notification";
-import { cn } from "@/lib/utils";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 
@@ -182,21 +188,22 @@ export function EditCostingQuotationDialog({
 
           <div className="md:col-span-2">
             <Label htmlFor="edit-costing-client">Client</Label>
-            <select
-              id="edit-costing-client"
-              name="clientId"
-              required
-              defaultValue={quotation.clientId}
-              aria-invalid={Boolean(fieldErrors.clientId)}
-              className={cn(selectFieldClassName, "mt-1 h-9 py-1")}
-            >
-              <option value="">Select client</option>
-              {activeClients.map((client) => (
-                <option key={client.id} value={client.id}>
-                  {client.companyName}
-                </option>
-              ))}
-            </select>
+            <Select name="clientId" required defaultValue={quotation.clientId}>
+              <SelectTrigger
+                id="edit-costing-client"
+                className="mt-1"
+                aria-invalid={Boolean(fieldErrors.clientId)}
+              >
+                <SelectValue placeholder="Select client" />
+              </SelectTrigger>
+              <SelectContent>
+                {activeClients.map((client) => (
+                  <SelectItem key={client.id} value={client.id}>
+                    {client.companyName}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
             {fieldErrors.clientId ? (
               <p className="mt-1 text-xs text-destructive">{fieldErrors.clientId}</p>
             ) : null}
