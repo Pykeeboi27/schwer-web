@@ -264,6 +264,7 @@ CREATE TABLE public.quotations (
   google_drive_link   TEXT,
   costing_rejection_reason TEXT,
   costing_approved_at TIMESTAMPTZ,
+  sales_person_id     UUID REFERENCES public.profiles(id),
   sales_margin_percent NUMERIC(6, 2),
   payment_terms       TEXT,
   payment_terms_custom TEXT,
@@ -284,6 +285,7 @@ CREATE TABLE public.quotations (
 
 CREATE INDEX idx_quotations_client ON public.quotations(client_id);
 CREATE INDEX idx_quotations_status ON public.quotations(status);
+CREATE INDEX idx_quotations_sales_person ON public.quotations(sales_person_id);
 
 CREATE TABLE public.quotation_approvals (
   id               UUID PRIMARY KEY DEFAULT uuid_generate_v4(),

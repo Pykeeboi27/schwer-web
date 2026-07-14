@@ -1,12 +1,8 @@
 "use client";
 
-import {
-  deleteCostingQuotationAction,
-  submitCostingForApprovalAction,
-} from "@/app/protected/engineering/quotations/actions";
-import { EditCostingQuotationDialog } from "@/components/dialogs/edit-costing-quotation-dialog";
-import { Button } from "@/components/ui/button";
+import { CostingQuotationDetailsDialog } from "@/components/dialogs/costing-quotation-details-dialog";
 import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
 import {
   DataCard,
   DataField,
@@ -15,9 +11,9 @@ import {
   StatusBadge,
 } from "@/components/patterns";
 import type { CostingQuotation } from "@/lib/engineering/costing-quotations";
-import { useToast } from "@/lib/utils/toast-notification";
-import { ExternalLink, FileText, Search } from "lucide-react";
-import { useRouter } from "next/navigation";
+import { formatCurrency } from "@/lib/utils/number-format";
+import { FileText, Search } from "lucide-react";
+import type { KeyboardEvent } from "react";
 import { useMemo, useState } from "react";
 
 type ClientOption = {
@@ -26,10 +22,16 @@ type ClientOption = {
   isActive: boolean;
 };
 
+type SalesPersonOption = {
+  id: string;
+  name: string;
+};
+
 type CostingQuotationsTableProps = {
   quotations: CostingQuotation[];
   currentUserId: string;
   clients: ClientOption[];
+  salesPeople: SalesPersonOption[];
 };
 
 type StatusFilter = "all" | CostingQuotation["status"] | "returned";
@@ -53,20 +55,19 @@ const ALL_FILTER_OPTIONS: StatusFilter[] = [
   "rejected",
 ];
 
-function formatCurrency(amount: number): string {
-  return new Intl.NumberFormat("en-PH", {
-    style: "currency",
-    currency: "PHP",
-    maximumFractionDigits: 2,
-  }).format(amount);
-}
-
 /** Resolve a costing quotation to a shared StatusBadge key. */
 function costingBadgeStatus(q: CostingQuotation): string {
   if (q.status === "draft" && q.costingRejectionReason) {
     return "returned";
   }
   return q.status;
+}
+
+function onRowKeyDown(event: KeyboardEvent<HTMLTableRowElement>, onActivate: () => void) {
+  if (event.key === "Enter" || event.key === " ") {
+    event.preventDefault();
+    onActivate();
+  }
 }
 
 function matchesStatusFilter(q: CostingQuotation, filter: StatusFilter): boolean {
@@ -80,11 +81,9 @@ export function CostingQuotationsTable({
   quotations,
   currentUserId,
   clients,
+  salesPeople,
 }: CostingQuotationsTableProps) {
-  const router = useRouter();
-  const { success, error } = useToast();
-  const [editing, setEditing] = useState<CostingQuotation | null>(null);
-  const [busyId, setBusyId] = useState<string | null>(null);
+  const [viewing, setViewing] = useState<CostingQuotation | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
 
@@ -103,32 +102,6 @@ export function CostingQuotationsTable({
     });
   }, [quotations, searchQuery, statusFilter]);
 
-  const handleSubmit = async (q: CostingQuotation) => {
-    setBusyId(q.id);
-    const response = await submitCostingForApprovalAction(q.id);
-    if (!response.success) {
-      error(response.error ?? "Failed to submit for costing approval.");
-      setBusyId(null);
-      return;
-    }
-    success(`Submitted ${q.quotationNumber} for costing approval.`);
-    setBusyId(null);
-    router.refresh();
-  };
-
-  const handleDelete = async (q: CostingQuotation) => {
-    setBusyId(q.id);
-    const response = await deleteCostingQuotationAction(q.id);
-    if (!response.success) {
-      error(response.error ?? "Failed to delete quotation.");
-      setBusyId(null);
-      return;
-    }
-    success(`Deleted ${q.quotationNumber}.`);
-    setBusyId(null);
-    router.refresh();
-  };
-
   const emptyState = (
     <EmptyState
       icon={FileText}
@@ -140,60 +113,6 @@ export function CostingQuotationsTable({
       }
     />
   );
-
-  const driveLink = (link: string | null) =>
-    link ? (
-      <a
-        href={link}
-        target="_blank"
-        rel="noreferrer"
-        className="inline-flex items-center gap-1 text-primary hover:underline"
-        aria-label="Open Google Drive link"
-      >
-        <ExternalLink className="h-3.5 w-3.5" /> Open
-      </a>
-    ) : (
-      <span className="text-muted-foreground">-</span>
-    );
-
-  const renderActions = (q: CostingQuotation) => {
-    const isMine = q.preparedBy === currentUserId;
-    const isEditable = isMine && q.status === "draft";
-    const isPending = q.status === "pending";
-    const isBusy = busyId === q.id;
-
-    if (isPending) {
-      return <span className="text-xs text-muted-foreground">Awaiting executive</span>;
-    }
-
-    if (!isEditable) {
-      return <span className="text-xs text-muted-foreground">View only</span>;
-    }
-
-    return (
-      <div className="flex flex-wrap gap-2">
-        <Button
-          size="sm"
-          variant="outline"
-          onClick={() => setEditing(q)}
-          disabled={isBusy}
-        >
-          Edit
-        </Button>
-        <Button size="sm" onClick={() => handleSubmit(q)} disabled={isBusy}>
-          {isBusy ? "Saving..." : "Submit for Approval"}
-        </Button>
-        <Button
-          size="sm"
-          variant="ghost"
-          onClick={() => handleDelete(q)}
-          disabled={isBusy}
-        >
-          Delete
-        </Button>
-      </div>
-    );
-  };
 
   return (
     <>
@@ -225,44 +144,37 @@ export function CostingQuotationsTable({
 
       <ResponsiveTable
         table={
-          <table className="w-full min-w-[920px] text-sm">
+          <table className="w-full min-w-[560px] text-sm">
             <thead className="bg-muted/40 text-left">
               <tr>
-                <th className="px-3 py-2 font-medium">ID</th>
                 <th className="px-3 py-2 font-medium">Client</th>
                 <th className="px-3 py-2 font-medium">Subject</th>
                 <th className="px-3 py-2 font-medium">Direct Cost</th>
-                <th className="px-3 py-2 font-medium">Drive</th>
                 <th className="px-3 py-2 font-medium">Status</th>
-                <th className="px-3 py-2 font-medium">Actions</th>
               </tr>
             </thead>
             <tbody>
               {filtered.length === 0 ? (
                 <tr>
-                  <td colSpan={7}>{emptyState}</td>
+                  <td colSpan={4}>{emptyState}</td>
                 </tr>
               ) : (
                 filtered.map((q) => (
-                  <tr key={q.id} className="border-t align-top">
-                    <td className="px-3 py-2 font-mono text-xs">{q.quotationNumber}</td>
+                  <tr
+                    key={q.id}
+                    role="button"
+                    tabIndex={0}
+                    aria-label={`View ${q.quotationNumber}`}
+                    onClick={() => setViewing(q)}
+                    onKeyDown={(event) => onRowKeyDown(event, () => setViewing(q))}
+                    className="cursor-pointer border-t align-top transition-colors hover:bg-muted/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset"
+                  >
                     <td className="px-3 py-2">{q.clientName}</td>
                     <td className="px-3 py-2">{q.subject}</td>
+                    <td className="px-3 py-2">{formatCurrency(q.cost)}</td>
                     <td className="px-3 py-2">
-                      {q.cost === null ? "-" : formatCurrency(q.cost)}
+                      <StatusBadge status={costingBadgeStatus(q)} />
                     </td>
-                    <td className="px-3 py-2">{driveLink(q.googleDriveLink)}</td>
-                    <td className="px-3 py-2">
-                      <div className="flex flex-col gap-1">
-                        <StatusBadge status={costingBadgeStatus(q)} />
-                        {q.costingRejectionReason ? (
-                          <span className="text-xs text-destructive">
-                            {q.costingRejectionReason}
-                          </span>
-                        ) : null}
-                      </div>
-                    </td>
-                    <td className="px-3 py-2">{renderActions(q)}</td>
                   </tr>
                 ))
               )}
@@ -276,45 +188,31 @@ export function CostingQuotationsTable({
             filtered.map((q) => (
               <DataCard
                 key={q.id}
+                onActivate={() => setViewing(q)}
+                ariaLabel={`View ${q.quotationNumber}`}
                 header={
                   <>
-                    <div className="min-w-0">
-                      <p className="truncate font-semibold">{q.clientName}</p>
-                      <p className="font-mono text-xs text-muted-foreground">
-                        {q.quotationNumber}
-                      </p>
-                    </div>
+                    <p className="truncate font-semibold">{q.clientName}</p>
                     <StatusBadge status={costingBadgeStatus(q)} />
                   </>
                 }
-                footer={renderActions(q)}
               >
                 <DataField label="Subject" value={q.subject} />
-                <DataField
-                  label="Direct Cost"
-                  value={q.cost === null ? "-" : formatCurrency(q.cost)}
-                />
-                <DataField label="Drive" value={driveLink(q.googleDriveLink)} />
-                {q.costingRejectionReason ? (
-                  <DataField
-                    label="Returned"
-                    value={
-                      <span className="text-destructive">{q.costingRejectionReason}</span>
-                    }
-                  />
-                ) : null}
+                <DataField label="Direct Cost" value={formatCurrency(q.cost)} />
               </DataCard>
             ))
           )
         }
       />
 
-      <EditCostingQuotationDialog
-        open={editing !== null}
-        quotation={editing}
+      <CostingQuotationDetailsDialog
+        open={viewing !== null}
+        quotation={viewing}
+        currentUserId={currentUserId}
         clients={clients}
+        salesPeople={salesPeople}
         onOpenChange={(open) => {
-          if (!open) setEditing(null);
+          if (!open) setViewing(null);
         }}
       />
     </>

@@ -50,6 +50,7 @@ export async function createCostingQuotationAction(
     const cost = parseCostingCost(formData.get("cost"));
     const googleDriveLink = ensureValidDriveLink(formData.get("googleDriveLink"));
     const notes = asOptionalString(formData.get("notes"))?.toUpperCase() ?? null;
+    const salesPersonId = asOptionalString(formData.get("salesPersonId"));
 
     const result = await createCostingQuotation({
       quotationNumber,
@@ -58,6 +59,7 @@ export async function createCostingQuotationAction(
       cost,
       googleDriveLink,
       notes,
+      salesPersonId,
     });
 
     revalidatePath("/protected/engineering/quotations");
@@ -83,6 +85,7 @@ export async function updateCostingQuotationAction(
     const cost = parseCostingCost(formData.get("cost"));
     const googleDriveLink = ensureValidDriveLink(formData.get("googleDriveLink"));
     const notes = asOptionalString(formData.get("notes"))?.toUpperCase() ?? null;
+    const salesPersonId = asOptionalString(formData.get("salesPersonId"));
 
     await updateCostingQuotation({
       quotationId,
@@ -92,6 +95,7 @@ export async function updateCostingQuotationAction(
       cost,
       googleDriveLink,
       notes,
+      salesPersonId,
     });
 
     revalidatePath("/protected/engineering/quotations");
