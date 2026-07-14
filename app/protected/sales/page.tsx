@@ -77,13 +77,16 @@ export default async function SalesDashboardPage() {
             {
               label: "Rejected",
               value: summary.quotations.rejected,
-              className: "border-red-200 bg-red-50 dark:border-red-900 dark:bg-red-950/40",
+              className:
+                "border-red-200 bg-red-50 dark:border-red-900 dark:bg-red-950/40",
               valueClassName: "text-red-700 dark:text-red-300",
             },
           ].map((item) => (
             <div key={item.label} className={`rounded-md border p-3 ${item.className}`}>
               <p className="text-sm text-muted-foreground">{item.label}</p>
-              <p className={`mt-1 text-xl font-semibold tabular-nums ${item.valueClassName}`}>
+              <p
+                className={`mt-1 text-xl font-semibold tabular-nums ${item.valueClassName}`}
+              >
                 {item.value}
               </p>
             </div>

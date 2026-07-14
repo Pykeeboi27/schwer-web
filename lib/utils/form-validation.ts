@@ -17,7 +17,9 @@ export type ClientFormErrors = {
 };
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-const PHONE_REGEX = /^[0-9\s-]{10,20}$/;
+// Allows digits plus common formatting characters (+, spaces, dashes, parens);
+// anything else (letters, symbols) is rejected.
+const PHONE_ALLOWED_CHARS_REGEX = /^[0-9+()\s-]+$/;
 const PO_AMOUNT_REGEX = /^\d{1,15}(?:\.\d{1,2})?$/;
 
 function normalizeInput(value: unknown): string {
@@ -46,18 +48,41 @@ export function validateClientEmail(email: string | null | undefined): string | 
   return null;
 }
 
-export function validateClientPhone(phone: string | null | undefined): string | null {
+/**
+ * Strips characters that can't appear in a phone number (letters, punctuation
+ * other than +()-, etc.) while typing. Used as a live input filter — keep this
+ * permissive; `validatePhone`/`validateClientPhone` enforce the real shape.
+ */
+export function sanitizePhoneInput(raw: string): string {
+  return raw.replace(/[^0-9+()\s-]/g, "");
+}
+
+/**
+ * Validates a phone/mobile number: only digits and common formatting
+ * characters (+, spaces, dashes, parens), with 7–15 significant digits once
+ * formatting is stripped (covers PH landline/mobile and intl formats).
+ */
+export function validatePhone(phone: string | null | undefined): string | null {
   const normalized = normalizeInput(phone);
 
   if (!normalized) {
     return null;
   }
 
-  if (!PHONE_REGEX.test(normalized)) {
-    return "Phone number must be 10 to 20 characters and contain only digits, spaces, or dashes.";
+  if (!PHONE_ALLOWED_CHARS_REGEX.test(normalized)) {
+    return "Phone number can only contain digits, spaces, dashes, parentheses, and a leading +.";
+  }
+
+  const digitCount = normalized.replace(/\D/g, "").length;
+  if (digitCount < 7 || digitCount > 15) {
+    return "Phone number must have 7 to 15 digits.";
   }
 
   return null;
+}
+
+export function validateClientPhone(phone: string | null | undefined): string | null {
+  return validatePhone(phone);
 }
 
 export function validateClientAddress(
