@@ -2,7 +2,7 @@ import { fetchQuotationsAction } from "@/app/protected/sales/quotations/actions"
 import { QuotationsTable } from "@/components/tables/quotations-table";
 import { ReadyForPurchaseOrderTable } from "@/components/tables/ready-for-purchase-order-table";
 import { ReadyForQuotationTable } from "@/components/tables/ready-for-quotation-table";
-import { PageHeader, Panel, StatCard } from "@/components/patterns";
+import { PageHeader, Panel } from "@/components/patterns";
 import { getCurrentProfile } from "@/lib/profile/get-current-profile";
 import { getSalesAccessRedirect } from "@/lib/sales/access";
 import { redirect } from "next/navigation";
@@ -25,7 +25,10 @@ export default async function SalesQuotationsPage() {
   const quotations = response.success ? (response.data ?? []) : [];
 
   const readyForQuotation = quotations.filter(
-    (quotation) => quotation.status === "draft" && quotation.costingApprovedAt !== null,
+    (quotation) =>
+      quotation.status === "draft" &&
+      quotation.costingApprovedAt !== null &&
+      quotation.salesPersonId === profile?.id,
   );
 
   // Approved + client PO recorded, but not yet converted: ready to make a PO.
@@ -59,6 +62,15 @@ export default async function SalesQuotationsPage() {
   const rejectedCount = statsQuotations.filter(
     (quotation) => quotation.status === "rejected",
   ).length;
+
+  // Sales users get their own assigned quotations split from the rest of the
+  // department's; owner/executive keep a single combined table.
+  const myQuotations = activeQuotations.filter(
+    (quotation) => quotation.salesPersonId === profile?.id,
+  );
+  const companyQuotations = activeQuotations.filter(
+    (quotation) => quotation.salesPersonId !== profile?.id,
+  );
 
   return (
     <div className="flex flex-col gap-6">
@@ -105,25 +117,91 @@ export default async function SalesQuotationsPage() {
         </Panel>
       ) : null}
 
-      <div className="grid gap-4 sm:grid-cols-3">
-        <StatCard label="Pending" value={pendingCount} />
-        <StatCard label="Approved" value={approvedCount} />
-        <StatCard label="Rejected" value={rejectedCount} />
+      <div className="grid gap-3 sm:grid-cols-3">
+        {[
+          {
+            label: "Pending",
+            value: pendingCount,
+            className:
+              "border-amber-200 bg-amber-50 dark:border-amber-900 dark:bg-amber-950/40",
+            valueClassName: "text-amber-700 dark:text-amber-300",
+          },
+          {
+            label: "Approved",
+            value: approvedCount,
+            className:
+              "border-green-200 bg-green-50 dark:border-green-900 dark:bg-green-950/40",
+            valueClassName: "text-green-700 dark:text-green-300",
+          },
+          {
+            label: "Rejected",
+            value: rejectedCount,
+            className: "border-red-200 bg-red-50 dark:border-red-900 dark:bg-red-950/40",
+            valueClassName: "text-red-700 dark:text-red-300",
+          },
+        ].map((item) => (
+          <div key={item.label} className={`rounded-md border p-3 ${item.className}`}>
+            <p className="text-sm text-muted-foreground">{item.label}</p>
+            <p
+              className={`mt-1 text-xl font-semibold tabular-nums ${item.valueClassName}`}
+            >
+              {item.value}
+            </p>
+          </div>
+        ))}
       </div>
 
-      <Panel title="Quotations">
-        {response.success ? (
-          <QuotationsTable
-            quotations={activeQuotations}
-            currentUserId={profile?.id ?? ""}
-            currentUserRole={profile?.role ?? null}
-          />
-        ) : (
-          <p className="text-sm text-destructive">
-            {response.error ?? "Failed to load quotations."}
-          </p>
-        )}
-      </Panel>
+      {isSalesDepartment ? (
+        <>
+          <Panel
+            title="My Quotations"
+            description="Quotations assigned to you. Fully editable while in draft or re-opened for a PO."
+          >
+            {response.success ? (
+              <QuotationsTable
+                quotations={myQuotations}
+                currentUserId={profile?.id ?? ""}
+                currentUserRole={profile?.role ?? null}
+              />
+            ) : (
+              <p className="text-sm text-destructive">
+                {response.error ?? "Failed to load quotations."}
+              </p>
+            )}
+          </Panel>
+
+          <Panel
+            title="Company Quotations"
+            description="Quotations assigned to other sales people. Read-only unless you're an approver."
+          >
+            {response.success ? (
+              <QuotationsTable
+                quotations={companyQuotations}
+                currentUserId={profile?.id ?? ""}
+                currentUserRole={profile?.role ?? null}
+              />
+            ) : (
+              <p className="text-sm text-destructive">
+                {response.error ?? "Failed to load quotations."}
+              </p>
+            )}
+          </Panel>
+        </>
+      ) : (
+        <Panel title="Quotations">
+          {response.success ? (
+            <QuotationsTable
+              quotations={activeQuotations}
+              currentUserId={profile?.id ?? ""}
+              currentUserRole={profile?.role ?? null}
+            />
+          ) : (
+            <p className="text-sm text-destructive">
+              {response.error ?? "Failed to load quotations."}
+            </p>
+          )}
+        </Panel>
+      )}
     </div>
   );
 }

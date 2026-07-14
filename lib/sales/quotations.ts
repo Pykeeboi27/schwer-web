@@ -15,6 +15,7 @@ export type SalesQuotation = {
   notes: string | null;
   status: "draft" | "pending" | "approved" | "rejected" | "cancelled" | "closed";
   preparedBy: string;
+  salesPersonId: string | null;
   pendingApprovalRoles: RequiredApproverRole[];
   createdAt: string;
   costingApprovedAt: string | null;
@@ -155,7 +156,7 @@ export async function listSalesQuotations(): Promise<SalesQuotation[]> {
   const { data, error } = await supabase
     .from("quotations")
     .select(
-      "id, quotation_number, client_id, subject, amount, cost, google_drive_link, notes, status, prepared_by, created_at, costing_approved_at, sales_margin_percent, margin_percentage, margin_amount, bank_percentage, bank_amount, sop_percentage, sop_amount, selling_amount, payment_terms, payment_terms_custom, lead_time_days, client_po_number, client_confirmed_at, converted_po_id, po_converted_at, clients:client_id(company_name), converted_po:converted_po_id(status), quotation_approvals(approver_role, status)",
+      "id, quotation_number, client_id, subject, amount, cost, google_drive_link, notes, status, prepared_by, sales_person_id, created_at, costing_approved_at, sales_margin_percent, margin_percentage, margin_amount, bank_percentage, bank_amount, sop_percentage, sop_amount, selling_amount, payment_terms, payment_terms_custom, lead_time_days, client_po_number, client_confirmed_at, converted_po_id, po_converted_at, clients:client_id(company_name), converted_po:converted_po_id(status), quotation_approvals(approver_role, status)",
     )
     .eq("phase", "sales")
     .order("created_at", { ascending: false });
@@ -189,6 +190,7 @@ export async function listSalesQuotations(): Promise<SalesQuotation[]> {
       notes: row.notes,
       status: row.status,
       preparedBy: row.prepared_by,
+      salesPersonId: row.sales_person_id ?? null,
       pendingApprovalRoles,
       createdAt: row.created_at,
       costingApprovedAt: row.costing_approved_at ?? null,
