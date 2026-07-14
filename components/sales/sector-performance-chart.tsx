@@ -59,29 +59,28 @@ export function SectorPerformanceChart({ slices }: SectorPerformanceChartProps) 
         })}
       </svg>
 
-      <ul className="w-full min-w-0 flex-1 space-y-2 text-sm">
+      <ul className="w-full min-w-0 flex-1 space-y-3 text-sm">
         {slices.map((slice) => {
           const share = total > 0 ? (slice.totalAmount / total) * 100 : 0;
           return (
-            <li
-              key={slice.sector}
-              className="flex min-w-0 items-center justify-between gap-3"
-            >
-              <span className="flex min-w-0 items-center gap-2">
-                <span
-                  className="inline-block h-3 w-3 shrink-0 rounded-sm"
-                  style={{ backgroundColor: SECTOR_COLORS[slice.sector] }}
-                  aria-hidden
-                />
-                <span className="truncate font-medium">{slice.label}</span>
-                <span className="shrink-0 text-muted-foreground">
-                  ({slice.count} {slice.count === 1 ? "quote" : "quotes"})
+            <li key={slice.sector} className="min-w-0">
+              <div className="flex min-w-0 items-center justify-between gap-3">
+                <span className="flex min-w-0 items-center gap-2">
+                  <span
+                    className="inline-block h-3.5 w-3.5 shrink-0 rounded-sm"
+                    style={{ backgroundColor: SECTOR_COLORS[slice.sector] }}
+                    aria-hidden
+                  />
+                  <span className="truncate font-medium">{slice.label}</span>
                 </span>
-              </span>
-              <span className="shrink-0 whitespace-nowrap text-right">
-                <span className="font-medium">{formatCurrency(slice.totalAmount)}</span>
-                <span className="ml-2 text-muted-foreground">{share.toFixed(1)}%</span>
-              </span>
+                <span className="shrink-0 font-medium tabular-nums">
+                  {share.toFixed(1)}%
+                </span>
+              </div>
+              <div className="mt-0.5 truncate pl-5 text-muted-foreground">
+                {formatCurrency(slice.totalAmount)} · {slice.count}{" "}
+                {slice.count === 1 ? "quote" : "quotes"}
+              </div>
             </li>
           );
         })}

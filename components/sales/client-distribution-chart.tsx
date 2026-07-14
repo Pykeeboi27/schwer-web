@@ -1,16 +1,21 @@
 import { EmptyState } from "@/components/patterns";
 import type { ClientDistributionBar } from "@/lib/sales/dashboard-charts";
+import { cn } from "@/lib/utils";
 import { formatCurrency } from "@/lib/utils/number-format";
 
 type ClientDistributionChartProps = {
   bars: ClientDistributionBar[];
   /** Cap the number of clients shown; the rest are grouped into "Others". */
   limit?: number;
+  /** Constrain the list to a max height with internal scroll, instead of
+   * letting it stretch the card indefinitely. Useful when showing all clients. */
+  scrollable?: boolean;
 };
 
 export function ClientDistributionChart({
   bars,
   limit = 8,
+  scrollable = false,
 }: ClientDistributionChartProps) {
   if (bars.length === 0) {
     return (
@@ -37,7 +42,12 @@ export function ClientDistributionChart({
   const max = Math.max(...rows.map((row) => row.totalAmount), 1);
 
   return (
-    <ul className="space-y-3 text-sm">
+    <ul
+      className={cn(
+        "space-y-3 text-sm",
+        scrollable && "max-h-80 overflow-y-auto pr-1",
+      )}
+    >
       {rows.map((row) => {
         const width = Math.max((row.totalAmount / max) * 100, 1.5);
         return (
