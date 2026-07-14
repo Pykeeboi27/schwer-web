@@ -11,6 +11,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import type { SalesPurchaseOrder } from "@/lib/sales/purchase-orders";
+import { cn } from "@/lib/utils";
 import { validateCollectionAmount } from "@/lib/utils/form-validation";
 import { useToast } from "@/lib/utils/toast-notification";
 import { useRouter } from "next/navigation";
@@ -114,7 +115,13 @@ export function RecordCollectionDialog({
         if (!next) handleClose();
       }}
     >
-      <DialogContent className="max-h-[85vh] overflow-y-auto">
+      <DialogContent
+        className={cn(
+          "max-h-[85vh] overflow-y-auto",
+          "data-[state=open]:slide-in-from-left-1/2 data-[state=open]:slide-in-from-top-[48%]",
+          "data-[state=closed]:slide-out-to-left-1/2 data-[state=closed]:slide-out-to-top-[48%]",
+        )}
+      >
         <DialogHeader>
           <DialogTitle>Record Collection</DialogTitle>
           <DialogDescription>

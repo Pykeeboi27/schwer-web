@@ -27,7 +27,6 @@ type SortDirection = "asc" | "desc";
 type ApprovalFilter = "all" | SalesPurchaseOrder["status"];
 
 const ALL_APPROVAL_STATUSES: SalesPurchaseOrder["status"][] = [
-  "draft",
   "pending",
   "approved",
   "rejected",
@@ -189,23 +188,20 @@ export function PurchaseOrdersTable({
 
       <ResponsiveTable
         table={
-          <table className="w-full min-w-[920px] text-sm">
+          <table className="w-full table-fixed text-sm">
             <thead className="bg-muted/40 text-left">
               <tr>
-                <th className="px-3 py-2 font-medium">Quotation #</th>
-                <th className="px-3 py-2 font-medium">Client Name</th>
-                <th className="px-3 py-2 font-medium">Total Amount</th>
-                <th className="px-3 py-2 font-medium">Collected Amount</th>
-                <th className="px-3 py-2 font-medium">Progress</th>
-                <th className="px-3 py-2 font-medium">Approval</th>
-                <th className="px-3 py-2 font-medium">Payment</th>
-                <th className="px-3 py-2 font-medium">Date</th>
+                <th className="w-[26%] px-3 py-2 font-medium">Client</th>
+                <th className="w-[19%] px-3 py-2 font-medium">Total Amount</th>
+                <th className="w-[27%] px-3 py-2 font-medium">Progress</th>
+                <th className="w-[14%] px-3 py-2 font-medium">Approval</th>
+                <th className="w-[14%] px-3 py-2 font-medium">Payment</th>
               </tr>
             </thead>
             <tbody>
               {filteredAndSorted.length === 0 ? (
                 <tr>
-                  <td colSpan={8}>{emptyState}</td>
+                  <td colSpan={5}>{emptyState}</td>
                 </tr>
               ) : (
                 filteredAndSorted.map((purchaseOrder) => (
@@ -222,28 +218,25 @@ export function PurchaseOrdersTable({
                       )
                     }
                   >
-                    <td className="px-3 py-2 font-mono text-xs">
-                      {purchaseOrder.poNumber}
+                    <td className="truncate px-3 py-2" title={purchaseOrder.clientName}>
+                      <p className="truncate">{purchaseOrder.clientName}</p>
+                      <p className="truncate font-mono text-xs text-muted-foreground">
+                        {purchaseOrder.poNumber}
+                      </p>
                     </td>
-                    <td className="px-3 py-2">{purchaseOrder.clientName}</td>
-                    <td className="px-3 py-2">
+                    <td className="truncate px-3 py-2">
                       {formatCurrency(purchaseOrder.poAmount)}
                     </td>
                     <td className="px-3 py-2">
-                      {formatCurrency(purchaseOrder.recognizedAmount)}
-                    </td>
-                    <td className="px-3 py-2">
-                      <div className="w-36">
-                        <p className="mb-1 text-xs text-muted-foreground">
-                          {purchaseOrder.recognizedAmount.toFixed(2)} /{" "}
-                          {purchaseOrder.poAmount.toFixed(2)}
-                        </p>
-                        <div className="h-2 rounded-full bg-muted">
-                          <div
-                            className="h-2 rounded-full bg-primary"
-                            style={{ width: `${progressOf(purchaseOrder)}%` }}
-                          />
-                        </div>
+                      <p className="mb-1 truncate text-xs text-muted-foreground">
+                        {formatCurrency(purchaseOrder.recognizedAmount)} /{" "}
+                        {formatCurrency(purchaseOrder.poAmount)}
+                      </p>
+                      <div className="h-2 rounded-full bg-muted">
+                        <div
+                          className="h-2 rounded-full bg-primary"
+                          style={{ width: `${progressOf(purchaseOrder)}%` }}
+                        />
                       </div>
                     </td>
                     <td className="px-3 py-2">
@@ -251,11 +244,6 @@ export function PurchaseOrdersTable({
                     </td>
                     <td className="px-3 py-2">
                       <StatusBadge status={purchaseOrder.paymentStatus} />
-                    </td>
-                    <td className="px-3 py-2">
-                      {purchaseOrder.approvedAt
-                        ? new Date(purchaseOrder.approvedAt).toLocaleDateString()
-                        : "—"}
                     </td>
                   </tr>
                 ))
@@ -302,14 +290,6 @@ export function PurchaseOrdersTable({
                 }
               >
                 <DataField label="Total" value={formatCurrency(purchaseOrder.poAmount)} />
-                <DataField
-                  label="Date"
-                  value={
-                    purchaseOrder.approvedAt
-                      ? new Date(purchaseOrder.approvedAt).toLocaleDateString()
-                      : "—"
-                  }
-                />
               </DataCard>
             ))
           )

@@ -27,7 +27,9 @@ describe("listPurchaseOrders", () => {
     cost: "1000000",
     margin_percentage: "10",
     margin_amount: "100000",
+    bank_percentage: null,
     bank_amount: null,
+    sop_percentage: null,
     sop_amount: null,
     selling_amount: "1500000",
     recognized_amount: "500000",
@@ -38,6 +40,7 @@ describe("listPurchaseOrders", () => {
     status: "approved",
     approved_at: "2026-02-01",
     created_at: "2026-01-01",
+    created_by: "u1",
     clients: { company_name: "Alpha Corp" },
     po_approvals: [],
   };

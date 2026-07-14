@@ -46,6 +46,17 @@ export default async function SalesPurchaseOrdersPage() {
     { closed: 0, recognized: 0 },
   );
 
+  const isSalesDepartment = profile?.department === "sales";
+
+  // Sales users get their own created purchase orders split from the rest of
+  // the department's; owner/executive keep a single combined table.
+  const myPurchaseOrders = purchaseOrders.filter(
+    (purchaseOrder) => purchaseOrder.createdBy === profile?.id,
+  );
+  const companyPurchaseOrders = purchaseOrders.filter(
+    (purchaseOrder) => purchaseOrder.createdBy !== profile?.id,
+  );
+
   return (
     <div className="flex flex-col gap-6">
       <PageHeader
@@ -58,20 +69,60 @@ export default async function SalesPurchaseOrdersPage() {
         <StatCard label="Recognized Sales" value={formatCurrency(totals.recognized)} />
       </div>
 
-      <Panel>
-        {response.success ? (
-          <PurchaseOrdersTable
-            purchaseOrders={purchaseOrders}
-            payments={payments}
-            currentUserId={profile?.id ?? ""}
-            currentUserRole={profile?.role ?? null}
-          />
-        ) : (
-          <p className="text-sm text-destructive">
-            {response.error ?? "Failed to load purchase orders."}
-          </p>
-        )}
-      </Panel>
+      {isSalesDepartment ? (
+        <>
+          <Panel
+            title="My Purchase Orders"
+            description="Purchase orders you created. Record collections and resubmit rejected POs here."
+          >
+            {response.success ? (
+              <PurchaseOrdersTable
+                purchaseOrders={myPurchaseOrders}
+                payments={payments}
+                currentUserId={profile?.id ?? ""}
+                currentUserRole={profile?.role ?? null}
+              />
+            ) : (
+              <p className="text-sm text-destructive">
+                {response.error ?? "Failed to load purchase orders."}
+              </p>
+            )}
+          </Panel>
+
+          <Panel
+            title="Company Purchase Orders"
+            description="Purchase orders created by other sales people. Collections can only be recorded by the owner."
+          >
+            {response.success ? (
+              <PurchaseOrdersTable
+                purchaseOrders={companyPurchaseOrders}
+                payments={payments}
+                currentUserId={profile?.id ?? ""}
+                currentUserRole={profile?.role ?? null}
+              />
+            ) : (
+              <p className="text-sm text-destructive">
+                {response.error ?? "Failed to load purchase orders."}
+              </p>
+            )}
+          </Panel>
+        </>
+      ) : (
+        <Panel>
+          {response.success ? (
+            <PurchaseOrdersTable
+              purchaseOrders={purchaseOrders}
+              payments={payments}
+              currentUserId={profile?.id ?? ""}
+              currentUserRole={profile?.role ?? null}
+            />
+          ) : (
+            <p className="text-sm text-destructive">
+              {response.error ?? "Failed to load purchase orders."}
+            </p>
+          )}
+        </Panel>
+      )}
     </div>
   );
 }
