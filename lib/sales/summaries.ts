@@ -45,6 +45,7 @@ export async function getSalesSummary(): Promise<SalesSummary> {
 
   const [
     { count: totalClients, error: clientsError },
+    { data: quotationRows, error: quotationError },
     { data: poRows, error: poError },
     draft,
     pending,
@@ -57,29 +58,34 @@ export async function getSalesSummary(): Promise<SalesSummary> {
       .eq("is_active", true),
     supabase
       .from("quotations")
-      .select("amount, recognized_amount")
+      .select("amount")
       .eq("status", "approved")
       .eq("phase", "sales"),
+    // Recognized sales are actual collections. `purchase_orders.recognized_amount`
+    // is kept current for every approved PO (converted from a quotation or
+    // created manually) by addPoPayment, unlike quotations.recognized_amount,
+    // which only tracks payments for POs still linked to their source quotation.
+    supabase
+      .from("purchase_orders")
+      .select("recognized_amount")
+      .eq("status", "approved"),
     getQuotationCountByStatus("draft"),
     getQuotationCountByStatus("pending"),
     getQuotationCountByStatus("approved"),
     getQuotationCountByStatus("rejected"),
   ]);
 
-  if (clientsError || poError) {
+  if (clientsError || quotationError || poError) {
     throw new Error("Failed to load sales dashboard summary.");
   }
 
-  const totals = (poRows ?? []).reduce(
-    (acc, row) => {
-      const poAmount = Number(row.amount ?? 0);
-      const recognizedAmount = Number(row.recognized_amount ?? 0);
-      return {
-        closed: acc.closed + poAmount,
-        recognized: acc.recognized + recognizedAmount,
-      };
-    },
-    { closed: 0, recognized: 0 },
+  const closedSaleTotal = (quotationRows ?? []).reduce(
+    (sum, row) => sum + Number(row.amount ?? 0),
+    0,
+  );
+  const recognizedSaleTotal = (poRows ?? []).reduce(
+    (sum, row) => sum + Number(row.recognized_amount ?? 0),
+    0,
   );
 
   return {
@@ -90,7 +96,7 @@ export async function getSalesSummary(): Promise<SalesSummary> {
       approved,
       rejected,
     },
-    closedSaleTotal: totals.closed,
-    recognizedSaleTotal: totals.recognized,
+    closedSaleTotal,
+    recognizedSaleTotal,
   };
 }
