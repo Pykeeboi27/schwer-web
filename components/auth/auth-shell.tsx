@@ -16,19 +16,22 @@ export function AuthShell({ children, showBackLink = true }: AuthShellProps) {
   return (
     <div className="grid min-h-svh w-full lg:grid-cols-[minmax(0,1fr)_minmax(0,1.3fr)]">
       {/* Desktop brand panel */}
-      <div className="hidden flex-col justify-between bg-secondary p-10 text-secondary-foreground lg:flex">
+      <div className="hidden flex-col justify-between bg-secondary p-10 text-secondary-foreground lg:flex xl:p-12 2xl:p-16">
         <Link href="/" className="inline-flex items-center gap-3">
-          <SchwerLogo className="h-9" barColor="hsl(var(--secondary-foreground))" />
+          <SchwerLogo
+            className="h-9 xl:h-10"
+            barColor="hsl(var(--secondary-foreground))"
+          />
         </Link>
 
-        <div className="space-y-3">
-          <p className="text-sm font-medium text-secondary-foreground/70">
+        <div className="space-y-4 xl:space-y-5">
+          <p className="text-base font-medium text-secondary-foreground/70 xl:text-lg">
             Schwer ERP Portal
           </p>
-          <h2 className="max-w-sm text-3xl font-semibold leading-tight tracking-tight">
+          <h2 className="max-w-sm text-4xl font-semibold leading-tight tracking-tight xl:max-w-md xl:text-5xl">
             Schwer Online Management
           </h2>
-          <p className="max-w-sm text-sm leading-relaxed text-secondary-foreground/70">
+          <p className="max-w-sm text-base leading-relaxed text-secondary-foreground/70 xl:max-w-md xl:text-lg">
             Centralized operations for Sales, Engineering, and Executive teams.
           </p>
         </div>
@@ -36,7 +39,7 @@ export function AuthShell({ children, showBackLink = true }: AuthShellProps) {
         {showBackLink ? (
           <Link
             href="/"
-            className="inline-flex items-center text-sm font-medium text-secondary-foreground/70 transition-colors hover:text-secondary-foreground"
+            className="inline-flex items-center text-base font-medium text-secondary-foreground/70 transition-colors hover:text-secondary-foreground"
           >
             &larr; Back to home
           </Link>
@@ -46,10 +49,13 @@ export function AuthShell({ children, showBackLink = true }: AuthShellProps) {
       </div>
 
       {/* Mobile brand strip */}
-      <div className="flex items-center justify-between gap-3 bg-secondary px-6 py-4 text-secondary-foreground lg:hidden">
-        <Link href="/" className="inline-flex items-center gap-3">
-          <SchwerLogo className="h-6" barColor="hsl(var(--secondary-foreground))" />
-          <span className="text-sm font-semibold">Schwer Online Management</span>
+      <div className="flex items-center justify-between gap-3 bg-secondary px-4 py-2.5 text-secondary-foreground sm:px-6 lg:hidden">
+        <Link href="/" className="inline-flex min-w-0 items-center gap-2.5">
+          <SchwerLogo
+            className="h-5 shrink-0"
+            barColor="hsl(var(--secondary-foreground))"
+          />
+          <span className="truncate text-sm font-semibold">Schwer Online Management</span>
         </Link>
       </div>
 

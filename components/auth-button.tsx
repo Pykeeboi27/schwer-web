@@ -10,10 +10,11 @@ export async function AuthButton() {
   const { data } = await supabase.auth.getClaims();
 
   const user = data?.claims;
+  const username = user?.email?.split("@")[0] ?? user?.email;
 
   return user ? (
     <div className="flex items-center gap-4">
-      Hey, {user.email}!
+      <span className="hidden truncate sm:inline">Hey, {username}!</span>
       <LogoutButton />
     </div>
   ) : (
