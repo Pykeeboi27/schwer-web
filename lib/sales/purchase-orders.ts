@@ -4,6 +4,7 @@ import {
   requiredApproverRolesForAmount,
   type RequiredApproverRole,
 } from "@/lib/sales/quotations";
+import { computeSalesPricing } from "@/lib/sales/pricing";
 import { createClient } from "@/lib/supabase/server";
 import { validatePoTotalAmount } from "@/lib/utils/form-validation";
 
@@ -23,7 +24,9 @@ export type SalesPurchaseOrder = {
   cost: number | null;
   marginPercentage: number | null;
   marginAmount: number | null;
+  bankPercentage: number | null;
   bankAmount: number | null;
+  sopPercentage: number | null;
   sopAmount: number | null;
   sellingAmount: number | null;
   recognizedAmount: number;
@@ -36,6 +39,7 @@ export type SalesPurchaseOrder = {
   pendingApprovalRoles: RequiredApproverRole[];
   approvedAt: string | null;
   createdAt: string;
+  createdBy: string;
 };
 
 export type SalesPoPayment = {
@@ -129,7 +133,7 @@ export async function listPurchaseOrders(): Promise<SalesPurchaseOrder[]> {
   const { data, error } = await supabase
     .from("purchase_orders")
     .select(
-      "id, quotation_id, po_number, client_po_number, quotation_reference, client_id, subject, po_amount, cost, margin_percentage, margin_amount, bank_amount, sop_amount, selling_amount, recognized_amount, payment_status, payment_terms, payment_terms_custom, lead_time_days, status, approved_at, created_at, clients:client_id(company_name), po_approvals(approver_role, status)",
+      "id, quotation_id, po_number, client_po_number, quotation_reference, client_id, subject, po_amount, cost, margin_percentage, margin_amount, bank_percentage, bank_amount, sop_percentage, sop_amount, selling_amount, recognized_amount, payment_status, payment_terms, payment_terms_custom, lead_time_days, status, approved_at, created_at, created_by, clients:client_id(company_name), po_approvals(approver_role, status)",
     )
     .order("created_at", { ascending: false });
 
@@ -163,7 +167,9 @@ export async function listPurchaseOrders(): Promise<SalesPurchaseOrder[]> {
       cost: numberOrNull(row.cost),
       marginPercentage: numberOrNull(row.margin_percentage),
       marginAmount: numberOrNull(row.margin_amount),
+      bankPercentage: numberOrNull(row.bank_percentage),
       bankAmount: numberOrNull(row.bank_amount),
+      sopPercentage: numberOrNull(row.sop_percentage),
       sopAmount: numberOrNull(row.sop_amount),
       sellingAmount: numberOrNull(row.selling_amount),
       recognizedAmount: Number(row.recognized_amount ?? 0),
@@ -176,6 +182,7 @@ export async function listPurchaseOrders(): Promise<SalesPurchaseOrder[]> {
       pendingApprovalRoles,
       approvedAt: row.approved_at ?? null,
       createdAt: row.created_at,
+      createdBy: row.created_by,
     };
   });
 }
@@ -507,10 +514,10 @@ export async function rejectPoApproval(input: {
     throw new Error(approvalError.message || "Failed to reject purchase order.");
   }
 
-  // Return PO to draft so the submitter can edit and resubmit.
+  // Return PO to rejected so the owner can edit its pricing and resubmit.
   const { error: poError } = await supabase
     .from("purchase_orders")
-    .update({ status: "draft" })
+    .update({ status: "rejected" })
     .eq("id", input.poId);
 
   if (poError) {
@@ -531,8 +538,8 @@ export async function resubmitPurchaseOrderForApproval(poId: string): Promise<vo
     throw new Error("Purchase order was not found.");
   }
 
-  if (po.status !== "draft") {
-    throw new Error("Only draft purchase orders can be resubmitted.");
+  if (po.status !== "rejected") {
+    throw new Error("Only rejected purchase orders can be resubmitted.");
   }
 
   const { error: poError } = await supabase
@@ -574,6 +581,72 @@ export async function resubmitPurchaseOrderForApproval(poId: string): Promise<vo
         approvalError.message || "Failed to create PO approval assignments.",
       );
     }
+  }
+}
+
+/**
+ * Editing step for a rejected PO: re-price it (margin/bank/sop %, lead time,
+ * payment terms) and update its references, ahead of resubmitting for approval.
+ * Only permitted while the PO is in the `rejected` state.
+ */
+export async function updatePurchaseOrderDetails(input: {
+  purchaseOrderId: string;
+  marginPercentage: number | null;
+  bankPercentage: number | null;
+  sopPercentage: number | null;
+  paymentTerms: string | null;
+  paymentTermsCustom: string | null;
+  leadTimeDays: number | null;
+  clientPoNumber: string | null;
+  quotationReference: string | null;
+}): Promise<void> {
+  const supabase = await createClient();
+
+  const { data: po, error: poError } = await supabase
+    .from("purchase_orders")
+    .select("id, status, cost")
+    .eq("id", input.purchaseOrderId)
+    .single();
+
+  if (poError || !po) {
+    throw new Error("Purchase order was not found.");
+  }
+
+  if (po.status !== "rejected") {
+    throw new Error("Only rejected purchase orders can be edited.");
+  }
+
+  const directCost = Number(po.cost ?? 0);
+  const pricing = computeSalesPricing({
+    directCost,
+    marginPercentage: input.marginPercentage ?? 0,
+    bankPercentage: input.bankPercentage ?? 0,
+    sopPercentage: input.sopPercentage ?? 0,
+  });
+
+  const { error: updateError } = await supabase
+    .from("purchase_orders")
+    .update({
+      margin_percentage: input.marginPercentage,
+      margin_amount: pricing.marginAmount,
+      bank_percentage: input.bankPercentage,
+      bank_amount: pricing.bankAmount,
+      sop_percentage: input.sopPercentage,
+      sop_amount: pricing.sopAmount,
+      selling_amount: pricing.sellingAmount,
+      po_amount: pricing.sellingAmount,
+      payment_terms: input.paymentTerms,
+      payment_terms_custom: input.paymentTermsCustom,
+      lead_time_days: input.leadTimeDays,
+      client_po_number: input.clientPoNumber ? input.clientPoNumber.toUpperCase() : null,
+      quotation_reference: input.quotationReference
+        ? input.quotationReference.toUpperCase()
+        : null,
+    })
+    .eq("id", input.purchaseOrderId);
+
+  if (updateError) {
+    throw new Error(updateError.message || "Failed to update purchase order details.");
   }
 }
 

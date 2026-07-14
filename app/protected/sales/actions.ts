@@ -19,6 +19,7 @@ import {
   submitQuotationForApproval,
 } from "@/lib/sales/quotations";
 import { addPoPayment, parsePoAmount } from "@/lib/sales/purchase-orders";
+import { validatePhone } from "@/lib/utils/form-validation";
 
 export type SalesActionResult = {
   ok: boolean;
@@ -141,6 +142,15 @@ export async function addClientContactAction(
     const mobile = String(formData.get("mobile") ?? "").trim() || null;
     const position = String(formData.get("position") ?? "").trim() || null;
     const isPrimary = String(formData.get("isPrimary") ?? "") === "on";
+
+    const phoneError = validatePhone(phone);
+    if (phoneError) {
+      throw new Error(phoneError);
+    }
+    const mobileError = validatePhone(mobile);
+    if (mobileError) {
+      throw new Error(mobileError);
+    }
 
     await addClientContact({
       clientId,

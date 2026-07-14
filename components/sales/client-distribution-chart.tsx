@@ -43,10 +43,7 @@ export function ClientDistributionChart({
 
   return (
     <ul
-      className={cn(
-        "space-y-3 text-sm",
-        scrollable && "max-h-80 overflow-y-auto pr-1",
-      )}
+      className={cn("space-y-3 text-sm", scrollable && "max-h-80 overflow-y-auto pr-1")}
     >
       {rows.map((row) => {
         const width = Math.max((row.totalAmount / max) * 100, 1.5);

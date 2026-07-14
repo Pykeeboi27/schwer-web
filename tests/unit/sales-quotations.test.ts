@@ -82,6 +82,7 @@ describe("listSalesQuotations", () => {
     notes: null,
     status: "pending",
     prepared_by: "u1",
+    sales_person_id: "u1",
     created_at: "2026-01-01",
     costing_approved_at: null,
     sales_margin_percent: "10",

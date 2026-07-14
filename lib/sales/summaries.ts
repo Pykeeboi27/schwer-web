@@ -65,10 +65,7 @@ export async function getSalesSummary(): Promise<SalesSummary> {
     // is kept current for every approved PO (converted from a quotation or
     // created manually) by addPoPayment, unlike quotations.recognized_amount,
     // which only tracks payments for POs still linked to their source quotation.
-    supabase
-      .from("purchase_orders")
-      .select("recognized_amount")
-      .eq("status", "approved"),
+    supabase.from("purchase_orders").select("recognized_amount").eq("status", "approved"),
     getQuotationCountByStatus("draft"),
     getQuotationCountByStatus("pending"),
     getQuotationCountByStatus("approved"),

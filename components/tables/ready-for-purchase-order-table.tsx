@@ -30,16 +30,6 @@ function formatDate(iso: string | null): string {
   });
 }
 
-function formatPercent(value: number | null): string {
-  if (value === null) return "—";
-  return `${value.toFixed(2)}%`;
-}
-
-function formatLeadTime(days: number | null): string {
-  if (days === null) return "—";
-  return `${days} day${days === 1 ? "" : "s"}`;
-}
-
 function onRowKeyDown(
   event: KeyboardEvent<HTMLTableRowElement>,
   onActivate: () => void,
@@ -102,25 +92,20 @@ export function ReadyForPurchaseOrderTable({
 
       <ResponsiveTable
         table={
-          <table className="w-full min-w-[1200px] text-sm">
+          <table className="w-full table-fixed text-sm">
             <thead className="bg-muted/40 text-left">
               <tr>
-                <th className="px-3 py-2 font-medium">Quotation</th>
-                <th className="px-3 py-2 font-medium">Client</th>
-                <th className="px-3 py-2 font-medium">Subject</th>
-                <th className="px-3 py-2 font-medium">Amount</th>
-                <th className="px-3 py-2 font-medium">Client PO #</th>
-                <th className="px-3 py-2 font-medium">Cost</th>
-                <th className="px-3 py-2 font-medium">Margin %</th>
-                <th className="px-3 py-2 font-medium">Payment Terms</th>
-                <th className="px-3 py-2 font-medium">Lead Time</th>
-                <th className="px-3 py-2 font-medium">Client Confirmed At</th>
+                <th className="w-[26%] px-3 py-2 font-medium">Client</th>
+                <th className="w-[28%] px-3 py-2 font-medium">Subject</th>
+                <th className="w-[17%] px-3 py-2 font-medium">Amount</th>
+                <th className="w-[15%] px-3 py-2 font-medium">Cost</th>
+                <th className="w-[14%] px-3 py-2 font-medium">Approved At</th>
               </tr>
             </thead>
             <tbody>
               {filtered.length === 0 ? (
                 <tr>
-                  <td colSpan={10}>{emptyState}</td>
+                  <td colSpan={5}>{emptyState}</td>
                 </tr>
               ) : (
                 filtered.map((quotation) => (
@@ -135,27 +120,23 @@ export function ReadyForPurchaseOrderTable({
                       onRowKeyDown(event, () => setSelectedQuotation(quotation))
                     }
                   >
-                    <td className="px-3 py-2 font-mono text-xs">
-                      {quotation.quotationNumber}
+                    <td className="truncate px-3 py-2" title={quotation.clientName}>
+                      {quotation.clientName}
                     </td>
-                    <td className="px-3 py-2">{quotation.clientName}</td>
-                    <td className="px-3 py-2">{quotation.subject || "-"}</td>
-                    <td className="px-3 py-2">{formatCurrency(quotation.amount)}</td>
-                    <td className="px-3 py-2 font-mono text-xs">
-                      {quotation.clientPoNumber ?? "—"}
+                    <td
+                      className="truncate px-3 py-2"
+                      title={quotation.subject || undefined}
+                    >
+                      {quotation.subject || "-"}
                     </td>
-                    <td className="px-3 py-2">
+                    <td className="truncate px-3 py-2">
+                      {formatCurrency(quotation.amount)}
+                    </td>
+                    <td className="truncate px-3 py-2">
                       {quotation.cost === null ? "-" : formatCurrency(quotation.cost)}
                     </td>
-                    <td className="px-3 py-2">
-                      {formatPercent(quotation.salesMarginPercent)}
-                    </td>
-                    <td className="px-3 py-2">{quotation.paymentTerms ?? "—"}</td>
-                    <td className="px-3 py-2">
-                      {formatLeadTime(quotation.leadTimeDays)}
-                    </td>
-                    <td className="px-3 py-2 text-muted-foreground">
-                      {formatDate(quotation.clientConfirmedAt)}
+                    <td className="truncate px-3 py-2 text-muted-foreground">
+                      {formatDate(quotation.costingApprovedAt)}
                     </td>
                   </tr>
                 ))
@@ -188,29 +169,12 @@ export function ReadyForPurchaseOrderTable({
               >
                 <DataField label="Subject" value={quotation.subject || "-"} />
                 <DataField
-                  label="Client PO #"
-                  value={
-                    <span className="font-mono text-xs">
-                      {quotation.clientPoNumber ?? "—"}
-                    </span>
-                  }
-                />
-                <DataField
                   label="Cost"
                   value={quotation.cost === null ? "-" : formatCurrency(quotation.cost)}
                 />
                 <DataField
-                  label="Margin %"
-                  value={formatPercent(quotation.salesMarginPercent)}
-                />
-                <DataField label="Payment Terms" value={quotation.paymentTerms ?? "—"} />
-                <DataField
-                  label="Lead Time"
-                  value={formatLeadTime(quotation.leadTimeDays)}
-                />
-                <DataField
-                  label="Client Confirmed At"
-                  value={formatDate(quotation.clientConfirmedAt)}
+                  label="Approved At"
+                  value={formatDate(quotation.costingApprovedAt)}
                 />
               </DataCard>
             ))

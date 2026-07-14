@@ -30,6 +30,7 @@ import {
 } from "@/components/ui/select";
 import { computeSalesPricing, computeVatBreakdown } from "@/lib/sales/pricing";
 import type { SalesQuotation } from "@/lib/sales/quotations";
+import { cn } from "@/lib/utils";
 import { formatCurrency } from "@/lib/utils/number-format";
 import { useToast } from "@/lib/utils/toast-notification";
 import { useRouter } from "next/navigation";
@@ -128,7 +129,10 @@ export function QuotationDetailsDialog({
     [currentUserRole],
   );
 
-  void currentUserId;
+  // Only the sales person a quotation is assigned to may edit it; everyone else
+  // in the department sees the same details read-only (approvers are exempt —
+  // see canApproveReject below, which is role-based, not ownership-based).
+  const isOwner = Boolean(quotation && quotation.salesPersonId === currentUserId);
 
   const isDraft = quotation?.status === "draft";
   const isRejected = quotation?.status === "rejected";
@@ -139,8 +143,8 @@ export function QuotationDetailsDialog({
   // Approved + client provided their PO + not yet converted -> re-open for editing.
   const isReopenedForPo = isApproved && isClientConfirmed && !isConverted;
   // Approved but client PO not yet recorded -> offer the "client confirmed" step.
-  const canEnterClientPo = isApproved && !isClientConfirmed && !isConverted;
-  const isEditable = isDraft || isReopenedForPo;
+  const canEnterClientPo = isApproved && !isClientConfirmed && !isConverted && isOwner;
+  const isEditable = (isDraft || isReopenedForPo) && isOwner;
 
   const canApproveReject =
     quotation?.status === "pending" &&
@@ -402,13 +406,21 @@ export function QuotationDetailsDialog({
         if (!next) handleClose();
       }}
     >
-      <DialogContent className="max-h-[90vh] max-w-2xl overflow-y-auto">
+      <DialogContent
+        className={cn(
+          "max-h-[90vh] max-w-2xl overflow-y-auto",
+          "data-[state=open]:slide-in-from-left-1/2 data-[state=open]:slide-in-from-top-[48%]",
+          "data-[state=closed]:slide-out-to-left-1/2 data-[state=closed]:slide-out-to-top-[48%]",
+        )}
+      >
         <DialogHeader>
           <DialogTitle>Quotation Details</DialogTitle>
           <DialogDescription>
-            {isDraft
-              ? "Add the sales details, then submit for approval."
-              : "Review details and process approval actions."}
+            {!isOwner && !canApproveReject
+              ? "This quotation belongs to another sales person and is read-only."
+              : isDraft
+                ? "Add the sales details, then submit for approval."
+                : "Review details and process approval actions."}
           </DialogDescription>
         </DialogHeader>
 
@@ -836,7 +848,7 @@ export function QuotationDetailsDialog({
         ) : null}
 
         <div className="mt-5 flex flex-wrap justify-end gap-2">
-          {isDraft ? (
+          {isDraft && isOwner ? (
             <>
               <Button
                 variant="outline"
@@ -860,7 +872,7 @@ export function QuotationDetailsDialog({
             </Button>
           ) : null}
 
-          {isReopenedForPo ? (
+          {isReopenedForPo && isOwner ? (
             <>
               <Button
                 variant="outline"
@@ -889,7 +901,7 @@ export function QuotationDetailsDialog({
             </>
           ) : null}
 
-          {isRejected ? (
+          {isRejected && isOwner ? (
             <Button onClick={handleResubmit} disabled={isSubmitting}>
               {isSubmitting ? "Resubmitting..." : "Resubmit for Approval"}
             </Button>
