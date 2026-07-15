@@ -122,7 +122,7 @@ export default async function SalesQuotationsPage() {
       </div>
 
       {isSalesDepartment ? (
-        <div className="grid gap-4 lg:grid-cols-2">
+        <div className="flex flex-col gap-4">
           <Panel
             title={
               <BeamTick>{`Ready for Quotation (${readyForQuotation.length})`}</BeamTick>

@@ -185,6 +185,53 @@ describe("listSalesQuotations", () => {
 
     await expect(listSalesQuotations()).rejects.toThrow("db down");
   });
+
+  it("surfaces the most recent rejection's reason and rejector name", async () => {
+    mockClient = createSupabaseMock({
+      tables: {
+        quotations: {
+          data: [
+            {
+              ...baseRow,
+              quotation_approvals: [
+                {
+                  approver_role: "sales_manager",
+                  status: "rejected",
+                  rejection_reason: "Margin too low",
+                  updated_at: "2026-01-01T00:00:00.000Z",
+                  approver: { full_name: "Mark Manager", email: "mark@example.com" },
+                },
+                {
+                  approver_role: "owner",
+                  status: "rejected",
+                  rejection_reason: "Stale reason",
+                  updated_at: "2025-12-01T00:00:00.000Z",
+                  approver: { full_name: "Old Owner", email: "old@example.com" },
+                },
+              ],
+            },
+          ],
+          error: null,
+        },
+      },
+    });
+
+    const [quotation] = await listSalesQuotations();
+
+    expect(quotation.rejectionReason).toBe("Margin too low");
+    expect(quotation.rejectedByName).toBe("Mark Manager");
+  });
+
+  it("has no rejection info when nothing was rejected", async () => {
+    mockClient = createSupabaseMock({
+      tables: { quotations: { data: [{ ...baseRow }], error: null } },
+    });
+
+    const [quotation] = await listSalesQuotations();
+
+    expect(quotation.rejectionReason).toBeNull();
+    expect(quotation.rejectedByName).toBeNull();
+  });
 });
 
 describe("listPendingApprovalsForCurrentUser", () => {

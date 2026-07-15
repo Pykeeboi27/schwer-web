@@ -815,6 +815,22 @@ CREATE POLICY "eng_quotations_executive_costing_update"
     )
   );
 
+-- Quotations: Executive (role='executive') can delete costing-phase rows (e.g. a
+-- costing submission entered in error). Server actions restrict this to rows still
+-- pending costing approval; this policy only gates access.
+CREATE POLICY "eng_quotations_executive_costing_delete"
+  ON public.quotations FOR DELETE
+  USING (
+    phase = 'costing'
+    AND EXISTS (
+      SELECT 1 FROM public.profiles p
+      WHERE p.id = auth.uid()
+        AND p.department = 'executive'
+        AND p.role = 'executive'
+        AND p.is_active = TRUE
+    )
+  );
+
 CREATE POLICY "sales_quotations_approver_select"
   ON public.quotations FOR SELECT
   USING (

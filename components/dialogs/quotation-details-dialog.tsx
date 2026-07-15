@@ -144,7 +144,7 @@ export function QuotationDetailsDialog({
   const isReopenedForPo = isApproved && isClientConfirmed && !isConverted;
   // Approved but client PO not yet recorded -> offer the "client confirmed" step.
   const canEnterClientPo = isApproved && !isClientConfirmed && !isConverted && isOwner;
-  const isEditable = (isDraft || isReopenedForPo) && isOwner;
+  const isEditable = (isDraft || isRejected || isReopenedForPo) && isOwner;
 
   const canApproveReject =
     quotation?.status === "pending" &&
@@ -171,7 +171,7 @@ export function QuotationDetailsDialog({
       setIsSubmitting(false);
       return;
     }
-    success("Quotation returned to draft. You can now edit and resubmit for approval.");
+    success("Quotation resubmitted for approval.");
     handleClose();
     router.refresh();
     setIsSubmitting(false);
@@ -420,9 +420,17 @@ export function QuotationDetailsDialog({
               ? "This quotation belongs to another sales person and is read-only."
               : isDraft
                 ? "Add the sales details, then submit for approval."
-                : "Review details and process approval actions."}
+                : isRejected
+                  ? "This quotation was rejected. Update the sales details, then resubmit for approval."
+                  : "Review details and process approval actions."}
           </DialogDescription>
         </DialogHeader>
+
+        {isRejected && quotation.rejectionReason ? (
+          <Callout tone="destructive" title={`Rejected by ${quotation.rejectedByName ?? "Unknown"}`}>
+            <p className="text-foreground">{quotation.rejectionReason}</p>
+          </Callout>
+        ) : null}
 
         <dl className="grid gap-3 text-sm">
           <div className="grid grid-cols-[160px_1fr] gap-2">
@@ -435,7 +443,7 @@ export function QuotationDetailsDialog({
           </div>
           <div className="grid grid-cols-[160px_1fr] gap-2">
             <dt className="text-muted-foreground">Authored By</dt>
-            <dd>{quotation.preparedByName}</dd>
+            <dd>{quotation.salesPersonName ?? "Unassigned"}</dd>
           </div>
           <div className="grid grid-cols-[160px_1fr] gap-2">
             <dt className="text-muted-foreground">Subject</dt>
@@ -479,7 +487,9 @@ export function QuotationDetailsDialog({
               <p className="text-xs text-muted-foreground">
                 {isReopenedForPo
                   ? "Re-opened after the client provided their PO. Adjust the pricing, then convert to a purchase order."
-                  : "Amounts are computed automatically from the direct cost. Margin, payment terms, and lead time are required before submitting for approval."}
+                  : isRejected
+                    ? "Rejected. Adjust the pricing, then resubmit for approval."
+                    : "Amounts are computed automatically from the direct cost. Margin, payment terms, and lead time are required before submitting for approval."}
               </p>
             </div>
 
@@ -906,9 +916,21 @@ export function QuotationDetailsDialog({
           ) : null}
 
           {isRejected && isOwner ? (
-            <Button onClick={handleResubmit} disabled={isSubmitting}>
-              {isSubmitting ? "Resubmitting..." : "Resubmit for Approval"}
-            </Button>
+            <>
+              <Button
+                variant="outline"
+                onClick={handleSaveSalesDetails}
+                disabled={isSubmitting}
+              >
+                {isSubmitting ? "Saving..." : "Save Changes"}
+              </Button>
+              <Button
+                onClick={handleResubmit}
+                disabled={isSubmitting || !salesDetailsComplete}
+              >
+                {isSubmitting ? "Resubmitting..." : "Resubmit for Approval"}
+              </Button>
+            </>
           ) : null}
 
           {isClosed ? (

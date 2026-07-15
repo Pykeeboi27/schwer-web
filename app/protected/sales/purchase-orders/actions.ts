@@ -3,11 +3,13 @@
 import {
   addPoPayment,
   approvePoApproval,
+  deletePoPayment,
   fetchPurchaseOrders,
   findPendingPoApprovalForRole,
   parsePoAmount,
   rejectPoApproval,
   resubmitPurchaseOrderForApproval,
+  updatePoPayment,
   updatePurchaseOrderDetails,
   type SalesPurchaseOrder,
 } from "@/lib/sales/purchase-orders";
@@ -72,6 +74,69 @@ export async function recordCollectionAction(
     return {
       success: false,
       error: error instanceof Error ? error.message : "Failed to record collection.",
+    };
+  }
+}
+
+export async function updateCollectionAction(
+  paymentId: string,
+  purchaseOrderId: string,
+  amount: number,
+): Promise<ActionResponse<{ poId: string }>> {
+  const normalizedPaymentId = String(paymentId ?? "").trim();
+  const normalizedPoId = String(purchaseOrderId ?? "").trim();
+
+  if (!normalizedPaymentId) {
+    return { success: false, error: "Collection id is required." };
+  }
+  if (!normalizedPoId) {
+    return { success: false, error: "Purchase order id is required." };
+  }
+
+  try {
+    const normalizedAmount = parsePoAmount(amount);
+
+    await updatePoPayment({
+      paymentId: normalizedPaymentId,
+      purchaseOrderId: normalizedPoId,
+      amountCollected: normalizedAmount,
+    });
+
+    revalidatePath("/protected/sales/purchase-orders");
+
+    return { success: true, data: { poId: normalizedPoId } };
+  } catch (error) {
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Failed to update collection.",
+    };
+  }
+}
+
+export async function deleteCollectionAction(
+  paymentId: string,
+  purchaseOrderId: string,
+): Promise<ActionResponse<{ poId: string }>> {
+  const normalizedPaymentId = String(paymentId ?? "").trim();
+  const normalizedPoId = String(purchaseOrderId ?? "").trim();
+
+  if (!normalizedPaymentId) {
+    return { success: false, error: "Collection id is required." };
+  }
+  if (!normalizedPoId) {
+    return { success: false, error: "Purchase order id is required." };
+  }
+
+  try {
+    await deletePoPayment({ paymentId: normalizedPaymentId, purchaseOrderId: normalizedPoId });
+
+    revalidatePath("/protected/sales/purchase-orders");
+
+    return { success: true, data: { poId: normalizedPoId } };
+  } catch (error) {
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Failed to delete collection.",
     };
   }
 }

@@ -348,6 +348,11 @@ export function ClientDetailsDialog({
                   }
                   className="mt-1"
                 />
+                {fieldErrors.contactPerson ? (
+                  <p className="mt-1 text-xs text-destructive">
+                    {fieldErrors.contactPerson}
+                  </p>
+                ) : null}
               </div>
               <div className="min-w-0">
                 <Label htmlFor="client-sector">Sector</Label>
@@ -424,6 +429,9 @@ export function ClientDetailsDialog({
                 }
                 className="mt-1"
               />
+              {fieldErrors.address ? (
+                <p className="mt-1 text-xs text-destructive">{fieldErrors.address}</p>
+              ) : null}
             </div>
 
             <div className="grid min-w-0 gap-4 md:grid-cols-2">
@@ -438,6 +446,9 @@ export function ClientDetailsDialog({
                   className="mt-1"
                   placeholder="000-000-000-000"
                 />
+                {fieldErrors.tin ? (
+                  <p className="mt-1 text-xs text-destructive">{fieldErrors.tin}</p>
+                ) : null}
               </div>
               <div className="min-w-0">
                 <DriveUploadField

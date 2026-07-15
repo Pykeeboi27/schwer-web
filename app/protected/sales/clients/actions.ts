@@ -166,7 +166,7 @@ export async function updateClientAction(
       };
     }
 
-    const validation = validateClientForm({ name, email, phone, address });
+    const validation = validateClientForm({ name, contactPerson, email, phone, address, tin });
     if (!validation.valid) {
       return {
         success: false,

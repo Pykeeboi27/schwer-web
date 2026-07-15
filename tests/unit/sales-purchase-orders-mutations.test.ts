@@ -479,7 +479,12 @@ describe("addPoPayment", () => {
       user,
       tables: {
         purchase_orders: {
-          data: { id: "p1", status: "pending", po_amount: "1000000" },
+          data: {
+            id: "p1",
+            status: "pending",
+            po_amount: "1000000",
+            created_by: user.id,
+          },
           error: null,
         },
       },
@@ -499,6 +504,7 @@ describe("addPoPayment", () => {
             status: "approved",
             po_amount: "100000",
             recognized_amount: "0",
+            created_by: user.id,
           },
           error: null,
         },
@@ -522,6 +528,7 @@ describe("addPoPayment", () => {
               status: "approved",
               po_amount: "1000000",
               recognized_amount: "300000",
+              created_by: user.id,
             },
             error: null,
           },

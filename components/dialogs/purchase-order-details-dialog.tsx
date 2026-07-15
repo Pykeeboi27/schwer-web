@@ -2,6 +2,7 @@
 
 import {
   approvePurchaseOrderAction,
+  deleteCollectionAction,
   rejectPurchaseOrderAction,
   resubmitPurchaseOrderAction,
   updatePurchaseOrderDetailsAction,
@@ -25,13 +26,14 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { StatusBadge } from "@/components/patterns";
+import { Callout, ConfirmDialog, StatusBadge } from "@/components/patterns";
 import { computeSalesPricing } from "@/lib/sales/pricing";
 import type { SalesPoPayment, SalesPurchaseOrder } from "@/lib/sales/purchase-orders";
 import { cn } from "@/lib/utils";
 import { formatCurrency } from "@/lib/utils/number-format";
 import { useToast } from "@/lib/utils/toast-notification";
 import { useRouter } from "next/navigation";
+import { Pencil, Trash2 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 
 type PurchaseOrderDetailsDialogProps = {
@@ -81,6 +83,9 @@ export function PurchaseOrderDetailsDialog({
   const router = useRouter();
   const { success, error } = useToast();
   const [recordDialogOpen, setRecordDialogOpen] = useState(false);
+  const [editingPayment, setEditingPayment] = useState<SalesPoPayment | null>(null);
+  const [deletingPayment, setDeletingPayment] = useState<SalesPoPayment | null>(null);
+  const [isDeletingPayment, setIsDeletingPayment] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [rejectionReason, setRejectionReason] = useState("");
   const [editClientPoNumber, setEditClientPoNumber] = useState("");
@@ -110,8 +115,27 @@ export function PurchaseOrderDetailsDialog({
 
   const handleClose = () => {
     setRecordDialogOpen(false);
+    setEditingPayment(null);
+    setDeletingPayment(null);
     setRejectionReason("");
     onOpenChange(false);
+  };
+
+  const handleDeletePayment = async () => {
+    if (!deletingPayment || !purchaseOrder) {
+      return;
+    }
+    setIsDeletingPayment(true);
+    const response = await deleteCollectionAction(deletingPayment.id, purchaseOrder.id);
+    if (!response.success) {
+      error(response.error ?? "Failed to delete collection.");
+      setIsDeletingPayment(false);
+      return;
+    }
+    success("Collection deleted.");
+    setDeletingPayment(null);
+    setIsDeletingPayment(false);
+    router.refresh();
   };
 
   useEffect(() => {
@@ -304,6 +328,15 @@ export function PurchaseOrderDetailsDialog({
                   : "Review details and process approval actions."}
             </DialogDescription>
           </DialogHeader>
+
+          {isRejected && purchaseOrder.rejectionReason ? (
+            <Callout
+              tone="destructive"
+              title={`Rejected by ${purchaseOrder.rejectedByName ?? "Unknown"}`}
+            >
+              <p className="text-foreground">{purchaseOrder.rejectionReason}</p>
+            </Callout>
+          ) : null}
 
           <div className="flex justify-end">
             <Button
@@ -681,15 +714,44 @@ export function PurchaseOrderDetailsDialog({
                     </p>
                   ) : (
                     paymentHistory.map((payment) => (
-                      <div key={payment.id} className="rounded border p-2 text-sm">
-                        <p className="font-medium">
-                          {formatCurrency(payment.amountCollected)}
-                        </p>
-                        <p className="text-xs text-muted-foreground">
-                          {new Date(payment.paymentDate).toLocaleDateString()}
-                          {payment.paymentMethod ? ` • ${payment.paymentMethod}` : ""}
-                          {payment.referenceNumber ? ` • ${payment.referenceNumber}` : ""}
-                        </p>
+                      <div
+                        key={payment.id}
+                        className="flex items-start justify-between gap-2 rounded border p-2 text-sm"
+                      >
+                        <div>
+                          <p className="font-medium">
+                            {formatCurrency(payment.amountCollected)}
+                          </p>
+                          <p className="text-xs text-muted-foreground">
+                            {new Date(payment.paymentDate).toLocaleDateString()}
+                            {payment.paymentMethod ? ` • ${payment.paymentMethod}` : ""}
+                            {payment.referenceNumber ? ` • ${payment.referenceNumber}` : ""}
+                          </p>
+                        </div>
+                        {isOwner ? (
+                          <div className="flex shrink-0 gap-1">
+                            <Button
+                              type="button"
+                              size="icon"
+                              variant="outline"
+                              className="h-7 w-7"
+                              aria-label={`Edit collection of ${formatCurrency(payment.amountCollected)}`}
+                              onClick={() => setEditingPayment(payment)}
+                            >
+                              <Pencil className="h-3.5 w-3.5" />
+                            </Button>
+                            <Button
+                              type="button"
+                              size="icon"
+                              variant="outline"
+                              className="h-7 w-7"
+                              aria-label={`Delete collection of ${formatCurrency(payment.amountCollected)}`}
+                              onClick={() => setDeletingPayment(payment)}
+                            >
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </Button>
+                          </div>
+                        ) : null}
                       </div>
                     ))
                   )}
@@ -710,6 +772,32 @@ export function PurchaseOrderDetailsDialog({
         open={recordDialogOpen}
         purchaseOrder={purchaseOrder}
         onOpenChange={setRecordDialogOpen}
+      />
+
+      <RecordCollectionDialog
+        open={Boolean(editingPayment)}
+        purchaseOrder={purchaseOrder}
+        mode="edit"
+        payment={editingPayment}
+        onOpenChange={(next) => {
+          if (!next) setEditingPayment(null);
+        }}
+      />
+
+      <ConfirmDialog
+        open={Boolean(deletingPayment)}
+        onOpenChange={(next) => {
+          if (!next) setDeletingPayment(null);
+        }}
+        title="Delete this collection?"
+        description={
+          deletingPayment
+            ? `Are you sure you want to delete the ${formatCurrency(deletingPayment.amountCollected)} collection recorded on ${new Date(deletingPayment.paymentDate).toLocaleDateString()}? This cannot be undone and will recalculate the PO's collected total.`
+            : ""
+        }
+        confirmLabel="Delete"
+        isBusy={isDeletingPayment}
+        onConfirm={handleDeletePayment}
       />
     </>
   );

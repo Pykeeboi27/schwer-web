@@ -126,6 +126,53 @@ describe("listPurchaseOrders", () => {
 
     await expect(listPurchaseOrders()).rejects.toThrow("po fail");
   });
+
+  it("surfaces the most recent rejection's reason and rejector name", async () => {
+    mockClient = createSupabaseMock({
+      tables: {
+        purchase_orders: {
+          data: [
+            {
+              ...baseRow,
+              po_approvals: [
+                {
+                  approver_role: "owner",
+                  status: "rejected",
+                  rejection_reason: "Pricing needs revision",
+                  updated_at: "2026-01-01T00:00:00.000Z",
+                  approver: { full_name: "Olive Owner", email: "olive@example.com" },
+                },
+                {
+                  approver_role: "sales_manager",
+                  status: "rejected",
+                  rejection_reason: "Stale reason",
+                  updated_at: "2025-12-01T00:00:00.000Z",
+                  approver: { full_name: "Old Manager", email: "old@example.com" },
+                },
+              ],
+            },
+          ],
+          error: null,
+        },
+      },
+    });
+
+    const [po] = await listPurchaseOrders();
+
+    expect(po.rejectionReason).toBe("Pricing needs revision");
+    expect(po.rejectedByName).toBe("Olive Owner");
+  });
+
+  it("has no rejection info when nothing was rejected", async () => {
+    mockClient = createSupabaseMock({
+      tables: { purchase_orders: { data: [{ ...baseRow }], error: null } },
+    });
+
+    const [po] = await listPurchaseOrders();
+
+    expect(po.rejectionReason).toBeNull();
+    expect(po.rejectedByName).toBeNull();
+  });
 });
 
 describe("listPendingPoApprovalsForCurrentUser", () => {

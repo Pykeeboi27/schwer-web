@@ -54,12 +54,13 @@ export function CostingHistoryTable({ items }: CostingHistoryTableProps) {
     <>
       <ResponsiveTable
         table={
-          <table className="w-full min-w-[680px] text-sm">
+          <table className="w-full min-w-[780px] text-sm">
             <thead className="bg-muted/40 text-left">
               <tr>
                 <th className="px-3 py-2 font-medium">Client</th>
                 <th className="px-3 py-2 font-medium">Subject</th>
                 <th className="px-3 py-2 font-medium">Direct Cost</th>
+                <th className="px-3 py-2 font-medium">Sales Person</th>
                 <th className="px-3 py-2 font-medium">Approved</th>
               </tr>
             </thead>
@@ -78,6 +79,9 @@ export function CostingHistoryTable({ items }: CostingHistoryTableProps) {
                   <td className="px-3 py-2">{item.subject || "-"}</td>
                   <td className="px-3 py-2">{formatCurrency(item.cost)}</td>
                   <td className="px-3 py-2 text-muted-foreground">
+                    {item.salesPersonName ?? "Unassigned"}
+                  </td>
+                  <td className="px-3 py-2 text-muted-foreground">
                     {formatDate(item.approvedAt)}
                   </td>
                 </tr>
@@ -94,6 +98,10 @@ export function CostingHistoryTable({ items }: CostingHistoryTableProps) {
           >
             <DataField label="Subject" value={item.subject || "-"} />
             <DataField label="Direct Cost" value={formatCurrency(item.cost)} />
+            <DataField
+              label="Sales Person"
+              value={item.salesPersonName ?? "Unassigned"}
+            />
             <DataField label="Approved" value={formatDate(item.approvedAt)} />
           </DataCard>
         ))}
@@ -123,8 +131,23 @@ export function CostingHistoryTable({ items }: CostingHistoryTableProps) {
                 <dt className="text-muted-foreground">Direct Cost</dt>
                 <dd className="font-medium">{formatCurrency(viewing.cost)}</dd>
 
+                <dt className="text-muted-foreground">Sales Person</dt>
+                <dd className="font-medium">
+                  {viewing.salesPersonName ?? (
+                    <span className="text-muted-foreground">Not assigned</span>
+                  )}
+                </dd>
+
                 <dt className="text-muted-foreground">Google Drive</dt>
                 <dd className="font-medium">{driveLink(viewing.googleDriveLink)}</dd>
+
+                <dt className="text-muted-foreground">Notes</dt>
+                <dd className="font-medium">
+                  {viewing.notes ?? <span className="text-muted-foreground">-</span>}
+                </dd>
+
+                <dt className="text-muted-foreground">Created</dt>
+                <dd className="font-medium">{formatDate(viewing.createdAt)}</dd>
 
                 <dt className="text-muted-foreground">Approved At</dt>
                 <dd className="font-medium">{formatDate(viewing.approvedAt)}</dd>

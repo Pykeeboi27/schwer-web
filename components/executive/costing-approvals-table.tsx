@@ -4,7 +4,7 @@ import { CostingApprovalDetailsDialog } from "@/components/executive/costing-app
 import { DataCard, DataField, EmptyState, ResponsiveTable } from "@/components/patterns";
 import type { CostingApprovalItem } from "@/lib/executive/costing-approvals";
 import { formatCurrency } from "@/lib/utils/number-format";
-import { useMemo, useState } from "react";
+import { useState } from "react";
 
 type ExecutiveCostingApprovalsTableProps = {
   items: CostingApprovalItem[];
@@ -13,23 +13,9 @@ type ExecutiveCostingApprovalsTableProps = {
 export function ExecutiveCostingApprovalsTable({
   items,
 }: ExecutiveCostingApprovalsTableProps) {
-  const [dismissedIds, setDismissedIds] = useState<Set<string>>(new Set());
   const [selectedItem, setSelectedItem] = useState<CostingApprovalItem | null>(null);
 
-  const visible = useMemo(
-    () => items.filter((item) => !dismissedIds.has(item.quotationId)),
-    [items, dismissedIds],
-  );
-
-  const handleDismiss = (item: CostingApprovalItem) => {
-    setDismissedIds((current) => {
-      const next = new Set(current);
-      next.add(item.quotationId);
-      return next;
-    });
-  };
-
-  if (visible.length === 0) {
+  if (items.length === 0) {
     return (
       <div className="rounded-md border">
         <EmptyState title="No quotations awaiting costing approval." />
@@ -46,12 +32,12 @@ export function ExecutiveCostingApprovalsTable({
               <tr>
                 <th className="px-3 py-2 font-medium">Quotation</th>
                 <th className="px-3 py-2 font-medium">Client</th>
-                <th className="px-3 py-2 font-medium">Amount</th>
+                <th className="px-3 py-2 font-medium">Cost</th>
                 <th className="px-3 py-2 font-medium">Prepared By</th>
               </tr>
             </thead>
             <tbody>
-              {visible.map((item) => (
+              {items.map((item) => (
                 <tr
                   key={item.quotationId}
                   role="button"
@@ -67,14 +53,14 @@ export function ExecutiveCostingApprovalsTable({
                 >
                   <td className="px-3 py-2 font-mono text-xs">{item.quotationNumber}</td>
                   <td className="px-3 py-2">{item.clientName}</td>
-                  <td className="px-3 py-2">{formatCurrency(item.amount)}</td>
+                  <td className="px-3 py-2">{formatCurrency(item.cost)}</td>
                   <td className="px-3 py-2">{item.preparedByName}</td>
                 </tr>
               ))}
             </tbody>
           </table>
         }
-        cards={visible.map((item) => (
+        cards={items.map((item) => (
           <DataCard
             key={item.quotationId}
             onActivate={() => setSelectedItem(item)}
@@ -88,7 +74,7 @@ export function ExecutiveCostingApprovalsTable({
                   </p>
                 </div>
                 <span className="shrink-0 font-semibold">
-                  {formatCurrency(item.amount)}
+                  {formatCurrency(item.cost)}
                 </span>
               </>
             }
@@ -103,7 +89,6 @@ export function ExecutiveCostingApprovalsTable({
         onOpenChange={(open) => {
           if (!open) setSelectedItem(null);
         }}
-        onDismiss={handleDismiss}
       />
     </>
   );

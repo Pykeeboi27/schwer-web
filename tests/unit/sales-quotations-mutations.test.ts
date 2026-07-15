@@ -126,6 +126,29 @@ describe("updateSalesQuotationDetails", () => {
     });
     await expect(updateSalesQuotationDetails(detailsInput)).resolves.toBeUndefined();
   });
+
+  it("allows edits on a rejected quotation", async () => {
+    mockClient = createSupabaseMock({
+      user,
+      tables: {
+        quotations: [
+          {
+            data: {
+              id: "q1",
+              phase: "sales",
+              status: "rejected",
+              cost: "1000000",
+              client_confirmed_at: null,
+              converted_po_id: null,
+            },
+            error: null,
+          },
+          ok,
+        ],
+      },
+    });
+    await expect(updateSalesQuotationDetails(detailsInput)).resolves.toBeUndefined();
+  });
 });
 
 describe("findApproversForRole", () => {
@@ -257,6 +280,15 @@ describe("approve / reject quotation approval", () => {
 });
 
 describe("resubmitQuotationForApproval", () => {
+  const rejectedRow = {
+    id: "q1",
+    status: "rejected",
+    amount: "1000000",
+    sales_margin_percent: "10",
+    payment_terms: "30 Days",
+    lead_time_days: 14,
+  };
+
   it("throws when the quotation is missing", async () => {
     mockClient = createSupabaseMock({ tables: { quotations: fail } });
     await expect(resubmitQuotationForApproval("q1")).rejects.toThrow(/not found/);
@@ -271,13 +303,28 @@ describe("resubmitQuotationForApproval", () => {
     );
   });
 
-  it("returns a rejected quotation to draft", async () => {
+  it("rejects incomplete quotations", async () => {
     mockClient = createSupabaseMock({
       tables: {
-        quotations: [
-          { data: { id: "q1", status: "rejected", created_by: "u1" }, error: null },
-          ok,
-        ],
+        quotations: {
+          data: { ...rejectedRow, sales_margin_percent: null },
+          error: null,
+        },
+      },
+    });
+    await expect(resubmitQuotationForApproval("q1")).rejects.toThrow(
+      /Margin, payment terms, and lead time are required/,
+    );
+  });
+
+  it("resubmits a rejected quotation and recreates approval assignments", async () => {
+    mockClient = createSupabaseMock({
+      tables: {
+        // 1) select quotation, 2) update quotation to pending
+        quotations: [{ data: rejectedRow, error: null }, ok],
+        // 1) delete old approvals, 2) insert new approvals
+        quotation_approvals: [ok, ok],
+        profiles: { data: [{ id: "mgr1" }], error: null },
       },
     });
     await expect(resubmitQuotationForApproval("q1")).resolves.toBeUndefined();

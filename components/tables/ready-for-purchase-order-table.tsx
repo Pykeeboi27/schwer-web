@@ -137,7 +137,7 @@ export function ReadyForPurchaseOrderTable({
                       {quotation.cost === null ? "-" : formatCurrency(quotation.cost)}
                     </td>
                     <td className="truncate px-3 py-2 text-muted-foreground">
-                      {quotation.preparedByName}
+                      {quotation.salesPersonName ?? "Unassigned"}
                     </td>
                     <td className="truncate px-3 py-2 text-muted-foreground">
                       {formatDate(quotation.costingApprovedAt)}
@@ -176,7 +176,10 @@ export function ReadyForPurchaseOrderTable({
                   label="Cost"
                   value={quotation.cost === null ? "-" : formatCurrency(quotation.cost)}
                 />
-                <DataField label="Authored By" value={quotation.preparedByName} />
+                <DataField
+                  label="Authored By"
+                  value={quotation.salesPersonName ?? "Unassigned"}
+                />
                 <DataField
                   label="Approved At"
                   value={formatDate(quotation.costingApprovedAt)}

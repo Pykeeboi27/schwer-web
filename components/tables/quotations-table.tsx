@@ -213,7 +213,7 @@ export function QuotationsTable({
                     <td className="px-3 py-2">{quotation.clientName}</td>
                     <td className="px-3 py-2">{formatCurrency(quotation.amount)}</td>
                     <td className="px-3 py-2 text-muted-foreground">
-                      {quotation.preparedByName}
+                      {quotation.salesPersonName ?? "Unassigned"}
                     </td>
                     <td className="px-3 py-2">
                       <StatusBadge status={quotation.status} />
@@ -249,7 +249,10 @@ export function QuotationsTable({
                 }
               >
                 <DataField label="Amount" value={formatCurrency(quotation.amount)} />
-                <DataField label="Authored By" value={quotation.preparedByName} />
+                <DataField
+                  label="Authored By"
+                  value={quotation.salesPersonName ?? "Unassigned"}
+                />
                 <DataField
                   label="Date"
                   value={new Date(quotation.createdAt).toLocaleDateString()}

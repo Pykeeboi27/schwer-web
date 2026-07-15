@@ -2,6 +2,7 @@
 
 import {
   approveCostingQuotation,
+  deleteCostingQuotation,
   rejectCostingQuotation,
 } from "@/lib/executive/costing-approvals";
 import { revalidatePath } from "next/cache";
@@ -35,6 +36,27 @@ export async function approveCostingQuotationAction(
       success: false,
       error:
         error instanceof Error ? error.message : "Failed to approve costing quotation.",
+    };
+  }
+}
+
+export async function deleteCostingQuotationAction(
+  quotationId: string,
+): Promise<ActionResponse<{ quotationId: string }>> {
+  const normalized = String(quotationId ?? "").trim();
+  if (!normalized) {
+    return { success: false, error: "Quotation id is required." };
+  }
+
+  try {
+    await deleteCostingQuotation(normalized);
+    revalidateAffectedPaths();
+    return { success: true, data: { quotationId: normalized } };
+  } catch (error) {
+    return {
+      success: false,
+      error:
+        error instanceof Error ? error.message : "Failed to delete costing quotation.",
     };
   }
 }

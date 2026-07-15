@@ -37,6 +37,8 @@ export type SalesPurchaseOrder = {
   salesMarginPercent: number | null;
   status: PurchaseOrderStatus;
   pendingApprovalRoles: RequiredApproverRole[];
+  rejectionReason: string | null;
+  rejectedByName: string | null;
   approvedAt: string | null;
   createdAt: string;
   createdBy: string;
@@ -157,7 +159,7 @@ export async function listPurchaseOrders(): Promise<SalesPurchaseOrder[]> {
   const { data, error } = await supabase
     .from("purchase_orders")
     .select(
-      "id, quotation_id, po_number, client_po_number, quotation_reference, client_id, subject, po_amount, cost, margin_percentage, margin_amount, bank_percentage, bank_amount, sop_percentage, sop_amount, selling_amount, recognized_amount, payment_status, payment_terms, payment_terms_custom, lead_time_days, status, approved_at, created_at, created_by, clients:client_id(company_name), po_approvals(approver_role, status), creator:created_by(full_name, email)",
+      "id, quotation_id, po_number, client_po_number, quotation_reference, client_id, subject, po_amount, cost, margin_percentage, margin_amount, bank_percentage, bank_amount, sop_percentage, sop_amount, selling_amount, recognized_amount, payment_status, payment_terms, payment_terms_custom, lead_time_days, status, approved_at, created_at, created_by, clients:client_id(company_name), po_approvals(approver_role, status, rejection_reason, updated_at, approver:approver_id(full_name, email)), creator:created_by(full_name, email)",
     )
     .order("created_at", { ascending: false });
 
@@ -177,6 +179,18 @@ export async function listPurchaseOrders(): Promise<SalesPurchaseOrder[]> {
           .filter((r): r is RequiredApproverRole => r !== null),
       ),
     );
+
+    const rejectedApproval = approvals
+      .filter((a) => a.status === "rejected")
+      .sort(
+        (a, b) =>
+          new Date(b.updated_at ?? 0).getTime() - new Date(a.updated_at ?? 0).getTime(),
+      )[0];
+    const rejectedByProfile = rejectedApproval
+      ? Array.isArray(rejectedApproval.approver)
+        ? rejectedApproval.approver[0]
+        : rejectedApproval.approver
+      : null;
 
     return {
       id: row.id,
@@ -205,6 +219,8 @@ export async function listPurchaseOrders(): Promise<SalesPurchaseOrder[]> {
       salesMarginPercent: numberOrNull(row.margin_percentage),
       status: (row.status ?? "pending") as PurchaseOrderStatus,
       pendingApprovalRoles,
+      rejectionReason: rejectedApproval?.rejection_reason ?? null,
+      rejectedByName: resolveDisplayName(rejectedByProfile),
       approvedAt: row.approved_at ?? null,
       createdAt: row.created_at,
       createdBy: row.created_by,
@@ -720,58 +736,56 @@ export async function listPoPayments(
   }));
 }
 
-/** Record a collection against an approved purchase order. */
-export async function addPoPayment(input: {
-  purchaseOrderId: string;
-  amountCollected: number;
-  paymentDate?: string | null;
-  paymentMethod?: string | null;
-  referenceNumber?: string | null;
-  notes?: string | null;
-}): Promise<void> {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+type SupabaseServerClient = Awaited<ReturnType<typeof createClient>>;
 
-  const { data: po, error: poError } = await supabase
+/**
+ * Loads a purchase order, asserting it exists, is owned by `userId`, and is
+ * `approved`. Collections may only be recorded/edited/deleted by the owning
+ * sales person against an approved PO — RLS on `po_payments` only checks
+ * department membership, not ownership, so this must be enforced here.
+ */
+async function loadOwnedApprovedPurchaseOrder(
+  supabase: SupabaseServerClient,
+  purchaseOrderId: string,
+  userId: string,
+) {
+  const { data: po, error } = await supabase
     .from("purchase_orders")
-    .select("id, quotation_id, po_amount, status, recognized_amount")
-    .eq("id", input.purchaseOrderId)
+    .select("id, quotation_id, po_amount, status, recognized_amount, created_by")
+    .eq("id", purchaseOrderId)
     .single();
 
-  if (poError || !po) {
+  if (error || !po) {
     throw new Error("Purchase order was not found.");
+  }
+
+  if (po.created_by !== userId) {
+    throw new Error("Only the purchase order owner can manage collections.");
   }
 
   if (po.status !== "approved") {
     throw new Error("Payments can only be recorded against approved purchase orders.");
   }
 
-  const poAmount = Number(po.po_amount);
-  const currentRecognized = Number(po.recognized_amount ?? 0);
-  assertCollectionDoesNotExceedPo(poAmount, currentRecognized + input.amountCollected);
+  return po;
+}
 
-  const { error } = await supabase.from("po_payments").insert({
-    purchase_order_id: po.id,
-    // po_id (-> quotations) retained for FK continuity with legacy payments.
-    po_id: po.quotation_id,
-    amount_collected: input.amountCollected,
-    payment_date: input.paymentDate || new Date().toISOString().slice(0, 10),
-    payment_method: input.paymentMethod ?? null,
-    reference_number: input.referenceNumber ?? null,
-    notes: input.notes ?? null,
-    recorded_by: user?.id ?? null,
-  });
-
-  if (error) {
-    throw new Error(error.message || "Failed to add PO payment.");
-  }
-
+/**
+ * Re-sums all payments for a purchase order and writes the recognized amount
+ * and payment status back onto it. There is no DB trigger keeping
+ * `purchase_orders` in sync with `purchase_order_id`-linked payments (only a
+ * legacy trigger syncing `quotations` via `po_id`), so every mutation to
+ * `po_payments` must call this afterward.
+ */
+async function recomputeAndSyncPoTotals(
+  supabase: SupabaseServerClient,
+  purchaseOrderId: string,
+  poAmount: number,
+): Promise<void> {
   const { data: paymentRows, error: paymentsError } = await supabase
     .from("po_payments")
     .select("amount_collected")
-    .eq("purchase_order_id", po.id);
+    .eq("purchase_order_id", purchaseOrderId);
 
   if (paymentsError) {
     throw new Error(paymentsError.message || "Failed to refresh PO totals.");
@@ -790,9 +804,134 @@ export async function addPoPayment(input: {
       recognized_amount: refreshedRecognizedAmount,
       payment_status: derivePaymentStatus(poAmount, refreshedRecognizedAmount),
     })
-    .eq("id", po.id);
+    .eq("id", purchaseOrderId);
 
   if (updateError) {
     throw new Error(updateError.message || "Failed to update PO totals.");
   }
+}
+
+/** Record a collection against an approved purchase order. */
+export async function addPoPayment(input: {
+  purchaseOrderId: string;
+  amountCollected: number;
+  paymentDate?: string | null;
+  paymentMethod?: string | null;
+  referenceNumber?: string | null;
+  notes?: string | null;
+}): Promise<void> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    throw new Error("You must be signed in.");
+  }
+
+  const po = await loadOwnedApprovedPurchaseOrder(supabase, input.purchaseOrderId, user.id);
+
+  const poAmount = Number(po.po_amount);
+  const currentRecognized = Number(po.recognized_amount ?? 0);
+  assertCollectionDoesNotExceedPo(poAmount, currentRecognized + input.amountCollected);
+
+  const { error } = await supabase.from("po_payments").insert({
+    purchase_order_id: po.id,
+    // po_id (-> quotations) retained for FK continuity with legacy payments.
+    po_id: po.quotation_id,
+    amount_collected: input.amountCollected,
+    payment_date: input.paymentDate || new Date().toISOString().slice(0, 10),
+    payment_method: input.paymentMethod ?? null,
+    reference_number: input.referenceNumber ?? null,
+    notes: input.notes ?? null,
+    recorded_by: user.id,
+  });
+
+  if (error) {
+    throw new Error(error.message || "Failed to add PO payment.");
+  }
+
+  await recomputeAndSyncPoTotals(supabase, po.id, poAmount);
+}
+
+/** Update the amount of an existing collection record. */
+export async function updatePoPayment(input: {
+  paymentId: string;
+  purchaseOrderId: string;
+  amountCollected: number;
+}): Promise<void> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    throw new Error("You must be signed in.");
+  }
+
+  const po = await loadOwnedApprovedPurchaseOrder(supabase, input.purchaseOrderId, user.id);
+
+  const { data: payment, error: paymentError } = await supabase
+    .from("po_payments")
+    .select("id, amount_collected, purchase_order_id")
+    .eq("id", input.paymentId)
+    .single();
+
+  if (paymentError || !payment || payment.purchase_order_id !== po.id) {
+    throw new Error("Collection record was not found.");
+  }
+
+  const poAmount = Number(po.po_amount);
+  const projectedTotal =
+    Number(po.recognized_amount ?? 0) - Number(payment.amount_collected) + input.amountCollected;
+  assertCollectionDoesNotExceedPo(poAmount, projectedTotal);
+
+  const { error: updateError } = await supabase
+    .from("po_payments")
+    .update({ amount_collected: input.amountCollected })
+    .eq("id", input.paymentId);
+
+  if (updateError) {
+    throw new Error(updateError.message || "Failed to update the collection.");
+  }
+
+  await recomputeAndSyncPoTotals(supabase, po.id, poAmount);
+}
+
+/** Delete an existing collection record. */
+export async function deletePoPayment(input: {
+  paymentId: string;
+  purchaseOrderId: string;
+}): Promise<void> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    throw new Error("You must be signed in.");
+  }
+
+  const po = await loadOwnedApprovedPurchaseOrder(supabase, input.purchaseOrderId, user.id);
+
+  const { data: payment, error: paymentError } = await supabase
+    .from("po_payments")
+    .select("id, purchase_order_id")
+    .eq("id", input.paymentId)
+    .single();
+
+  if (paymentError || !payment || payment.purchase_order_id !== po.id) {
+    throw new Error("Collection record was not found.");
+  }
+
+  const { error: deleteError } = await supabase
+    .from("po_payments")
+    .delete()
+    .eq("id", input.paymentId);
+
+  if (deleteError) {
+    throw new Error(deleteError.message || "Failed to delete the collection.");
+  }
+
+  await recomputeAndSyncPoTotals(supabase, po.id, Number(po.po_amount));
 }

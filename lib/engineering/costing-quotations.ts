@@ -8,6 +8,10 @@ export type CostingApprovedHistoryItem = {
   amount: number;
   cost: number | null;
   googleDriveLink: string | null;
+  notes: string | null;
+  salesPersonId: string | null;
+  salesPersonName: string | null;
+  createdAt: string;
   approvedAt: string;
 };
 
@@ -102,7 +106,7 @@ export async function listCostingApprovedHistory(): Promise<
   const { data, error } = await supabase
     .from("quotations")
     .select(
-      "id, quotation_number, subject, amount, cost, google_drive_link, costing_approved_at, clients:client_id(company_name)",
+      "id, quotation_number, subject, amount, cost, google_drive_link, notes, sales_person_id, created_at, costing_approved_at, clients:client_id(company_name), sales_person:sales_person_id(full_name, email)",
     )
     .not("costing_approved_at", "is", null)
     .order("costing_approved_at", { ascending: false });
@@ -113,6 +117,9 @@ export async function listCostingApprovedHistory(): Promise<
 
   return (data ?? []).map((row) => {
     const client = Array.isArray(row.clients) ? row.clients[0] : row.clients;
+    const salesPerson = Array.isArray(row.sales_person)
+      ? row.sales_person[0]
+      : row.sales_person;
     return {
       quotationId: row.id,
       quotationNumber: row.quotation_number,
@@ -121,6 +128,10 @@ export async function listCostingApprovedHistory(): Promise<
       amount: Number(row.amount),
       cost: row.cost === null ? null : Number(row.cost),
       googleDriveLink: row.google_drive_link,
+      notes: row.notes,
+      salesPersonId: row.sales_person_id,
+      salesPersonName: salesPerson?.full_name || salesPerson?.email || null,
+      createdAt: row.created_at,
       approvedAt: row.costing_approved_at,
     };
   });

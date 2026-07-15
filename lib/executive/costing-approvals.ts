@@ -160,6 +160,34 @@ export async function rejectCostingQuotation(input: {
   }
 }
 
+export async function deleteCostingQuotation(quotationId: string): Promise<void> {
+  await assertExecutiveActor();
+  const supabase = await createClient();
+
+  const { data: row, error: rowError } = await supabase
+    .from("quotations")
+    .select("id, phase, status")
+    .eq("id", quotationId)
+    .single();
+
+  if (rowError || !row) {
+    throw new Error("Quotation was not found.");
+  }
+
+  if (row.phase !== "costing" || row.status !== "pending") {
+    throw new Error("Only quotations pending costing approval can be deleted here.");
+  }
+
+  const { error: deleteError } = await supabase
+    .from("quotations")
+    .delete()
+    .eq("id", quotationId);
+
+  if (deleteError) {
+    throw new Error(deleteError.message || "Failed to delete costing quotation.");
+  }
+}
+
 export async function listCostingApprovalHistory(): Promise<
   CostingApprovalHistoryItem[]
 > {
