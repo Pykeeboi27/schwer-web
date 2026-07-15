@@ -129,14 +129,17 @@ export function RecordCollectionDialog({
 
     if (!response.success) {
       const message =
-        response.error ?? (isEdit ? "Failed to update collection." : "Failed to record collection.");
+        response.error ??
+        (isEdit ? "Failed to update collection." : "Failed to record collection.");
       setFormError(message);
       error(message);
       setIsSubmitting(false);
       return;
     }
 
-    success(isEdit ? "Collection updated successfully." : "Collection recorded successfully.");
+    success(
+      isEdit ? "Collection updated successfully." : "Collection recorded successfully.",
+    );
     handleClose();
     router.refresh();
     setIsSubmitting(false);
@@ -226,11 +229,7 @@ export function RecordCollectionDialog({
               Cancel
             </Button>
             <Button type="submit" disabled={isSubmitting}>
-              {isSubmitting
-                ? "Saving..."
-                : isEdit
-                  ? "Save Changes"
-                  : "Record Collection"}
+              {isSubmitting ? "Saving..." : isEdit ? "Save Changes" : "Record Collection"}
             </Button>
           </div>
         </form>

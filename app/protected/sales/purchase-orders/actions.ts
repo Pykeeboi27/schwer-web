@@ -128,7 +128,10 @@ export async function deleteCollectionAction(
   }
 
   try {
-    await deletePoPayment({ paymentId: normalizedPaymentId, purchaseOrderId: normalizedPoId });
+    await deletePoPayment({
+      paymentId: normalizedPaymentId,
+      purchaseOrderId: normalizedPoId,
+    });
 
     revalidatePath("/protected/sales/purchase-orders");
 

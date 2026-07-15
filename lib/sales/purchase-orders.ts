@@ -829,7 +829,11 @@ export async function addPoPayment(input: {
     throw new Error("You must be signed in.");
   }
 
-  const po = await loadOwnedApprovedPurchaseOrder(supabase, input.purchaseOrderId, user.id);
+  const po = await loadOwnedApprovedPurchaseOrder(
+    supabase,
+    input.purchaseOrderId,
+    user.id,
+  );
 
   const poAmount = Number(po.po_amount);
   const currentRecognized = Number(po.recognized_amount ?? 0);
@@ -869,7 +873,11 @@ export async function updatePoPayment(input: {
     throw new Error("You must be signed in.");
   }
 
-  const po = await loadOwnedApprovedPurchaseOrder(supabase, input.purchaseOrderId, user.id);
+  const po = await loadOwnedApprovedPurchaseOrder(
+    supabase,
+    input.purchaseOrderId,
+    user.id,
+  );
 
   const { data: payment, error: paymentError } = await supabase
     .from("po_payments")
@@ -883,7 +891,9 @@ export async function updatePoPayment(input: {
 
   const poAmount = Number(po.po_amount);
   const projectedTotal =
-    Number(po.recognized_amount ?? 0) - Number(payment.amount_collected) + input.amountCollected;
+    Number(po.recognized_amount ?? 0) -
+    Number(payment.amount_collected) +
+    input.amountCollected;
   assertCollectionDoesNotExceedPo(poAmount, projectedTotal);
 
   const { error: updateError } = await supabase
@@ -912,7 +922,11 @@ export async function deletePoPayment(input: {
     throw new Error("You must be signed in.");
   }
 
-  const po = await loadOwnedApprovedPurchaseOrder(supabase, input.purchaseOrderId, user.id);
+  const po = await loadOwnedApprovedPurchaseOrder(
+    supabase,
+    input.purchaseOrderId,
+    user.id,
+  );
 
   const { data: payment, error: paymentError } = await supabase
     .from("po_payments")

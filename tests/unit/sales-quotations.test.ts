@@ -144,7 +144,9 @@ describe("listSalesQuotations", () => {
     mockClient = createSupabaseMock({
       tables: {
         quotations: {
-          data: [{ ...baseRow, preparer: { full_name: null, email: "jane@example.com" } }],
+          data: [
+            { ...baseRow, preparer: { full_name: null, email: "jane@example.com" } },
+          ],
           error: null,
         },
       },

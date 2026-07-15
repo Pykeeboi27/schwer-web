@@ -22,8 +22,7 @@ type UserMenuProps = {
 function initialsFromEmail(email: string): string {
   const name = email.split("@")[0] ?? email;
   const parts = name.split(/[^a-zA-Z0-9]+/).filter(Boolean);
-  const initials =
-    parts.length >= 2 ? `${parts[0][0]}${parts[1][0]}` : name.slice(0, 2);
+  const initials = parts.length >= 2 ? `${parts[0][0]}${parts[1][0]}` : name.slice(0, 2);
   return initials.toUpperCase();
 }
 
@@ -44,7 +43,11 @@ function formatLabel(value: string): string {
 export function UserMenu({ email, role, department }: UserMenuProps) {
   const router = useRouter();
   const username = email.split("@")[0] ?? email;
-  const roleLabel = role ? formatLabel(role) : department ? formatLabel(department) : null;
+  const roleLabel = role
+    ? formatLabel(role)
+    : department
+      ? formatLabel(department)
+      : null;
 
   const signOut = async () => {
     const supabase = createClient();

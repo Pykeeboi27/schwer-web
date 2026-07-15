@@ -725,7 +725,9 @@ export function PurchaseOrderDetailsDialog({
                           <p className="text-xs text-muted-foreground">
                             {new Date(payment.paymentDate).toLocaleDateString()}
                             {payment.paymentMethod ? ` • ${payment.paymentMethod}` : ""}
-                            {payment.referenceNumber ? ` • ${payment.referenceNumber}` : ""}
+                            {payment.referenceNumber
+                              ? ` • ${payment.referenceNumber}`
+                              : ""}
                           </p>
                         </div>
                         {isOwner ? (
