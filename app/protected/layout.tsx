@@ -33,7 +33,9 @@ export default function ProtectedLayout({ children }: { children: React.ReactNod
                   </span>
                 </span>
               </Link>
-              <NavModuleBadge />
+              <Suspense fallback={null}>
+                <NavModuleBadge />
+              </Suspense>
             </div>
             <div className="flex shrink-0 items-center gap-1.5">
               <ThemeSwitcher />
