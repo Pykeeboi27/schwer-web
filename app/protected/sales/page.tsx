@@ -51,7 +51,7 @@ export default async function SalesDashboardPage() {
       </div>
 
       <Panel title={<BeamTick>Quotations by Status</BeamTick>}>
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="grid gap-3 sm:grid-cols-3 lg:grid-cols-5">
           {[
             {
               label: "Draft",
@@ -73,6 +73,13 @@ export default async function SalesDashboardPage() {
               className:
                 "border-green-200 bg-green-50 dark:border-green-900 dark:bg-green-950/40",
               valueClassName: "text-green-700 dark:text-green-300",
+            },
+            {
+              label: "Closed",
+              value: summary.quotations.closed,
+              className:
+                "border-blue-200 bg-blue-50 dark:border-blue-900 dark:bg-blue-950/40",
+              valueClassName: "text-blue-700 dark:text-blue-300",
             },
             {
               label: "Rejected",

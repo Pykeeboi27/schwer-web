@@ -34,6 +34,8 @@ export async function getAnnualTarget(year: number): Promise<AnnualTargetRecord 
     .eq("year", year)
     .is("month", null)
     .is("sector", null)
+    .order("updated_at", { ascending: false })
+    .limit(1)
     .maybeSingle();
 
   if (error) {
@@ -48,6 +50,88 @@ export async function getAnnualTarget(year: number): Promise<AnnualTargetRecord 
     year: Number(data.year),
     targetAmount: toNumber(data.target_amount),
   };
+}
+
+/**
+ * `(year, month, sector)` is unique in Postgres only when all three are
+ * non-NULL — NULL is never equal to NULL, so `onConflict` upserts on rows with
+ * NULL `month`/`sector` (annual targets, and quarterly targets before sectors
+ * are used) always insert a new row instead of updating. This reads the
+ * matching row(s) first, updates the newest, and deletes any historical
+ * duplicates so the table self-heals on the next save.
+ */
+async function upsertRevenueTargetRow(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  params: {
+    year: number;
+    month: number | null;
+    targetAmount: number;
+    userId: string;
+    errorMessage: string;
+  },
+): Promise<AnnualTargetRecord> {
+  let existingQuery = supabase
+    .from("revenue_targets")
+    .select("id")
+    .eq("year", params.year)
+    .is("sector", null)
+    .order("updated_at", { ascending: false });
+
+  existingQuery =
+    params.month === null
+      ? existingQuery.is("month", null)
+      : existingQuery.eq("month", params.month);
+
+  const { data: existingRows, error: selectError } = await existingQuery;
+
+  if (selectError) {
+    throw new Error(params.errorMessage);
+  }
+
+  const [newest, ...duplicates] = (existingRows ?? []) as Array<{ id: string }>;
+
+  if (duplicates.length > 0) {
+    await supabase
+      .from("revenue_targets")
+      .delete()
+      .in(
+        "id",
+        duplicates.map((row) => row.id),
+      );
+  }
+
+  if (newest) {
+    const { data, error } = await supabase
+      .from("revenue_targets")
+      .update({ target_amount: params.targetAmount, set_by: params.userId })
+      .eq("id", newest.id)
+      .select("year, target_amount")
+      .single();
+
+    if (error || !data) {
+      throw new Error(params.errorMessage);
+    }
+
+    return { year: Number(data.year), targetAmount: toNumber(data.target_amount) };
+  }
+
+  const { data, error } = await supabase
+    .from("revenue_targets")
+    .insert({
+      year: params.year,
+      month: params.month,
+      sector: null,
+      target_amount: params.targetAmount,
+      set_by: params.userId,
+    })
+    .select("year, target_amount")
+    .single();
+
+  if (error || !data) {
+    throw new Error(params.errorMessage);
+  }
+
+  return { year: Number(data.year), targetAmount: toNumber(data.target_amount) };
 }
 
 function fmt(n: number): string {
@@ -89,31 +173,13 @@ export async function upsertAnnualTarget(
     throw new Error("You must be signed in to update yearly targets.");
   }
 
-  const { data, error } = await supabase
-    .from("revenue_targets")
-    .upsert(
-      {
-        year,
-        month: null,
-        sector: null,
-        target_amount: targetAmount,
-        set_by: user.id,
-      },
-      {
-        onConflict: "year,month,sector",
-      },
-    )
-    .select("year, target_amount")
-    .single();
-
-  if (error || !data) {
-    throw new Error("Failed to update yearly target.");
-  }
-
-  return {
-    year: Number(data.year),
-    targetAmount: toNumber(data.target_amount),
-  };
+  return upsertRevenueTargetRow(supabase, {
+    year,
+    month: null,
+    targetAmount,
+    userId: user.id,
+    errorMessage: "Failed to update yearly target.",
+  });
 }
 
 // Months 3, 6, 9, 12 represent end-of-quarter targets (Q1–Q4).
@@ -162,16 +228,13 @@ export async function upsertQuarterlyTarget(
     throw new Error("You must be signed in to update quarterly targets.");
   }
 
-  const { error } = await supabase
-    .from("revenue_targets")
-    .upsert(
-      { year, month, sector: null, target_amount: targetAmount, set_by: user.id },
-      { onConflict: "year,month,sector" },
-    );
-
-  if (error) {
-    throw new Error("Failed to update quarterly target.");
-  }
+  await upsertRevenueTargetRow(supabase, {
+    year,
+    month,
+    targetAmount,
+    userId: user.id,
+    errorMessage: "Failed to update quarterly target.",
+  });
 }
 
 export async function getQuarterlyTargets(year: number): Promise<{

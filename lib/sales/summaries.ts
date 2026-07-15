@@ -7,6 +7,7 @@ export type SalesSummary = {
     pending: number;
     approved: number;
     rejected: number;
+    closed: number;
   };
   closedSaleTotal: number;
   recognizedSaleTotal: number;
@@ -19,13 +20,14 @@ export const EMPTY_SALES_SUMMARY: SalesSummary = {
     pending: 0,
     approved: 0,
     rejected: 0,
+    closed: 0,
   },
   closedSaleTotal: 0,
   recognizedSaleTotal: 0,
 };
 
 async function getQuotationCountByStatus(
-  status: "draft" | "pending" | "approved" | "rejected",
+  status: "draft" | "pending" | "approved" | "rejected" | "closed",
 ) {
   const supabase = await createClient();
   const { count, error } = await supabase
@@ -51,6 +53,7 @@ export async function getSalesSummary(): Promise<SalesSummary> {
     pending,
     approved,
     rejected,
+    closed,
   ] = await Promise.all([
     supabase
       .from("clients")
@@ -70,6 +73,7 @@ export async function getSalesSummary(): Promise<SalesSummary> {
     getQuotationCountByStatus("pending"),
     getQuotationCountByStatus("approved"),
     getQuotationCountByStatus("rejected"),
+    getQuotationCountByStatus("closed"),
   ]);
 
   if (clientsError || quotationError || poError) {
@@ -92,6 +96,7 @@ export async function getSalesSummary(): Promise<SalesSummary> {
       pending,
       approved,
       rejected,
+      closed,
     },
     closedSaleTotal,
     recognizedSaleTotal,

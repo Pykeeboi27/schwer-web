@@ -15,7 +15,6 @@ import {
   upsertQuarterlyTarget,
 } from "@/lib/executive/targets";
 
-const ok = { data: null, error: null };
 const noQuarters = { data: [], error: null };
 const user = { id: "u1" };
 
@@ -131,7 +130,8 @@ describe("upsertAnnualTarget", () => {
       tables: {
         revenue_targets: [
           noQuarters, // getQuarterlyTargets
-          { data: { year: 2026, target_amount: "5000000" }, error: null }, // upsert
+          { data: [], error: null }, // select existing rows -> none -> insert
+          { data: { year: 2026, target_amount: "5000000" }, error: null }, // insert
         ],
       },
     });
@@ -153,6 +153,24 @@ describe("upsertAnnualTarget", () => {
     await expect(upsertAnnualTarget(2026, 5_000_000)).rejects.toThrow(
       /Failed to update yearly target/,
     );
+  });
+
+  it("updates the newest existing row instead of inserting a duplicate", async () => {
+    mockClient = createSupabaseMock({
+      user,
+      tables: {
+        revenue_targets: [
+          noQuarters, // getQuarterlyTargets
+          { data: [{ id: "row-2" }, { id: "row-1" }], error: null }, // existing rows, newest first
+          { data: { year: 2026, target_amount: "5000000" }, error: null }, // update
+        ],
+      },
+    });
+
+    await expect(upsertAnnualTarget(2026, 5_000_000)).resolves.toEqual({
+      year: 2026,
+      targetAmount: 5000000,
+    });
   });
 });
 
@@ -192,7 +210,8 @@ describe("upsertQuarterlyTarget", () => {
         revenue_targets: [
           { data: { year: 2026, target_amount: "1000000" }, error: null }, // getAnnualTarget
           { data: [{ month: 6, target_amount: "300000" }], error: null }, // getQuarterlyTargets
-          ok, // upsert
+          { data: [], error: null }, // select existing rows -> none -> insert
+          { data: { year: 2026, target_amount: "500000" }, error: null }, // insert
         ],
       },
     });

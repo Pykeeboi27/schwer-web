@@ -46,8 +46,25 @@ describe("executive sales performance helpers", () => {
     expect(result.find((entry) => entry.ownerId === "unassigned")?.ownerName).toBe(
       "Unassigned",
     );
-    expect(
-      result.find((entry) => entry.ownerId === "abc12345-ffff")?.ownerName,
-    ).toContain("Owner");
+    expect(result.find((entry) => entry.ownerId === "abc12345-ffff")?.ownerName).toBe(
+      "Unknown",
+    );
+  });
+
+  it("seeds every roster owner at zero revenue so inactive salespeople still appear", () => {
+    const rows: PurchaseOrderMetricRow[] = [
+      { created_by: "owner-a", po_amount: 500, margin_amount: 50, po_date: "2026-03-01" },
+    ];
+
+    const names = new Map<string, string>([["owner-a", "aimee"]]);
+    const roster = [
+      { ownerId: "owner-a", ownerName: "aimee" },
+      { ownerId: "owner-b", ownerName: "brian" },
+    ];
+
+    const result = buildSalesPerformanceFromRows(rows, names, roster);
+
+    expect(result.map((entry) => entry.ownerName)).toEqual(["aimee", "brian"]);
+    expect(result.find((entry) => entry.ownerId === "owner-b")?.bookedRevenue).toBe(0);
   });
 });

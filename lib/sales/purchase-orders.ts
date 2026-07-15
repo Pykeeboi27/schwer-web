@@ -60,6 +60,11 @@ export type PendingPoApprovalItem = {
   amount: number;
   approverRole: string;
   status: string;
+  clientName?: string;
+  cost?: number | null;
+  marginAmount?: number | null;
+  sector?: string | null;
+  poDate?: string | null;
 };
 
 function derivePaymentStatus(
@@ -446,7 +451,7 @@ export async function listPendingPoApprovalsForCurrentUser(): Promise<
   const { data, error } = await supabase
     .from("po_approvals")
     .select(
-      "id, po_id, approver_role, status, purchase_orders:po_id(po_number, subject, po_amount)",
+      "id, po_id, approver_role, status, purchase_orders:po_id(po_number, subject, po_amount, cost, margin_amount, sector, po_date, clients:client_id(company_name))",
     )
     .eq("approver_id", user.id)
     .eq("status", "pending")
@@ -460,6 +465,12 @@ export async function listPendingPoApprovalsForCurrentUser(): Promise<
     const po = Array.isArray(row.purchase_orders)
       ? row.purchase_orders[0]
       : row.purchase_orders;
+    const client = po
+      ? Array.isArray(po.clients)
+        ? po.clients[0]
+        : po.clients
+      : null;
+
     return {
       approvalId: row.id,
       poId: row.po_id,
@@ -468,6 +479,14 @@ export async function listPendingPoApprovalsForCurrentUser(): Promise<
       amount: Number(po?.po_amount ?? 0),
       approverRole: row.approver_role,
       status: row.status,
+      clientName: client?.company_name ?? undefined,
+      cost: po?.cost === null || po?.cost === undefined ? null : Number(po.cost),
+      marginAmount:
+        po?.margin_amount === null || po?.margin_amount === undefined
+          ? null
+          : Number(po.margin_amount),
+      sector: po?.sector ?? null,
+      poDate: po?.po_date ?? null,
     };
   });
 }

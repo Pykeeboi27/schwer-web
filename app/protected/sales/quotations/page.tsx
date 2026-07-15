@@ -41,12 +41,9 @@ export default async function SalesQuotationsPage() {
 
   // Counts cover every non-draft quotation still owned by this page (before the
   // ready-for-PO rows are split out), so the "Approved" tile keeps counting them.
-  const statsQuotations = quotations.filter(
-    (quotation) =>
-      quotation.status !== "draft" &&
-      // Once the converted PO is fully approved, the quotation moves to the PO module.
-      quotation.convertedPoStatus !== "approved",
-  );
+  // Closed quotations (converted to a PO) stay visible here too, regardless of
+  // how far the linked PO's own approval has progressed.
+  const statsQuotations = quotations.filter((quotation) => quotation.status !== "draft");
 
   // The main table excludes rows surfaced in the "Ready for Purchase Order" section.
   const activeQuotations = statsQuotations.filter(

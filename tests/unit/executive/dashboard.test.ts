@@ -42,8 +42,11 @@ beforeEach(() => {
   vi.restoreAllMocks();
   vi.spyOn(executiveDashboardQueries, "fetchPurchaseOrderRows").mockResolvedValue(rows);
   vi.spyOn(executiveDashboardQueries, "fetchAnnualTarget").mockResolvedValue(1000);
-  vi.spyOn(executiveDashboardQueries, "fetchProfileNames").mockResolvedValue(
-    new Map([["o1", "Owner One"]]),
+  vi.spyOn(executiveDashboardQueries, "fetchSalesRoster").mockResolvedValue([
+    { ownerId: "o1", ownerName: "Owner One" },
+  ]);
+  vi.spyOn(executiveDashboardQueries, "fetchProfileUsernames").mockResolvedValue(
+    new Map(),
   );
 });
 
@@ -92,7 +95,7 @@ describe("getExecutiveSalesPerformance", () => {
       bookedRevenue: 200,
     });
     expect(performance[1].ownerId).toBe("o2");
-    expect(performance[1].ownerName).toContain("Owner");
+    expect(performance[1].ownerName).toBe("Unknown");
   });
 });
 

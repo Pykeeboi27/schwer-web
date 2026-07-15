@@ -191,6 +191,13 @@ describe("listPendingApprovalsForCurrentUser", () => {
                 quotation_number: "Q-1",
                 subject: "Roof upgrade",
                 amount: "1500000",
+                cost: "900000",
+                margin_amount: "150000",
+                sector: "residential",
+                google_drive_link: "https://drive.example/q1",
+                notes: "Rush order",
+                created_at: "2026-01-05T00:00:00.000Z",
+                clients: { company_name: "Acme Corp" },
               },
             },
           ],
@@ -209,6 +216,13 @@ describe("listPendingApprovalsForCurrentUser", () => {
       amount: 1500000,
       approverRole: "owner",
       status: "pending",
+      clientName: "Acme Corp",
+      cost: 900000,
+      marginAmount: 150000,
+      sector: "residential",
+      googleDriveLink: "https://drive.example/q1",
+      notes: "Rush order",
+      createdAt: "2026-01-05T00:00:00.000Z",
     });
   });
 });

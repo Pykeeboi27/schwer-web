@@ -45,6 +45,13 @@ export type PendingApprovalItem = {
   amount: number;
   approverRole: string;
   status: string;
+  clientName?: string;
+  cost?: number | null;
+  marginAmount?: number | null;
+  sector?: string | null;
+  googleDriveLink?: string | null;
+  notes?: string | null;
+  createdAt?: string;
 };
 
 export async function fetchQuotations(_departmentId?: string): Promise<SalesQuotation[]> {
@@ -458,7 +465,7 @@ export async function listPendingApprovalsForCurrentUser(): Promise<
   const { data, error } = await supabase
     .from("quotation_approvals")
     .select(
-      "id, quotation_id, approver_role, status, quotations:quotation_id(quotation_number, subject, amount)",
+      "id, quotation_id, approver_role, status, quotations:quotation_id(quotation_number, subject, amount, cost, margin_amount, sector, google_drive_link, notes, created_at, clients:client_id(company_name))",
     )
     .eq("approver_id", user.id)
     .eq("status", "pending")
@@ -470,6 +477,11 @@ export async function listPendingApprovalsForCurrentUser(): Promise<
 
   return (data ?? []).map((row) => {
     const quotation = Array.isArray(row.quotations) ? row.quotations[0] : row.quotations;
+    const client = quotation
+      ? Array.isArray(quotation.clients)
+        ? quotation.clients[0]
+        : quotation.clients
+      : null;
 
     return {
       approvalId: row.id,
@@ -479,6 +491,18 @@ export async function listPendingApprovalsForCurrentUser(): Promise<
       amount: Number(quotation?.amount ?? 0),
       approverRole: row.approver_role,
       status: row.status,
+      clientName: client?.company_name ?? undefined,
+      cost: quotation?.cost === null || quotation?.cost === undefined
+        ? null
+        : Number(quotation.cost),
+      marginAmount:
+        quotation?.margin_amount === null || quotation?.margin_amount === undefined
+          ? null
+          : Number(quotation.margin_amount),
+      sector: quotation?.sector ?? null,
+      googleDriveLink: quotation?.google_drive_link ?? null,
+      notes: quotation?.notes ?? null,
+      createdAt: quotation?.created_at ?? undefined,
     };
   });
 }

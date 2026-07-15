@@ -132,6 +132,11 @@ describe("listPendingPoApprovalsForCurrentUser", () => {
                 po_number: "PO-2026-0001",
                 subject: "Roof upgrade",
                 po_amount: "1500000",
+                cost: "1000000",
+                margin_amount: "100000",
+                sector: "residential",
+                po_date: "2026-01-05",
+                clients: { company_name: "Acme Corp" },
               },
             },
           ],
@@ -150,6 +155,11 @@ describe("listPendingPoApprovalsForCurrentUser", () => {
       amount: 1500000,
       approverRole: "executive",
       status: "pending",
+      clientName: "Acme Corp",
+      cost: 1000000,
+      marginAmount: 100000,
+      sector: "residential",
+      poDate: "2026-01-05",
     });
   });
 });
