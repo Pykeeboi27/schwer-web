@@ -112,6 +112,7 @@ describe("listSalesQuotations", () => {
           data: [
             {
               ...baseRow,
+              preparer: { full_name: "Jane Author", email: "jane@example.com" },
               quotation_approvals: [
                 { approver_role: "sales_manager", status: "pending" },
                 { approver_role: "sales_manager", status: "pending" },
@@ -136,6 +137,22 @@ describe("listSalesQuotations", () => {
     expect(quotation.leadTimeDays).toBe(14);
     expect(quotation.pendingApprovalRoles).toEqual(["sales_manager"]);
     expect(quotation.convertedPoStatus).toBeNull();
+    expect(quotation.preparedByName).toBe("Jane Author");
+  });
+
+  it("falls back to the email username when the preparer has no full name", async () => {
+    mockClient = createSupabaseMock({
+      tables: {
+        quotations: {
+          data: [{ ...baseRow, preparer: { full_name: null, email: "jane@example.com" } }],
+          error: null,
+        },
+      },
+    });
+
+    const [quotation] = await listSalesQuotations();
+
+    expect(quotation.preparedByName).toBe("jane");
   });
 
   it("reads converted PO status from an array relation and falls back on unknown clients", async () => {
@@ -158,6 +175,7 @@ describe("listSalesQuotations", () => {
 
     expect(quotation.clientName).toBe("Unknown client");
     expect(quotation.convertedPoStatus).toBe("approved");
+    expect(quotation.preparedByName).toBe("Unknown");
   });
 
   it("throws when the query fails", async () => {
@@ -198,6 +216,7 @@ describe("listPendingApprovalsForCurrentUser", () => {
                 notes: "Rush order",
                 created_at: "2026-01-05T00:00:00.000Z",
                 clients: { company_name: "Acme Corp" },
+                preparer: { full_name: "Jane Author", email: "jane@example.com" },
               },
             },
           ],
@@ -223,6 +242,7 @@ describe("listPendingApprovalsForCurrentUser", () => {
       googleDriveLink: "https://drive.example/q1",
       notes: "Rush order",
       createdAt: "2026-01-05T00:00:00.000Z",
+      preparedByName: "Jane Author",
     });
   });
 });

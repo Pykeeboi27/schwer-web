@@ -52,6 +52,7 @@ describe("listPurchaseOrders", () => {
           data: [
             {
               ...baseRow,
+              creator: { full_name: "Jane Author", email: "jane@example.com" },
               po_approvals: [
                 { approver_role: "owner", status: "pending" },
                 { approver_role: "owner", status: "pending" },
@@ -73,6 +74,22 @@ describe("listPurchaseOrders", () => {
     expect(po.paymentStatus).toBe("partial");
     expect(po.status).toBe("approved");
     expect(po.pendingApprovalRoles).toEqual(["owner"]);
+    expect(po.createdByName).toBe("Jane Author");
+  });
+
+  it("falls back to the email username when the creator has no full name", async () => {
+    mockClient = createSupabaseMock({
+      tables: {
+        purchase_orders: {
+          data: [{ ...baseRow, creator: { full_name: null, email: "jane@example.com" } }],
+          error: null,
+        },
+      },
+    });
+
+    const [po] = await listPurchaseOrders();
+
+    expect(po.createdByName).toBe("jane");
   });
 
   it("applies defaults for missing client, status, and recognized amount", async () => {
@@ -99,6 +116,7 @@ describe("listPurchaseOrders", () => {
     expect(po.status).toBe("pending");
     expect(po.recognizedAmount).toBe(0);
     expect(po.paymentStatus).toBe("unpaid");
+    expect(po.createdByName).toBe("Unknown");
   });
 
   it("throws when the query fails", async () => {
@@ -137,6 +155,7 @@ describe("listPendingPoApprovalsForCurrentUser", () => {
                 sector: "residential",
                 po_date: "2026-01-05",
                 clients: { company_name: "Acme Corp" },
+                creator: { full_name: "Jane Author", email: "jane@example.com" },
               },
             },
           ],
@@ -160,6 +179,7 @@ describe("listPendingPoApprovalsForCurrentUser", () => {
       marginAmount: 100000,
       sector: "residential",
       poDate: "2026-01-05",
+      createdByName: "Jane Author",
     });
   });
 });

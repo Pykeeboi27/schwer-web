@@ -40,6 +40,7 @@ export type SalesPurchaseOrder = {
   approvedAt: string | null;
   createdAt: string;
   createdBy: string;
+  createdByName: string;
 };
 
 export type SalesPoPayment = {
@@ -65,6 +66,7 @@ export type PendingPoApprovalItem = {
   marginAmount?: number | null;
   sector?: string | null;
   poDate?: string | null;
+  createdByName?: string;
 };
 
 function derivePaymentStatus(
@@ -133,12 +135,29 @@ function numberOrNull(value: unknown): number | null {
   return value === null || value === undefined ? null : Number(value);
 }
 
+/** Full name if set, else the email username (before the "@"), else null. */
+function resolveDisplayName(
+  profile: { full_name?: string | null; email?: string | null } | null | undefined,
+): string | null {
+  const fullName = profile?.full_name?.trim();
+  if (fullName) {
+    return fullName;
+  }
+
+  const email = profile?.email?.trim();
+  if (email) {
+    return email.split("@")[0];
+  }
+
+  return null;
+}
+
 export async function listPurchaseOrders(): Promise<SalesPurchaseOrder[]> {
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("purchase_orders")
     .select(
-      "id, quotation_id, po_number, client_po_number, quotation_reference, client_id, subject, po_amount, cost, margin_percentage, margin_amount, bank_percentage, bank_amount, sop_percentage, sop_amount, selling_amount, recognized_amount, payment_status, payment_terms, payment_terms_custom, lead_time_days, status, approved_at, created_at, created_by, clients:client_id(company_name), po_approvals(approver_role, status)",
+      "id, quotation_id, po_number, client_po_number, quotation_reference, client_id, subject, po_amount, cost, margin_percentage, margin_amount, bank_percentage, bank_amount, sop_percentage, sop_amount, selling_amount, recognized_amount, payment_status, payment_terms, payment_terms_custom, lead_time_days, status, approved_at, created_at, created_by, clients:client_id(company_name), po_approvals(approver_role, status), creator:created_by(full_name, email)",
     )
     .order("created_at", { ascending: false });
 
@@ -148,6 +167,7 @@ export async function listPurchaseOrders(): Promise<SalesPurchaseOrder[]> {
 
   return (data ?? []).map((row) => {
     const client = Array.isArray(row.clients) ? row.clients[0] : row.clients;
+    const creator = Array.isArray(row.creator) ? row.creator[0] : row.creator;
     const approvals = Array.isArray(row.po_approvals) ? row.po_approvals : [];
     const pendingApprovalRoles = Array.from(
       new Set(
@@ -188,6 +208,7 @@ export async function listPurchaseOrders(): Promise<SalesPurchaseOrder[]> {
       approvedAt: row.approved_at ?? null,
       createdAt: row.created_at,
       createdBy: row.created_by,
+      createdByName: resolveDisplayName(creator) ?? "Unknown",
     };
   });
 }
@@ -451,7 +472,7 @@ export async function listPendingPoApprovalsForCurrentUser(): Promise<
   const { data, error } = await supabase
     .from("po_approvals")
     .select(
-      "id, po_id, approver_role, status, purchase_orders:po_id(po_number, subject, po_amount, cost, margin_amount, sector, po_date, clients:client_id(company_name))",
+      "id, po_id, approver_role, status, purchase_orders:po_id(po_number, subject, po_amount, cost, margin_amount, sector, po_date, clients:client_id(company_name), creator:created_by(full_name, email))",
     )
     .eq("approver_id", user.id)
     .eq("status", "pending")
@@ -465,11 +486,8 @@ export async function listPendingPoApprovalsForCurrentUser(): Promise<
     const po = Array.isArray(row.purchase_orders)
       ? row.purchase_orders[0]
       : row.purchase_orders;
-    const client = po
-      ? Array.isArray(po.clients)
-        ? po.clients[0]
-        : po.clients
-      : null;
+    const client = po ? (Array.isArray(po.clients) ? po.clients[0] : po.clients) : null;
+    const creator = po ? (Array.isArray(po.creator) ? po.creator[0] : po.creator) : null;
 
     return {
       approvalId: row.id,
@@ -487,6 +505,7 @@ export async function listPendingPoApprovalsForCurrentUser(): Promise<
           : Number(po.margin_amount),
       sector: po?.sector ?? null,
       poDate: po?.po_date ?? null,
+      createdByName: resolveDisplayName(creator) ?? undefined,
     };
   });
 }

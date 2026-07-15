@@ -118,6 +118,9 @@ export function ApprovalDetailsDialog({
           <dt className="text-muted-foreground">Client</dt>
           <dd className="font-medium">{item.clientName ?? "-"}</dd>
 
+          <dt className="text-muted-foreground">Authored By</dt>
+          <dd className="font-medium">{item.preparedByName ?? "-"}</dd>
+
           <dt className="text-muted-foreground">Subject</dt>
           <dd className="font-medium">{item.subject || "-"}</dd>
 
@@ -178,7 +181,11 @@ export function ApprovalDetailsDialog({
             >
               Reject
             </Button>
-            <Button type="button" onClick={handleApprove} disabled={isBusy || !canApprove}>
+            <Button
+              type="button"
+              onClick={handleApprove}
+              disabled={isBusy || !canApprove}
+            >
               {isBusy ? "Saving..." : "Approve"}
             </Button>
           </div>

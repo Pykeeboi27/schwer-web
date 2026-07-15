@@ -1,8 +1,9 @@
 import { fetchQuotationsAction } from "@/app/protected/sales/quotations/actions";
+import { QuotationsScopePanel } from "@/components/sales/quotations-scope-panel";
 import { QuotationsTable } from "@/components/tables/quotations-table";
 import { ReadyForPurchaseOrderTable } from "@/components/tables/ready-for-purchase-order-table";
 import { ReadyForQuotationTable } from "@/components/tables/ready-for-quotation-table";
-import { PageHeader, Panel } from "@/components/patterns";
+import { BeamTick, PageHeader, Panel } from "@/components/patterns";
 import { getCurrentProfile } from "@/lib/profile/get-current-profile";
 import { getSalesAccessRedirect } from "@/lib/sales/access";
 import { redirect } from "next/navigation";
@@ -56,6 +57,9 @@ export default async function SalesQuotationsPage() {
   const approvedCount = statsQuotations.filter(
     (quotation) => quotation.status === "approved",
   ).length;
+  const closedCount = statsQuotations.filter(
+    (quotation) => quotation.status === "closed",
+  ).length;
   const rejectedCount = statsQuotations.filter(
     (quotation) => quotation.status === "rejected",
   ).length;
@@ -76,45 +80,7 @@ export default async function SalesQuotationsPage() {
         description="Quotations originate in engineering and reach this page after executive approves the costing. Add the sales details, then submit through the approval workflow."
       />
 
-      {isSalesDepartment ? (
-        <Panel
-          title="Ready for Quotation"
-          description="Costing quotations approved by the executive. Add the margin, payment terms, and lead time, then submit for sales approval."
-        >
-          {response.success ? (
-            <ReadyForQuotationTable
-              quotations={readyForQuotation}
-              currentUserId={profile?.id ?? ""}
-              currentUserRole={profile?.role ?? null}
-            />
-          ) : (
-            <p className="text-sm text-destructive">
-              {response.error ?? "Failed to load quotations."}
-            </p>
-          )}
-        </Panel>
-      ) : null}
-
-      {isSalesDepartment ? (
-        <Panel
-          title="Ready for Purchase Order"
-          description="Approved quotations with a recorded client PO. Review the pricing, then convert to a purchase order."
-        >
-          {response.success ? (
-            <ReadyForPurchaseOrderTable
-              quotations={readyForPurchaseOrder}
-              currentUserId={profile?.id ?? ""}
-              currentUserRole={profile?.role ?? null}
-            />
-          ) : (
-            <p className="text-sm text-destructive">
-              {response.error ?? "Failed to load quotations."}
-            </p>
-          )}
-        </Panel>
-      ) : null}
-
-      <div className="grid gap-3 sm:grid-cols-3">
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         {[
           {
             label: "Pending",
@@ -129,6 +95,13 @@ export default async function SalesQuotationsPage() {
             className:
               "border-green-200 bg-green-50 dark:border-green-900 dark:bg-green-950/40",
             valueClassName: "text-green-700 dark:text-green-300",
+          },
+          {
+            label: "Closed",
+            value: closedCount,
+            className:
+              "border-blue-200 bg-blue-50 dark:border-blue-900 dark:bg-blue-950/40",
+            valueClassName: "text-blue-700 dark:text-blue-300",
           },
           {
             label: "Rejected",
@@ -149,14 +122,16 @@ export default async function SalesQuotationsPage() {
       </div>
 
       {isSalesDepartment ? (
-        <>
+        <div className="grid gap-4 lg:grid-cols-2">
           <Panel
-            title="My Quotations"
-            description="Quotations assigned to you. Fully editable while in draft or re-opened for a PO."
+            title={
+              <BeamTick>{`Ready for Quotation (${readyForQuotation.length})`}</BeamTick>
+            }
+            description="Costing quotations approved by the executive. Add the margin, payment terms, and lead time, then submit for sales approval."
           >
             {response.success ? (
-              <QuotationsTable
-                quotations={myQuotations}
+              <ReadyForQuotationTable
+                quotations={readyForQuotation}
                 currentUserId={profile?.id ?? ""}
                 currentUserRole={profile?.role ?? null}
               />
@@ -168,12 +143,14 @@ export default async function SalesQuotationsPage() {
           </Panel>
 
           <Panel
-            title="Company Quotations"
-            description="Quotations assigned to other sales people. Read-only unless you're an approver."
+            title={
+              <BeamTick>{`Ready for Purchase Order (${readyForPurchaseOrder.length})`}</BeamTick>
+            }
+            description="Approved quotations with a recorded client PO. Review the pricing, then convert to a purchase order."
           >
             {response.success ? (
-              <QuotationsTable
-                quotations={companyQuotations}
+              <ReadyForPurchaseOrderTable
+                quotations={readyForPurchaseOrder}
                 currentUserId={profile?.id ?? ""}
                 currentUserRole={profile?.role ?? null}
               />
@@ -183,20 +160,29 @@ export default async function SalesQuotationsPage() {
               </p>
             )}
           </Panel>
-        </>
+        </div>
+      ) : null}
+
+      {!response.success ? (
+        <Panel title="Quotations">
+          <p className="text-sm text-destructive">
+            {response.error ?? "Failed to load quotations."}
+          </p>
+        </Panel>
+      ) : isSalesDepartment ? (
+        <QuotationsScopePanel
+          myQuotations={myQuotations}
+          companyQuotations={companyQuotations}
+          currentUserId={profile?.id ?? ""}
+          currentUserRole={profile?.role ?? null}
+        />
       ) : (
         <Panel title="Quotations">
-          {response.success ? (
-            <QuotationsTable
-              quotations={activeQuotations}
-              currentUserId={profile?.id ?? ""}
-              currentUserRole={profile?.role ?? null}
-            />
-          ) : (
-            <p className="text-sm text-destructive">
-              {response.error ?? "Failed to load quotations."}
-            </p>
-          )}
+          <QuotationsTable
+            quotations={activeQuotations}
+            currentUserId={profile?.id ?? ""}
+            currentUserRole={profile?.role ?? null}
+          />
         </Panel>
       )}
     </div>

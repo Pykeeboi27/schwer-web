@@ -35,6 +35,7 @@ export function ExecutiveApprovalsTable({
                 <th className="px-3 py-2 font-medium">Quotation</th>
                 <th className="px-3 py-2 font-medium">Subject</th>
                 <th className="px-3 py-2 font-medium">Amount</th>
+                <th className="px-3 py-2 font-medium">Authored By</th>
                 <th className="px-3 py-2 font-medium">Required Role</th>
               </tr>
             </thead>
@@ -56,6 +57,9 @@ export function ExecutiveApprovalsTable({
                   <td className="px-3 py-2 font-mono text-xs">{item.quotationNumber}</td>
                   <td className="px-3 py-2">{item.subject || "-"}</td>
                   <td className="px-3 py-2">{formatCurrency(item.amount)}</td>
+                  <td className="px-3 py-2 text-muted-foreground">
+                    {item.preparedByName ?? "-"}
+                  </td>
                   <td className="px-3 py-2 capitalize">
                     {item.approverRole.replaceAll("_", " ")}
                   </td>
@@ -83,6 +87,7 @@ export function ExecutiveApprovalsTable({
               </>
             }
           >
+            <DataField label="Authored By" value={item.preparedByName ?? "-"} />
             <DataField
               label="Required Role"
               value={

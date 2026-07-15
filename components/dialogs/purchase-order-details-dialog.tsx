@@ -367,6 +367,10 @@ export function PurchaseOrderDetailsDialog({
                 <dd>{purchaseOrder.clientName}</dd>
               </div>
               <div className="grid grid-cols-[160px_1fr] gap-2">
+                <dt className="text-muted-foreground">Authored By</dt>
+                <dd>{purchaseOrder.createdByName}</dd>
+              </div>
+              <div className="grid grid-cols-[160px_1fr] gap-2">
                 <dt className="text-muted-foreground">Subject</dt>
                 <dd>{purchaseOrder.subject}</dd>
               </div>

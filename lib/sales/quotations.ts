@@ -15,6 +15,7 @@ export type SalesQuotation = {
   notes: string | null;
   status: "draft" | "pending" | "approved" | "rejected" | "cancelled" | "closed";
   preparedBy: string;
+  preparedByName: string;
   salesPersonId: string | null;
   pendingApprovalRoles: RequiredApproverRole[];
   createdAt: string;
@@ -52,6 +53,7 @@ export type PendingApprovalItem = {
   googleDriveLink?: string | null;
   notes?: string | null;
   createdAt?: string;
+  preparedByName?: string;
 };
 
 export async function fetchQuotations(_departmentId?: string): Promise<SalesQuotation[]> {
@@ -82,6 +84,23 @@ function toUniqueRoles(roles: RequiredApproverRole[]): RequiredApproverRole[] {
 
 function numberOrNull(value: unknown): number | null {
   return value === null || value === undefined ? null : Number(value);
+}
+
+/** Full name if set, else the email username (before the "@"), else null. */
+function resolveDisplayName(
+  profile: { full_name?: string | null; email?: string | null } | null | undefined,
+): string | null {
+  const fullName = profile?.full_name?.trim();
+  if (fullName) {
+    return fullName;
+  }
+
+  const email = profile?.email?.trim();
+  if (email) {
+    return email.split("@")[0];
+  }
+
+  return null;
 }
 
 export function parseQuotationAmount(raw: unknown): number {
@@ -163,7 +182,7 @@ export async function listSalesQuotations(): Promise<SalesQuotation[]> {
   const { data, error } = await supabase
     .from("quotations")
     .select(
-      "id, quotation_number, client_id, subject, amount, cost, google_drive_link, notes, status, prepared_by, sales_person_id, created_at, costing_approved_at, sales_margin_percent, margin_percentage, margin_amount, bank_percentage, bank_amount, sop_percentage, sop_amount, selling_amount, payment_terms, payment_terms_custom, lead_time_days, client_po_number, client_confirmed_at, converted_po_id, po_converted_at, clients:client_id(company_name), converted_po:converted_po_id(status), quotation_approvals(approver_role, status)",
+      "id, quotation_number, client_id, subject, amount, cost, google_drive_link, notes, status, prepared_by, sales_person_id, created_at, costing_approved_at, sales_margin_percent, margin_percentage, margin_amount, bank_percentage, bank_amount, sop_percentage, sop_amount, selling_amount, payment_terms, payment_terms_custom, lead_time_days, client_po_number, client_confirmed_at, converted_po_id, po_converted_at, clients:client_id(company_name), converted_po:converted_po_id(status), quotation_approvals(approver_role, status), preparer:prepared_by(full_name, email)",
     )
     .eq("phase", "sales")
     .order("created_at", { ascending: false });
@@ -174,6 +193,7 @@ export async function listSalesQuotations(): Promise<SalesQuotation[]> {
 
   return (data ?? []).map((row) => {
     const client = Array.isArray(row.clients) ? row.clients[0] : row.clients;
+    const preparer = Array.isArray(row.preparer) ? row.preparer[0] : row.preparer;
     const approvals = Array.isArray(row.quotation_approvals)
       ? row.quotation_approvals
       : [];
@@ -197,6 +217,7 @@ export async function listSalesQuotations(): Promise<SalesQuotation[]> {
       notes: row.notes,
       status: row.status,
       preparedBy: row.prepared_by,
+      preparedByName: resolveDisplayName(preparer) ?? "Unknown",
       salesPersonId: row.sales_person_id ?? null,
       pendingApprovalRoles,
       createdAt: row.created_at,
@@ -465,7 +486,7 @@ export async function listPendingApprovalsForCurrentUser(): Promise<
   const { data, error } = await supabase
     .from("quotation_approvals")
     .select(
-      "id, quotation_id, approver_role, status, quotations:quotation_id(quotation_number, subject, amount, cost, margin_amount, sector, google_drive_link, notes, created_at, clients:client_id(company_name))",
+      "id, quotation_id, approver_role, status, quotations:quotation_id(quotation_number, subject, amount, cost, margin_amount, sector, google_drive_link, notes, created_at, clients:client_id(company_name), preparer:prepared_by(full_name, email))",
     )
     .eq("approver_id", user.id)
     .eq("status", "pending")
@@ -482,6 +503,11 @@ export async function listPendingApprovalsForCurrentUser(): Promise<
         ? quotation.clients[0]
         : quotation.clients
       : null;
+    const preparer = quotation
+      ? Array.isArray(quotation.preparer)
+        ? quotation.preparer[0]
+        : quotation.preparer
+      : null;
 
     return {
       approvalId: row.id,
@@ -492,9 +518,10 @@ export async function listPendingApprovalsForCurrentUser(): Promise<
       approverRole: row.approver_role,
       status: row.status,
       clientName: client?.company_name ?? undefined,
-      cost: quotation?.cost === null || quotation?.cost === undefined
-        ? null
-        : Number(quotation.cost),
+      cost:
+        quotation?.cost === null || quotation?.cost === undefined
+          ? null
+          : Number(quotation.cost),
       marginAmount:
         quotation?.margin_amount === null || quotation?.margin_amount === undefined
           ? null
@@ -503,6 +530,7 @@ export async function listPendingApprovalsForCurrentUser(): Promise<
       googleDriveLink: quotation?.google_drive_link ?? null,
       notes: quotation?.notes ?? null,
       createdAt: quotation?.created_at ?? undefined,
+      preparedByName: resolveDisplayName(preparer) ?? undefined,
     };
   });
 }

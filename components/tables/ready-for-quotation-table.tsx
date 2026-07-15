@@ -94,17 +94,18 @@ export function ReadyForQuotationTable({
           <table className="w-full table-fixed text-sm">
             <thead className="bg-muted/40 text-left">
               <tr>
-                <th className="w-[26%] px-3 py-2 font-medium">Client</th>
-                <th className="w-[28%] px-3 py-2 font-medium">Subject</th>
-                <th className="w-[17%] px-3 py-2 font-medium">Amount</th>
-                <th className="w-[15%] px-3 py-2 font-medium">Cost</th>
-                <th className="w-[14%] px-3 py-2 font-medium">Approved At</th>
+                <th className="w-[22%] px-3 py-2 font-medium">Client</th>
+                <th className="w-[23%] px-3 py-2 font-medium">Subject</th>
+                <th className="w-[14%] px-3 py-2 font-medium">Amount</th>
+                <th className="w-[13%] px-3 py-2 font-medium">Cost</th>
+                <th className="w-[15%] px-3 py-2 font-medium">Authored By</th>
+                <th className="w-[13%] px-3 py-2 font-medium">Approved At</th>
               </tr>
             </thead>
             <tbody>
               {filtered.length === 0 ? (
                 <tr>
-                  <td colSpan={5}>{emptyState}</td>
+                  <td colSpan={6}>{emptyState}</td>
                 </tr>
               ) : (
                 filtered.map((quotation) => (
@@ -133,6 +134,9 @@ export function ReadyForQuotationTable({
                     </td>
                     <td className="truncate px-3 py-2">
                       {quotation.cost === null ? "-" : formatCurrency(quotation.cost)}
+                    </td>
+                    <td className="truncate px-3 py-2 text-muted-foreground">
+                      {quotation.preparedByName}
                     </td>
                     <td className="truncate px-3 py-2 text-muted-foreground">
                       {formatDate(quotation.costingApprovedAt)}
@@ -171,6 +175,7 @@ export function ReadyForQuotationTable({
                   label="Cost"
                   value={quotation.cost === null ? "-" : formatCurrency(quotation.cost)}
                 />
+                <DataField label="Authored By" value={quotation.preparedByName} />
                 <DataField
                   label="Approved At"
                   value={formatDate(quotation.costingApprovedAt)}

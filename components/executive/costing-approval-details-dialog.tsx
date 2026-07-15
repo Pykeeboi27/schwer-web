@@ -140,10 +140,20 @@ export function CostingApprovalDetailsDialog({
             disabled={isBusy}
           />
           <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
-            <Button type="button" variant="ghost" onClick={handleDismiss} disabled={isBusy}>
+            <Button
+              type="button"
+              variant="ghost"
+              onClick={handleDismiss}
+              disabled={isBusy}
+            >
               Close
             </Button>
-            <Button type="button" variant="outline" onClick={handleReject} disabled={isBusy}>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={handleReject}
+              disabled={isBusy}
+            >
               Reject
             </Button>
             <Button type="button" onClick={handleApprove} disabled={isBusy}>

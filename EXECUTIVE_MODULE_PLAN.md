@@ -6,12 +6,12 @@ Four issues were reported in the **Executive module** (scope is strictly this mo
 data-loaders are touched only additively where explicitly approved). Each is a real defect or a
 requested feature:
 
-1. **Dashboard / Targets bug** — saving a *quarterly* target shows "Failed to load yearly target."
+1. **Dashboard / Targets bug** — saving a _quarterly_ target shows "Failed to load yearly target."
    Root cause: `upsertAnnualTarget`/`upsertQuarterlyTarget` use `onConflict: "year,month,sector"`,
-   but Postgres treats the `NULL` `month`/`sector` as *distinct*, so every save **inserts a new row**
+   but Postgres treats the `NULL` `month`/`sector` as _distinct_, so every save **inserts a new row**
    instead of updating. Once ≥2 annual rows exist, `getAnnualTarget` (which uses `.maybeSingle()`
    with no `.limit(1)`) errors on "multiple rows", and that error is surfaced when a quarterly save
-   calls it as a precondition. The dashboard KPI card doesn't break because its *separate* loader
+   calls it as a precondition. The dashboard KPI card doesn't break because its _separate_ loader
    (`fetchAnnualTarget` in `dashboard.ts`) already defends with `.order(updated_at desc).limit(1)`.
 
 2. **Revenue Breakdown (Monthly view)** — hardcoded to the real current month, with no month label
@@ -47,8 +47,8 @@ self-heals existing duplicates on the next save.
   2. If one or more exist → `update` the newest by `id` (set `target_amount`, `set_by`, `updated_at`),
      and `delete` any extra duplicate ids to clean up historical duplicates.
   3. If none exist → `insert`.
-  Keep all existing validation/guards (`validateAnnualTargetInput`, annual-vs-quarter-sum checks,
-  auth check). Preserve return shapes.
+     Keep all existing validation/guards (`validateAnnualTargetInput`, annual-vs-quarter-sum checks,
+     auth check). Preserve return shapes.
 - `getQuarterlyTargets` already tolerates duplicates (map keyed by month); no change needed beyond
   the dedupe that the fixed upsert provides.
 
@@ -115,17 +115,19 @@ open a per-item **detail dialog** that shows the enriched fields and hosts the A
 state, rendering one dialog after `<ResponsiveTable>`; the dialog owns its local reason-input state.
 
 **Enrich the shared loaders (additive — approved):**
+
 - `lib/sales/quotations.ts` — extend `PendingApprovalItem` with optional `clientName`, `cost`,
   `marginAmount`, `sector`, `googleDriveLink`, `notes`, `createdAt`; expand the
   `listPendingApprovalsForCurrentUser` join select
   (`quotations:quotation_id(..., cost, margin_amount, sector, google_drive_link, notes, created_at,
-  clients:client_id(company_name))`). Sales-module consumers render a subset → unaffected.
+clients:client_id(company_name))`). Sales-module consumers render a subset → unaffected.
 - `lib/sales/purchase-orders.ts` — extend `PendingPoApprovalItem` with optional `clientName`, `cost`,
   `marginAmount`, `sector`, `poDate`; expand the `listPendingPoApprovalsForCurrentUser` join select.
 - Costing (`CostingApprovalItem`) already carries client/cost/drive/preparer/notes/createdAt — no
   loader change.
 
 **Components:**
+
 - `components/executive/approvals-table.tsx` — slim columns to Quotation · Subject · Amount · Required
   Role; add row-click → new `components/executive/approval-details-dialog.tsx`.
 - `components/executive/po-approvals-table.tsx` — same treatment → new

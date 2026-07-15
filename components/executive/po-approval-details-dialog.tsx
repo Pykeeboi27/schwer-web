@@ -110,6 +110,9 @@ export function PoApprovalDetailsDialog({
           <dt className="text-muted-foreground">Client</dt>
           <dd className="font-medium">{item.clientName ?? "-"}</dd>
 
+          <dt className="text-muted-foreground">Authored By</dt>
+          <dd className="font-medium">{item.createdByName ?? "-"}</dd>
+
           <dt className="text-muted-foreground">Subject</dt>
           <dd className="font-medium">{item.subject || "-"}</dd>
 
@@ -151,7 +154,11 @@ export function PoApprovalDetailsDialog({
             >
               Reject
             </Button>
-            <Button type="button" onClick={handleApprove} disabled={isBusy || !canApprove}>
+            <Button
+              type="button"
+              onClick={handleApprove}
+              disabled={isBusy || !canApprove}
+            >
               {isBusy ? "Saving..." : "Approve"}
             </Button>
           </div>

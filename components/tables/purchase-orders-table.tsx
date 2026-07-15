@@ -191,17 +191,18 @@ export function PurchaseOrdersTable({
           <table className="w-full table-fixed text-sm">
             <thead className="bg-muted/40 text-left">
               <tr>
-                <th className="w-[26%] px-3 py-2 font-medium">Client</th>
-                <th className="w-[19%] px-3 py-2 font-medium">Total Amount</th>
-                <th className="w-[27%] px-3 py-2 font-medium">Progress</th>
-                <th className="w-[14%] px-3 py-2 font-medium">Approval</th>
-                <th className="w-[14%] px-3 py-2 font-medium">Payment</th>
+                <th className="w-[22%] px-3 py-2 font-medium">Client</th>
+                <th className="w-[16%] px-3 py-2 font-medium">Total Amount</th>
+                <th className="w-[22%] px-3 py-2 font-medium">Progress</th>
+                <th className="w-[15%] px-3 py-2 font-medium">Authored By</th>
+                <th className="w-[12%] px-3 py-2 font-medium">Approval</th>
+                <th className="w-[13%] px-3 py-2 font-medium">Payment</th>
               </tr>
             </thead>
             <tbody>
               {filteredAndSorted.length === 0 ? (
                 <tr>
-                  <td colSpan={5}>{emptyState}</td>
+                  <td colSpan={6}>{emptyState}</td>
                 </tr>
               ) : (
                 filteredAndSorted.map((purchaseOrder) => (
@@ -238,6 +239,9 @@ export function PurchaseOrdersTable({
                           style={{ width: `${progressOf(purchaseOrder)}%` }}
                         />
                       </div>
+                    </td>
+                    <td className="truncate px-3 py-2 text-muted-foreground">
+                      {purchaseOrder.createdByName}
                     </td>
                     <td className="px-3 py-2">
                       <StatusBadge status={purchaseOrder.status} />
@@ -290,6 +294,7 @@ export function PurchaseOrdersTable({
                 }
               >
                 <DataField label="Total" value={formatCurrency(purchaseOrder.poAmount)} />
+                <DataField label="Authored By" value={purchaseOrder.createdByName} />
               </DataCard>
             ))
           )
