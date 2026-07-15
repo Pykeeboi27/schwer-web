@@ -1,155 +1,188 @@
-<a href="https://demo-nextjs-with-supabase.vercel.app/">
-  <img alt="Schwer Online Management" src="https://demo-nextjs-with-supabase.vercel.app/opengraph-image.png">
-  <h1 align="center">Schwer Online Management</h1>
-</a>
+# Schwer Online Management
 
-<p align="center">
- Department-first operations portal with Next.js and Supabase
-</p>
+A department-first operations portal for Schwer PH — sales pipeline, engineering
+costing, and executive oversight in one internal web app.
 
-<p align="center">
-  <a href="#features"><strong>Features</strong></a> ·
-  <a href="#demo"><strong>Demo</strong></a> ·
-  <a href="#deploy-to-vercel"><strong>Deploy to Vercel</strong></a> ·
-  <a href="#clone-and-run-locally"><strong>Clone and run locally</strong></a> ·
-  <a href="#feedback-and-issues"><strong>Feedback and issues</strong></a>
-  <a href="#more-supabase-examples"><strong>More Examples</strong></a>
-</p>
-<br/>
+Built with [Next.js](https://nextjs.org) (App Router) and [Supabase](https://supabase.com)
+(Postgres, Auth, Row-Level Security).
 
-## Current Behavior
+## Overview
 
-- `/` is a public landing page with Login and Sign up calls to action.
-- Protected routes redirect unauthenticated users to `/auth/login` and preserve intended destination via `redirectTo`.
-- Post-auth routing converges to:
-  - `/auth/choose-department` when department is missing
-  - `/protected/{department}` when department is set
-- Profile self-healing is enabled via server-side ensurement fallback and schema-backed RLS policy support.
+Every employee signs in once and lands on the dashboard for their department.
+Each module owns its own workflow, but they connect into one pipeline:
 
-## Feature 004: Sales Dashboard UI Overhaul
-
-The sales workspace under `/protected/sales` now includes:
-
-- Responsive sales navigation with tabbed sections for clients, quotations, and purchase orders.
-- Client management with generated client codes, searchable table UI, and detail dialogs.
-- Quotation approval workflow with role-based submit/approve/reject actions.
-- Purchase-order tracking with collection recording and running recognized totals.
-- Improved form validation and accessibility polish (inline errors, keyboard row activation, Esc-close dialogs).
-
-### Feature 004 test commands
-
-```bash
-npm run test
+```
+Engineering (costing)  →  Sales (pricing & approval)  →  Purchase Orders  →  Executive (oversight)
 ```
 
-## Feature 005: Executive Dashboard
+- **Engineering** prepares the direct cost for a quotation and submits it for
+  executive costing approval.
+- **Sales** adds margin/pricing on top of the approved cost, routes the
+  quotation through approval (sales manager → owner → executive, based on
+  amount), records the client's PO, and converts it into a purchase order with
+  collections tracking.
+- **Executive** reviews high-value quotation/PO approvals, approves costing
+  submissions, sets revenue targets, and monitors company-wide KPIs.
 
-The executive workspace under `/protected/executive` now includes:
+`hr`, `accounting`, and `purchasing` are registered departments (users can
+select them at sign-up and will land on a placeholder dashboard) but don't yet
+have dedicated modules.
 
-- Revenue YTD vs target, weighted YTD margin, and PO summary cards.
-- Period-filtered revenue breakdown (`monthly`, `quarterly`, `ytd`) with URL-based filter state.
-- Sales performance overview ranked by PO owner for the selected period.
-- Yearly target editing with Target Editor authorization checks and server-side updates.
+## Tech stack
 
-### Executive access model
+| Layer      | Choice                                                                   |
+| ---------- | ------------------------------------------------------------------------ |
+| Framework  | Next.js 16 (App Router, Server Components, Server Actions)               |
+| Language   | TypeScript (strict mode)                                                 |
+| Database   | Supabase Postgres, with Row-Level Security on every table                |
+| Auth       | Supabase Auth via `@supabase/ssr` (cookie-based sessions)                |
+| Styling    | Tailwind CSS                                                             |
+| Components | shadcn/ui (New York style) on top of Radix primitives                    |
+| Testing    | Vitest + Testing Library + jsdom                                         |
+| Deployment | Docker (`output: "standalone"`), see `Dockerfile` / `docker-compose.yml` |
 
-- Viewer (read): `profiles.is_executive_viewer = true` and `profiles.is_active = true`
-- Target Editor (write): `profiles.role in ('owner', 'executive')` and `profiles.is_active = true`
+## Modules at a glance
 
-### Feature 005 test commands
+| Route                                    | Who                     | What it does                                                                   |
+| ---------------------------------------- | ----------------------- | ------------------------------------------------------------------------------ |
+| `/protected/sales`                       | Sales                   | KPIs, sector performance, client distribution, quotation status breakdown      |
+| `/protected/sales/clients`               | Sales                   | Client directory with generated client codes and contact details               |
+| `/protected/sales/quotations`            | Sales                   | Quotation pipeline — ready-for-quotation, ready-for-PO, mine vs. company       |
+| `/protected/sales/purchase-orders`       | Sales                   | Converted POs, payment collection, running recognized totals, worksheet export |
+| `/protected/sales/approvals`             | Sales manager           | Quotations/POs pending sales-manager approval                                  |
+| `/protected/engineering`                 | Engineering             | Costing status breakdown and recent submissions                                |
+| `/protected/engineering/quotations`      | Engineering             | Draft and submit costing quotations for executive approval                     |
+| `/protected/executive`                   | Executive/Owner viewers | Revenue vs. target, YTD margin, PO summary, yearly/quarterly target editing    |
+| `/protected/executive/sales`             | Executive/Owner viewers | Revenue breakdown by period, sector/client charts, sales performance ranking   |
+| `/protected/executive/approvals`         | Owner/Executive         | High-value (≥ ₱3M) quotation and PO approvals                                  |
+| `/protected/executive/costing-approvals` | Executive               | Approve or reject engineering's costing submissions                            |
 
-```bash
-npx vitest run tests/unit/executive/period.test.ts tests/unit/executive/metrics.test.ts tests/unit/executive/targets-validation.test.ts tests/unit/executive/sales-performance.test.ts
+## Authentication & profile flow
+
+1. Supabase cookie-based SSR sessions — no JWT is ever handled client-side.
+2. After login, `ensureCurrentProfile()` self-heals by creating a `profiles`
+   row if one doesn't exist yet.
+3. No department set → redirected to `/auth/choose-department`.
+4. Department set → redirected to `/protected/{department}`.
+
+Access control is enforced twice: pure predicate functions in `lib/*/access.ts`
+gate page rendering, and Postgres RLS policies gate the data itself.
+
+## Quotation approval workflow
+
+```
+draft → pending_sales_manager → pending_owner (if amount ≥ ₱3M) → pending_executive → approved
 ```
 
-## Features
+Quotations under ₱3M skip the owner step. Terminal states are `approved` and
+`rejected`; `closed` marks a quotation that's been converted into a purchase
+order. The state machine lives in `lib/sales/approval-workflow.ts` and is unit
+tested in `tests/unit/approval-workflow.test.ts`.
 
-- Works across the entire [Next.js](https://nextjs.org) stack
-  - App Router
-  - Pages Router
-  - Proxy
-  - Client
-  - Server
-  - It just works!
-- supabase-ssr. A package to configure Supabase Auth to use cookies
-- Password-based authentication block installed via the [Supabase UI Library](https://supabase.com/ui/docs/nextjs/password-based-auth)
-- Styling with [Tailwind CSS](https://tailwindcss.com)
-- Components with [shadcn/ui](https://ui.shadcn.com/)
-- Optional deployment with [Supabase Vercel Integration and Vercel deploy](#deploy-your-own)
-  - Environment variables automatically assigned to Vercel project
+## Getting started
 
-## Demo
+### Prerequisites
 
-You can view a fully working demo at [demo-nextjs-with-supabase.vercel.app](https://demo-nextjs-with-supabase.vercel.app/).
+- Node.js 20+
+- A [Supabase project](https://database.new) (or the Supabase CLI for local development)
 
-## Deploy to Vercel
+### 1. Install dependencies
 
-Vercel deployment will guide you through creating a Supabase account and project.
+```bash
+npm install
+```
 
-After installation of the Supabase integration, all relevant environment variables will be assigned to the project so the deployment is fully functioning.
+### 2. Configure environment variables
 
-[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https%3A%2F%2Fgithub.com%2Fvercel%2Fnext.js%2Ftree%2Fcanary%2Fexamples%2Fwith-supabase&project-name=nextjs-with-supabase&repository-name=nextjs-with-supabase&demo-title=nextjs-with-supabase&demo-description=This+starter+configures+Supabase+Auth+to+use+cookies%2C+making+the+user%27s+session+available+throughout+the+entire+Next.js+app+-+Client+Components%2C+Server+Components%2C+Route+Handlers%2C+Server+Actions+and+Middleware.&demo-url=https%3A%2F%2Fdemo-nextjs-with-supabase.vercel.app%2F&external-id=https%3A%2F%2Fgithub.com%2Fvercel%2Fnext.js%2Ftree%2Fcanary%2Fexamples%2Fwith-supabase&demo-image=https%3A%2F%2Fdemo-nextjs-with-supabase.vercel.app%2Fopengraph-image.png)
-
-The above will also clone the Starter kit to your GitHub, you can clone that locally and develop locally.
-
-If you wish to just develop locally and not deploy to Vercel, [follow the steps below](#clone-and-run-locally).
-
-## Clone and run locally
-
-1. You'll first need a Supabase project which can be made [via the Supabase dashboard](https://database.new)
-
-2. Create a Next.js app using the Supabase Starter template npx command
-
-   ```bash
-   npx create-next-app --example with-supabase with-supabase-app
-   ```
-
-   ```bash
-   yarn create next-app --example with-supabase with-supabase-app
-   ```
-
-   ```bash
-   pnpm create next-app --example with-supabase with-supabase-app
-   ```
-
-3. Use `cd` to change into the app's directory
-
-   ```bash
-   cd with-supabase-app
-   ```
-
-4. Rename `.env.example` to `.env.local` and update the following:
+Create `.env.local` in the project root:
 
 ```env
-NEXT_PUBLIC_SUPABASE_URL=[INSERT SUPABASE PROJECT URL]
-NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=[INSERT SUPABASE PROJECT API PUBLISHABLE OR ANON KEY]
+NEXT_PUBLIC_SUPABASE_URL=<your Supabase project URL>
+NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=<your Supabase publishable/anon key>
+
+# Optional — enables in-app Google Drive uploads for quotation attachments.
+# Without these, users can still paste a Drive link manually.
+GOOGLE_SERVICE_ACCOUNT_JSON=<service account JSON, as a single-line string>
+GOOGLE_DRIVE_FOLDER_ID=<target Drive folder ID>
 ```
 
-> [!NOTE]
-> This example uses `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`, which refers to Supabase's new **publishable** key format.
-> Both legacy **anon** keys and new **publishable** keys can be used with this variable name during the transition period. Supabase's dashboard may show `NEXT_PUBLIC_SUPABASE_ANON_KEY`; its value can be used in this example.
-> See the [full announcement](https://github.com/orgs/supabase/discussions/29260) for more information.
+Both Supabase values are in your project's API settings
+(`https://supabase.com/dashboard/project/_?showConnect=true`).
 
-Both `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` can be found in [your Supabase project's API settings](https://supabase.com/dashboard/project/_?showConnect=true)
+### 3. Set up the database
 
-5. You can now run the Next.js local development server:
+Apply `schema.sql` to your Supabase project (via the SQL editor or
+`supabase db push`). It creates every table (`profiles`, `clients`,
+`client_contacts`, `quotations`, `quotation_approvals`, `purchase_orders`,
+`po_approvals`, `po_payments`, `revenue_targets`, `audit_logs`), their RLS
+policies, triggers, and helper functions.
 
-   ```bash
-   npm run dev
-   ```
+### 4. Run the dev server
 
-   The starter kit should now be running on [localhost:3000](http://localhost:3000/).
+```bash
+npm run dev
+```
 
-6. This template comes with the default shadcn/ui style initialized. If you instead want other ui.shadcn styles, delete `components.json` and [re-install shadcn/ui](https://ui.shadcn.com/docs/installation/next)
+The app runs at [localhost:3000](http://localhost:3000).
 
-> Check out [the docs for Local Development](https://supabase.com/docs/guides/getting-started/local-development) to also run Supabase locally.
+## Available scripts
 
-## Feedback and issues
+| Command                | Description                      |
+| ---------------------- | -------------------------------- |
+| `npm run dev`          | Start the dev server             |
+| `npm run build`        | Production build                 |
+| `npm run start`        | Serve a production build         |
+| `npm run lint`         | ESLint                           |
+| `npm run format`       | Prettier check                   |
+| `npm run format:write` | Prettier — write fixes           |
+| `npm run test`         | Run the unit test suite (Vitest) |
 
-Please file feedback and issues over on the [Supabase GitHub org](https://github.com/supabase/supabase/issues/new/choose).
+Run a single test file with:
 
-## More Supabase examples
+```bash
+npx vitest run tests/unit/approval-workflow.test.ts
+```
 
-- [Next.js Subscription Payments Starter](https://github.com/vercel/nextjs-subscription-payments)
-- [Cookie-based Auth and the Next.js 13 App Router (free course)](https://youtube.com/playlist?list=PL5S4mPUpp4OtMhpnp93EFSo42iQ40XjbF)
-- [Supabase Auth and the Next.js App Router](https://github.com/supabase/supabase/tree/master/examples/auth/nextjs)
+## Project structure
+
+```
+app/
+  page.tsx                 # public landing page
+  auth/                    # login, sign-up, confirm, choose-department, forgot-password
+  protected/
+    [department]/          # generic placeholder for departments without a module
+    sales/                 # clients, quotations, purchase orders, approvals
+    engineering/           # costing quotations
+    executive/             # KPI dashboard, sales details, approvals, costing approvals
+  api/                     # Drive upload proxy, PO worksheet export
+components/
+  ui/                      # shadcn/ui primitives (don't hand-edit — regenerate via shadcn)
+  layouts/                 # DashboardLayout, Sidebar
+  dialogs/                 # modal CRUD forms
+  patterns/                # shared page/panel/table/status primitives
+  sales/ · executive/ · engineering/ · tables/   # domain components
+lib/
+  sales/ · executive/ · engineering/ · profile/  # domain logic, calls Supabase directly (no ORM)
+  supabase/                # server/client Supabase factory functions
+tests/unit/                # Vitest suite, mirrors the lib/ and components/ structure
+schema.sql                 # canonical database schema (tables, RLS, triggers, functions)
+```
+
+## Testing
+
+Unit tests (Vitest + jsdom) are the only automated test layer, living in
+`tests/unit/`. They cover domain logic (`lib/`), key components, and the
+approval workflow state machine. Run the full suite with `npm run test`.
+
+## Deployment
+
+The app builds as a standalone Next.js output (`next.config.ts` sets
+`output: "standalone"`) and ships with a `Dockerfile` and
+`docker-compose.yml` for self-hosted deployment:
+
+```bash
+docker compose up --build
+```
+
+Environment variables are read from `.env.local` (see above) and passed
+through as build args for the public Supabase values.
