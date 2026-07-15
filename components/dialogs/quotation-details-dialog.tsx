@@ -427,7 +427,10 @@ export function QuotationDetailsDialog({
         </DialogHeader>
 
         {isRejected && quotation.rejectionReason ? (
-          <Callout tone="destructive" title={`Rejected by ${quotation.rejectedByName ?? "Unknown"}`}>
+          <Callout
+            tone="destructive"
+            title={`Rejected by ${quotation.rejectedByName ?? "Unknown"}`}
+          >
             <p className="text-foreground">{quotation.rejectionReason}</p>
           </Callout>
         ) : null}
