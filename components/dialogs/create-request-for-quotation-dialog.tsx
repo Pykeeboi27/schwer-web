@@ -71,9 +71,7 @@ export function CreateRequestForQuotationDialog({
   };
 
   const updateItem = (index: number, patch: Partial<ItemRow>) => {
-    setItems((prev) =>
-      prev.map((row, i) => (i === index ? { ...row, ...patch } : row)),
-    );
+    setItems((prev) => prev.map((row, i) => (i === index ? { ...row, ...patch } : row)));
   };
 
   const removeItem = (index: number) => {

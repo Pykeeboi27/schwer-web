@@ -161,7 +161,9 @@ export function RequestForQuotationTable({ requests }: RequestForQuotationTableP
                   <StatusBadge status={badgeStatus(request)} />
                 </>
               }
-              footer={expanded.has(request.id) ? <ItemsBreakdown request={request} /> : null}
+              footer={
+                expanded.has(request.id) ? <ItemsBreakdown request={request} /> : null
+              }
             >
               <DataField label="Client" value={request.clientName} />
               <DataField label="Subject" value={request.subject} />

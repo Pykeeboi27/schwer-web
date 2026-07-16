@@ -202,7 +202,9 @@ export async function listPurchaseOrders(): Promise<SalesPurchaseOrder[]> {
         : rejectedApproval.approver
       : null;
 
-    const items = (Array.isArray(row.purchase_order_items) ? row.purchase_order_items : [])
+    const items = (
+      Array.isArray(row.purchase_order_items) ? row.purchase_order_items : []
+    )
       .slice()
       .sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0))
       .map((item) => ({
@@ -410,7 +412,9 @@ export async function convertQuotationToPurchaseOrder(
       })),
     );
     if (itemsError) {
-      throw new Error(itemsError.message || "Failed to copy line items to the purchase order.");
+      throw new Error(
+        itemsError.message || "Failed to copy line items to the purchase order.",
+      );
     }
   }
 

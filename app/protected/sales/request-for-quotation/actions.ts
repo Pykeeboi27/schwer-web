@@ -50,9 +50,7 @@ export async function fetchRequestsForQuotationAction(): Promise<
     return {
       success: false,
       error:
-        error instanceof Error
-          ? error.message
-          : "Failed to load requests for quotation.",
+        error instanceof Error ? error.message : "Failed to load requests for quotation.",
     };
   }
 }
