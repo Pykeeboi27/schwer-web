@@ -1,5 +1,13 @@
 import { createClient } from "@/lib/supabase/server";
 
+export type CostingQuotationItem = {
+  id: string;
+  description: string;
+  quantity: number;
+  unitCost: number | null;
+  lineTotal: number;
+};
+
 export type CostingApprovedHistoryItem = {
   quotationId: string;
   quotationNumber: string;
@@ -7,6 +15,7 @@ export type CostingApprovedHistoryItem = {
   subject: string;
   amount: number;
   cost: number | null;
+  items: CostingQuotationItem[];
   googleDriveLink: string | null;
   notes: string | null;
   salesPersonId: string | null;
@@ -23,6 +32,7 @@ export type CostingQuotation = {
   subject: string;
   amount: number;
   cost: number | null;
+  items: CostingQuotationItem[];
   googleDriveLink: string | null;
   notes: string | null;
   status: "draft" | "pending" | "approved" | "rejected" | "cancelled";
@@ -43,12 +53,17 @@ export function parseCostingAmount(raw: unknown): number {
   return value;
 }
 
-export function parseCostingCost(raw: unknown): number {
+export function parseUnitCost(raw: unknown): number {
   const value = Number(raw);
   if (!Number.isFinite(value) || value < 0) {
-    throw new Error("Cost must be 0 or greater.");
+    throw new Error("Unit cost must be 0 or greater.");
   }
   return value;
+}
+
+/** True once every line item on the quotation has a unit cost set. */
+export function allItemsCosted(items: Array<{ unitCost: number | null }>): boolean {
+  return items.length > 0 && items.every((item) => item.unitCost !== null);
 }
 
 export function isHttpUrl(value: string): boolean {
@@ -65,7 +80,7 @@ export async function listCostingQuotations(): Promise<CostingQuotation[]> {
   const { data, error } = await supabase
     .from("quotations")
     .select(
-      "id, quotation_number, client_id, subject, amount, cost, google_drive_link, costing_rejection_reason, notes, status, prepared_by, sales_person_id, created_at, clients:client_id(company_name), sales_person:sales_person_id(full_name, email)",
+      "id, quotation_number, client_id, subject, amount, cost, google_drive_link, costing_rejection_reason, notes, status, prepared_by, sales_person_id, created_at, clients:client_id(company_name), sales_person:sales_person_id(full_name, email), quotation_items(id, description, quantity, unit_cost, line_total, sort_order)",
     )
     .eq("phase", "costing")
     .order("created_at", { ascending: false });
@@ -79,6 +94,16 @@ export async function listCostingQuotations(): Promise<CostingQuotation[]> {
     const salesPerson = Array.isArray(row.sales_person)
       ? row.sales_person[0]
       : row.sales_person;
+    const items = (Array.isArray(row.quotation_items) ? row.quotation_items : [])
+      .slice()
+      .sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0))
+      .map((item) => ({
+        id: item.id,
+        description: item.description,
+        quantity: Number(item.quantity),
+        unitCost: item.unit_cost === null ? null : Number(item.unit_cost),
+        lineTotal: Number(item.line_total),
+      }));
     return {
       id: row.id,
       quotationNumber: row.quotation_number,
@@ -87,6 +112,7 @@ export async function listCostingQuotations(): Promise<CostingQuotation[]> {
       subject: row.subject,
       amount: Number(row.amount),
       cost: row.cost === null ? null : Number(row.cost),
+      items,
       googleDriveLink: row.google_drive_link,
       notes: row.notes,
       status: row.status,
@@ -106,7 +132,7 @@ export async function listCostingApprovedHistory(): Promise<
   const { data, error } = await supabase
     .from("quotations")
     .select(
-      "id, quotation_number, subject, amount, cost, google_drive_link, notes, sales_person_id, created_at, costing_approved_at, clients:client_id(company_name), sales_person:sales_person_id(full_name, email)",
+      "id, quotation_number, subject, amount, cost, google_drive_link, notes, sales_person_id, created_at, costing_approved_at, clients:client_id(company_name), sales_person:sales_person_id(full_name, email), quotation_items(id, description, quantity, unit_cost, line_total, sort_order)",
     )
     .not("costing_approved_at", "is", null)
     .order("costing_approved_at", { ascending: false });
@@ -120,6 +146,16 @@ export async function listCostingApprovedHistory(): Promise<
     const salesPerson = Array.isArray(row.sales_person)
       ? row.sales_person[0]
       : row.sales_person;
+    const items = (Array.isArray(row.quotation_items) ? row.quotation_items : [])
+      .slice()
+      .sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0))
+      .map((item) => ({
+        id: item.id,
+        description: item.description,
+        quantity: Number(item.quantity),
+        unitCost: item.unit_cost === null ? null : Number(item.unit_cost),
+        lineTotal: Number(item.line_total),
+      }));
     return {
       quotationId: row.id,
       quotationNumber: row.quotation_number,
@@ -127,6 +163,7 @@ export async function listCostingApprovedHistory(): Promise<
       subject: row.subject,
       amount: Number(row.amount),
       cost: row.cost === null ? null : Number(row.cost),
+      items,
       googleDriveLink: row.google_drive_link,
       notes: row.notes,
       salesPersonId: row.sales_person_id,
@@ -137,72 +174,18 @@ export async function listCostingApprovedHistory(): Promise<
   });
 }
 
-export async function createCostingQuotation(input: {
-  quotationNumber: string;
-  clientId: string;
-  subject: string;
-  cost: number;
-  googleDriveLink: string;
-  notes?: string | null;
-  salesPersonId?: string | null;
-}): Promise<{ quotationId: string }> {
-  const supabase = await createClient();
-  const {
-    data: { user },
-    error: userError,
-  } = await supabase.auth.getUser();
-
-  if (userError || !user) {
-    throw new Error("You must be signed in.");
-  }
-
-  const { data: clientRow, error: clientError } = await supabase
-    .from("clients")
-    .select("sector")
-    .eq("id", input.clientId)
-    .single();
-
-  if (clientError || !clientRow) {
-    throw new Error("Selected client was not found.");
-  }
-
-  const { data, error } = await supabase
-    .from("quotations")
-    .insert({
-      quotation_number: input.quotationNumber,
-      client_id: input.clientId,
-      sector: clientRow.sector,
-      subject: input.subject,
-      // amount (selling amount) is set later in the sales phase; costing only
-      // captures the direct cost.
-      amount: 0,
-      cost: input.cost,
-      google_drive_link: input.googleDriveLink,
-      notes: input.notes ?? null,
-      sales_person_id: input.salesPersonId ?? null,
-      prepared_by: user.id,
-      status: "draft",
-      phase: "costing",
-    })
-    .select("id")
-    .single();
-
-  if (error || !data) {
-    if (error?.code === "23505") {
-      throw new Error("Quotation ID already exists. Please choose a different one.");
-    }
-    throw new Error(error?.message || "Failed to create costing quotation.");
-  }
-
-  return { quotationId: data.id };
-}
-
-export async function updateCostingQuotation(input: {
+/**
+ * Engineering sets/updates the per-item unit cost on a Sales-originated
+ * request for quotation, plus the Google Drive link and optional metadata
+ * corrections. quotations.cost rolls up automatically via the
+ * trg_sync_quotation_cost_from_items trigger.
+ */
+export async function setQuotationItemCosts(input: {
   quotationId: string;
   quotationNumber?: string;
   clientId: string;
   subject: string;
-  cost: number;
+  items: Array<{ id: string; unitCost: number | null }>;
   googleDriveLink: string;
   notes?: string | null;
   salesPersonId?: string | null;
@@ -219,7 +202,7 @@ export async function updateCostingQuotation(input: {
 
   const { data: row, error: rowError } = await supabase
     .from("quotations")
-    .select("id, status, phase, prepared_by")
+    .select("id, status, phase")
     .eq("id", input.quotationId)
     .single();
 
@@ -233,10 +216,6 @@ export async function updateCostingQuotation(input: {
 
   if (row.status !== "draft") {
     throw new Error("Only draft costing quotations can be edited.");
-  }
-
-  if (row.prepared_by !== user.id) {
-    throw new Error("Only the costing engineer who created this quotation can edit it.");
   }
 
   const { data: clientRow, error: clientError } = await supabase
@@ -253,7 +232,6 @@ export async function updateCostingQuotation(input: {
     client_id: input.clientId,
     sector: clientRow.sector,
     subject: input.subject,
-    cost: input.cost,
     google_drive_link: input.googleDriveLink,
     notes: input.notes ?? null,
     sales_person_id: input.salesPersonId ?? null,
@@ -275,6 +253,18 @@ export async function updateCostingQuotation(input: {
     }
     throw new Error(updateError.message || "Failed to update costing quotation.");
   }
+
+  for (const item of input.items) {
+    const { error: itemError } = await supabase
+      .from("quotation_items")
+      .update({ unit_cost: item.unitCost })
+      .eq("id", item.id)
+      .eq("quotation_id", input.quotationId);
+
+    if (itemError) {
+      throw new Error(itemError.message || "Failed to update an item's unit cost.");
+    }
+  }
 }
 
 export async function deleteCostingQuotation(quotationId: string): Promise<void> {
@@ -290,7 +280,7 @@ export async function deleteCostingQuotation(quotationId: string): Promise<void>
 
   const { data: row, error: rowError } = await supabase
     .from("quotations")
-    .select("id, status, phase, prepared_by")
+    .select("id, status, phase")
     .eq("id", quotationId)
     .single();
 
@@ -304,12 +294,6 @@ export async function deleteCostingQuotation(quotationId: string): Promise<void>
 
   if (row.status !== "draft") {
     throw new Error("Only draft costing quotations can be deleted.");
-  }
-
-  if (row.prepared_by !== user.id) {
-    throw new Error(
-      "Only the costing engineer who created this quotation can delete it.",
-    );
   }
 
   const { error: deleteError } = await supabase
@@ -335,7 +319,9 @@ export async function submitCostingForApproval(quotationId: string): Promise<voi
 
   const { data: row, error: rowError } = await supabase
     .from("quotations")
-    .select("id, status, phase, prepared_by, google_drive_link, cost, sales_person_id")
+    .select(
+      "id, status, phase, google_drive_link, sales_person_id, quotation_items(unit_cost)",
+    )
     .eq("id", quotationId)
     .single();
 
@@ -353,14 +339,17 @@ export async function submitCostingForApproval(quotationId: string): Promise<voi
     throw new Error("Only draft costing quotations can be submitted.");
   }
 
-  if (row.prepared_by !== user.id) {
+  const items = Array.isArray(row.quotation_items) ? row.quotation_items : [];
+  if (
+    !allItemsCosted(
+      items.map((item) => ({
+        unitCost: item.unit_cost === null ? null : Number(item.unit_cost),
+      })),
+    )
+  ) {
     throw new Error(
-      "Only the costing engineer who created this quotation can submit it.",
+      "Every line item needs a unit cost before submitting for costing approval.",
     );
-  }
-
-  if (row.cost === null || row.cost === undefined) {
-    throw new Error("Cost must be set before submitting for costing approval.");
   }
 
   if (!row.google_drive_link) {

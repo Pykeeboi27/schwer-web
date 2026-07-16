@@ -11,6 +11,14 @@ import { validatePoTotalAmount } from "@/lib/utils/form-validation";
 export type PurchaseOrderStatus =
   "draft" | "pending" | "approved" | "rejected" | "cancelled";
 
+export type SalesPurchaseOrderItem = {
+  id: string;
+  description: string;
+  quantity: number;
+  unitCost: number | null;
+  lineTotal: number;
+};
+
 export type SalesPurchaseOrder = {
   id: string;
   quotationId: string | null;
@@ -22,6 +30,7 @@ export type SalesPurchaseOrder = {
   subject: string;
   poAmount: number;
   cost: number | null;
+  items: SalesPurchaseOrderItem[];
   marginPercentage: number | null;
   marginAmount: number | null;
   bankPercentage: number | null;
@@ -43,6 +52,7 @@ export type SalesPurchaseOrder = {
   createdAt: string;
   createdBy: string;
   createdByName: string;
+  itemCount: number;
 };
 
 export type SalesPoPayment = {
@@ -159,7 +169,7 @@ export async function listPurchaseOrders(): Promise<SalesPurchaseOrder[]> {
   const { data, error } = await supabase
     .from("purchase_orders")
     .select(
-      "id, quotation_id, po_number, client_po_number, quotation_reference, client_id, subject, po_amount, cost, margin_percentage, margin_amount, bank_percentage, bank_amount, sop_percentage, sop_amount, selling_amount, recognized_amount, payment_status, payment_terms, payment_terms_custom, lead_time_days, status, approved_at, created_at, created_by, clients:client_id(company_name), po_approvals(approver_role, status, rejection_reason, updated_at, approver:approver_id(full_name, email)), creator:created_by(full_name, email)",
+      "id, quotation_id, po_number, client_po_number, quotation_reference, client_id, subject, po_amount, cost, margin_percentage, margin_amount, bank_percentage, bank_amount, sop_percentage, sop_amount, selling_amount, recognized_amount, payment_status, payment_terms, payment_terms_custom, lead_time_days, status, approved_at, created_at, created_by, clients:client_id(company_name), po_approvals(approver_role, status, rejection_reason, updated_at, approver:approver_id(full_name, email)), creator:created_by(full_name, email), purchase_order_items(id, description, quantity, unit_cost, line_total, sort_order)",
     )
     .order("created_at", { ascending: false });
 
@@ -192,6 +202,17 @@ export async function listPurchaseOrders(): Promise<SalesPurchaseOrder[]> {
         : rejectedApproval.approver
       : null;
 
+    const items = (Array.isArray(row.purchase_order_items) ? row.purchase_order_items : [])
+      .slice()
+      .sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0))
+      .map((item) => ({
+        id: item.id,
+        description: item.description,
+        quantity: Number(item.quantity),
+        unitCost: item.unit_cost === null ? null : Number(item.unit_cost),
+        lineTotal: Number(item.line_total),
+      }));
+
     return {
       id: row.id,
       quotationId: row.quotation_id ?? null,
@@ -204,6 +225,7 @@ export async function listPurchaseOrders(): Promise<SalesPurchaseOrder[]> {
       subject: row.subject,
       poAmount: Number(row.po_amount),
       cost: numberOrNull(row.cost),
+      items,
       marginPercentage: numberOrNull(row.margin_percentage),
       marginAmount: numberOrNull(row.margin_amount),
       bankPercentage: numberOrNull(row.bank_percentage),
@@ -225,6 +247,7 @@ export async function listPurchaseOrders(): Promise<SalesPurchaseOrder[]> {
       createdAt: row.created_at,
       createdBy: row.created_by,
       createdByName: resolveDisplayName(creator) ?? "Unknown",
+      itemCount: items.length,
     };
   });
 }
@@ -299,7 +322,7 @@ export async function convertQuotationToPurchaseOrder(
   const { data: q, error: qError } = await supabase
     .from("quotations")
     .select(
-      "id, status, phase, client_id, sector, subject, amount, cost, margin_percentage, margin_amount, bank_percentage, bank_amount, sop_percentage, sop_amount, selling_amount, payment_terms, payment_terms_custom, lead_time_days, client_po_number, client_confirmed_at, converted_po_id",
+      "id, status, phase, client_id, sector, subject, amount, cost, margin_percentage, margin_amount, bank_percentage, bank_amount, sop_percentage, sop_amount, selling_amount, payment_terms, payment_terms_custom, lead_time_days, client_po_number, client_confirmed_at, converted_po_id, quotation_items(description, quantity, unit_cost, sort_order)",
     )
     .eq("id", quotationId)
     .single();
@@ -373,6 +396,22 @@ export async function convertQuotationToPurchaseOrder(
 
   if (poError || !po) {
     throw new Error(poError?.message || "Failed to create the purchase order.");
+  }
+
+  const sourceItems = Array.isArray(q.quotation_items) ? q.quotation_items : [];
+  if (sourceItems.length > 0) {
+    const { error: itemsError } = await supabase.from("purchase_order_items").insert(
+      sourceItems.map((item) => ({
+        purchase_order_id: po.id,
+        description: item.description,
+        quantity: item.quantity,
+        unit_cost: item.unit_cost,
+        sort_order: item.sort_order ?? 0,
+      })),
+    );
+    if (itemsError) {
+      throw new Error(itemsError.message || "Failed to copy line items to the purchase order.");
+    }
   }
 
   const roles = requiredApproverRolesForAmount(poAmount);

@@ -183,6 +183,7 @@ export function QuotationsTable({
               <tr>
                 <th className="px-3 py-2 font-medium">ID</th>
                 <th className="px-3 py-2 font-medium">Client Name</th>
+                <th className="px-3 py-2 font-medium">Items</th>
                 <th className="px-3 py-2 font-medium">Amount</th>
                 <th className="px-3 py-2 font-medium">Authored By</th>
                 <th className="px-3 py-2 font-medium">Status</th>
@@ -192,7 +193,7 @@ export function QuotationsTable({
             <tbody>
               {filteredAndSorted.length === 0 ? (
                 <tr>
-                  <td colSpan={6}>{emptyState}</td>
+                  <td colSpan={7}>{emptyState}</td>
                 </tr>
               ) : (
                 filteredAndSorted.map((quotation) => (
@@ -211,6 +212,9 @@ export function QuotationsTable({
                       {quotation.quotationNumber}
                     </td>
                     <td className="px-3 py-2">{quotation.clientName}</td>
+                    <td className="px-3 py-2 text-muted-foreground">
+                      {quotation.items.length}
+                    </td>
                     <td className="px-3 py-2">{formatCurrency(quotation.amount)}</td>
                     <td className="px-3 py-2 text-muted-foreground">
                       {quotation.salesPersonName ?? "Unassigned"}
@@ -248,6 +252,7 @@ export function QuotationsTable({
                   </>
                 }
               >
+                <DataField label="Items" value={quotation.items.length} />
                 <DataField label="Amount" value={formatCurrency(quotation.amount)} />
                 <DataField
                   label="Authored By"

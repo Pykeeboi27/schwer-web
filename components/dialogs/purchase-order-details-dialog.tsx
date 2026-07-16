@@ -27,6 +27,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Callout, ConfirmDialog, StatusBadge } from "@/components/patterns";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { computeSalesPricing } from "@/lib/sales/pricing";
 import type { SalesPoPayment, SalesPurchaseOrder } from "@/lib/sales/purchase-orders";
 import { cn } from "@/lib/utils";
@@ -353,420 +354,476 @@ export function PurchaseOrderDetailsDialog({
             </Button>
           </div>
 
-          {/* Overview */}
-          <div className="space-y-3 rounded-md border p-4 text-sm">
-            <h3 className="text-base font-semibold">Overview</h3>
-            <dl className="grid gap-3">
-              <div className="grid grid-cols-[160px_1fr] gap-2">
-                <dt className="text-muted-foreground">PO #</dt>
-                <dd className="font-medium">{purchaseOrder.poNumber}</dd>
-              </div>
-              <div className="grid grid-cols-[160px_1fr] gap-2">
-                <dt className="text-muted-foreground">Client PO #</dt>
-                <dd>
-                  {isEditable ? (
-                    <Input
-                      value={editClientPoNumber}
-                      onChange={(e) =>
-                        setEditClientPoNumber(e.target.value.toUpperCase())
-                      }
-                      placeholder="Client PO number"
-                      className="h-8"
-                    />
-                  ) : (
-                    (purchaseOrder.clientPoNumber ?? "—")
-                  )}
-                </dd>
-              </div>
-              <div className="grid grid-cols-[160px_1fr] gap-2">
-                <dt className="text-muted-foreground">Quotation Ref.</dt>
-                <dd>
-                  {isEditable ? (
-                    <Input
-                      value={editQuotationReference}
-                      onChange={(e) =>
-                        setEditQuotationReference(e.target.value.toUpperCase())
-                      }
-                      placeholder="Quotation reference"
-                      className="h-8"
-                    />
-                  ) : (
-                    (purchaseOrder.quotationReference ?? "—")
-                  )}
-                </dd>
-              </div>
-              <div className="grid grid-cols-[160px_1fr] gap-2">
-                <dt className="text-muted-foreground">Client</dt>
-                <dd>{purchaseOrder.clientName}</dd>
-              </div>
-              <div className="grid grid-cols-[160px_1fr] gap-2">
-                <dt className="text-muted-foreground">Authored By</dt>
-                <dd>{purchaseOrder.createdByName}</dd>
-              </div>
-              <div className="grid grid-cols-[160px_1fr] gap-2">
-                <dt className="text-muted-foreground">Subject</dt>
-                <dd>{purchaseOrder.subject}</dd>
-              </div>
-              <div className="grid grid-cols-[160px_1fr] gap-2">
-                <dt className="text-muted-foreground">Approval Status</dt>
-                <dd className="flex flex-wrap items-center gap-x-1">
-                  <StatusBadge status={purchaseOrder.status} />
-                  {purchaseOrder.status === "pending" &&
-                  purchaseOrder.pendingApprovalRoles.length > 0
-                    ? ` · awaiting ${purchaseOrder.pendingApprovalRoles.join(" -> ")}`
-                    : ""}
-                </dd>
-              </div>
-              <div className="grid grid-cols-[160px_1fr] gap-2">
-                <dt className="text-muted-foreground">Approved At</dt>
-                <dd>{formatDateTime(purchaseOrder.approvedAt)}</dd>
-              </div>
-            </dl>
-          </div>
+          <Tabs defaultValue="overview" className="mt-2">
+            <TabsList className="grid w-full grid-cols-4">
+              <TabsTrigger value="overview">Overview</TabsTrigger>
+              <TabsTrigger value="items">Line Items</TabsTrigger>
+              <TabsTrigger value="pricing">Pricing</TabsTrigger>
+              <TabsTrigger value="payment">Payment</TabsTrigger>
+            </TabsList>
 
-          {/* Pricing Breakdown */}
-          <div className="mt-4 space-y-3 rounded-md border p-4 text-sm">
-            <h3 className="text-base font-semibold">Pricing Breakdown</h3>
-
-            {isEditable ? (
-              <div className="space-y-4">
-                <div className="grid grid-cols-[160px_1fr] items-center gap-2">
-                  <Label className="text-muted-foreground">Direct Cost</Label>
-                  <span className="font-medium">{formatCurrency(directCost)}</span>
-                </div>
-
-                <div className="grid gap-3 sm:grid-cols-2">
-                  <div>
-                    <Label htmlFor="po-margin-percent">Margin %</Label>
-                    <NumberInput
-                      id="po-margin-percent"
-                      value={marginPercentage}
-                      onValueChange={setMarginPercentage}
-                      className="mt-1"
-                      placeholder="e.g. 25"
-                    />
+            <TabsContent value="overview" className="space-y-4">
+              <div className="space-y-3 rounded-md border p-4 text-sm">
+                <dl className="grid gap-3">
+                  <div className="grid grid-cols-[160px_1fr] gap-2">
+                    <dt className="text-muted-foreground">PO #</dt>
+                    <dd className="font-medium">{purchaseOrder.poNumber}</dd>
                   </div>
-                  <div>
-                    <Label>Margin Amount</Label>
-                    <Input
-                      value={formatCurrency(pricingPreview.marginAmount)}
-                      readOnly
-                      className="mt-1 bg-muted/40"
-                    />
+                  <div className="grid grid-cols-[160px_1fr] gap-2">
+                    <dt className="text-muted-foreground">Client PO #</dt>
+                    <dd>
+                      {isEditable ? (
+                        <Input
+                          value={editClientPoNumber}
+                          onChange={(e) =>
+                            setEditClientPoNumber(e.target.value.toUpperCase())
+                          }
+                          placeholder="Client PO number"
+                          className="h-8"
+                        />
+                      ) : (
+                        (purchaseOrder.clientPoNumber ?? "—")
+                      )}
+                    </dd>
                   </div>
-                  <div>
-                    <Label htmlFor="po-bank-percent">Bank %</Label>
-                    <NumberInput
-                      id="po-bank-percent"
-                      value={bankPercentage}
-                      onValueChange={setBankPercentage}
-                      className="mt-1"
-                      placeholder="e.g. 3"
-                    />
+                  <div className="grid grid-cols-[160px_1fr] gap-2">
+                    <dt className="text-muted-foreground">Quotation Ref.</dt>
+                    <dd>
+                      {isEditable ? (
+                        <Input
+                          value={editQuotationReference}
+                          onChange={(e) =>
+                            setEditQuotationReference(e.target.value.toUpperCase())
+                          }
+                          placeholder="Quotation reference"
+                          className="h-8"
+                        />
+                      ) : (
+                        (purchaseOrder.quotationReference ?? "—")
+                      )}
+                    </dd>
                   </div>
-                  <div>
-                    <Label>Bank Amount</Label>
-                    <Input
-                      value={formatCurrency(pricingPreview.bankAmount)}
-                      readOnly
-                      className="mt-1 bg-muted/40"
-                    />
+                  <div className="grid grid-cols-[160px_1fr] gap-2">
+                    <dt className="text-muted-foreground">Client</dt>
+                    <dd>{purchaseOrder.clientName}</dd>
                   </div>
-                  <div>
-                    <Label htmlFor="po-sop-percent">SOP %</Label>
-                    <NumberInput
-                      id="po-sop-percent"
-                      value={sopPercentage}
-                      onValueChange={setSopPercentage}
-                      className="mt-1"
-                      placeholder="e.g. 5"
-                    />
+                  <div className="grid grid-cols-[160px_1fr] gap-2">
+                    <dt className="text-muted-foreground">Authored By</dt>
+                    <dd>{purchaseOrder.createdByName}</dd>
                   </div>
-                  <div>
-                    <Label>SOP Amount</Label>
-                    <Input
-                      value={formatCurrency(pricingPreview.sopAmount)}
-                      readOnly
-                      className="mt-1 bg-muted/40"
-                    />
+                  <div className="grid grid-cols-[160px_1fr] gap-2">
+                    <dt className="text-muted-foreground">Subject</dt>
+                    <dd>{purchaseOrder.subject}</dd>
                   </div>
-                </div>
-
-                <div className="grid grid-cols-[160px_1fr] items-center gap-2 border-t pt-3">
-                  <Label className="font-semibold">Selling / Total Amount</Label>
-                  <span className="text-base font-semibold">
-                    {formatCurrency(pricingPreview.sellingAmount)}
-                  </span>
-                </div>
-
-                <div className="grid gap-3 sm:grid-cols-2">
-                  <div>
-                    <Label htmlFor="po-lead-time">Lead Time (days)</Label>
-                    <Input
-                      id="po-lead-time"
-                      type="number"
-                      min={0}
-                      step="1"
-                      value={leadTimeDays}
-                      onChange={(event) => setLeadTimeDays(event.target.value)}
-                      className="mt-1"
-                      placeholder="e.g. 30"
-                    />
+                  <div className="grid grid-cols-[160px_1fr] gap-2">
+                    <dt className="text-muted-foreground">Approval Status</dt>
+                    <dd className="flex flex-wrap items-center gap-x-1">
+                      <StatusBadge status={purchaseOrder.status} />
+                      {purchaseOrder.status === "pending" &&
+                      purchaseOrder.pendingApprovalRoles.length > 0
+                        ? ` · awaiting ${purchaseOrder.pendingApprovalRoles.join(" -> ")}`
+                        : ""}
+                    </dd>
                   </div>
-                  <div>
-                    <Label htmlFor="po-payment-terms">Payment Terms</Label>
-                    <Select
-                      value={paymentTermsSelect || undefined}
-                      onValueChange={(value) => setPaymentTermsSelect(value)}
-                    >
-                      <SelectTrigger id="po-payment-terms" className="mt-1">
-                        <SelectValue placeholder="Select payment terms" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {PAYMENT_TERMS_OPTIONS.map((option) => (
-                          <SelectItem key={option} value={option}>
-                            {option}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                  <div className="grid grid-cols-[160px_1fr] gap-2">
+                    <dt className="text-muted-foreground">Approved At</dt>
+                    <dd>{formatDateTime(purchaseOrder.approvedAt)}</dd>
                   </div>
-                </div>
-
-                {paymentTermsSelect === "Other" ? (
-                  <div>
-                    <Label htmlFor="po-payment-terms-custom">Custom Payment Terms</Label>
-                    <Input
-                      id="po-payment-terms-custom"
-                      value={paymentTermsCustom}
-                      onChange={(event) => setPaymentTermsCustom(event.target.value)}
-                      className="mt-1"
-                      placeholder="Describe the agreed payment terms"
-                    />
-                  </div>
-                ) : null}
-
-                <div className="flex justify-end gap-2 border-t pt-3">
-                  <Button
-                    variant="outline"
-                    onClick={handleSaveDetails}
-                    disabled={isSubmitting}
-                  >
-                    {isSubmitting ? "Saving..." : "Save Changes"}
-                  </Button>
-                  <Button onClick={handleResubmit} disabled={isSubmitting}>
-                    {isSubmitting ? "Submitting..." : "Submit for Approval"}
-                  </Button>
-                </div>
+                </dl>
               </div>
-            ) : (
-              <dl className="grid gap-3">
-                <div className="grid grid-cols-[160px_1fr] gap-2">
-                  <dt className="text-muted-foreground">Direct Cost</dt>
-                  <dd>
-                    {purchaseOrder.cost === null
-                      ? "—"
-                      : formatCurrency(purchaseOrder.cost)}
-                  </dd>
-                </div>
-                <div className="grid grid-cols-[160px_1fr] gap-2">
-                  <dt className="text-muted-foreground">Margin</dt>
-                  <dd>
-                    {formatPercent(purchaseOrder.marginPercentage)}
-                    {purchaseOrder.marginAmount !== null
-                      ? ` · ${formatCurrency(purchaseOrder.marginAmount)}`
-                      : ""}
-                  </dd>
-                </div>
-                <div className="grid grid-cols-[160px_1fr] gap-2">
-                  <dt className="text-muted-foreground">Bank</dt>
-                  <dd>
-                    {formatPercent(purchaseOrder.bankPercentage)}
-                    {purchaseOrder.bankAmount !== null
-                      ? ` · ${formatCurrency(purchaseOrder.bankAmount)}`
-                      : ""}
-                  </dd>
-                </div>
-                <div className="grid grid-cols-[160px_1fr] gap-2">
-                  <dt className="text-muted-foreground">SOP</dt>
-                  <dd>
-                    {formatPercent(purchaseOrder.sopPercentage)}
-                    {purchaseOrder.sopAmount !== null
-                      ? ` · ${formatCurrency(purchaseOrder.sopAmount)}`
-                      : ""}
-                  </dd>
-                </div>
-                <div className="grid grid-cols-[160px_1fr] gap-2">
-                  <dt className="text-muted-foreground">Selling Amount</dt>
-                  <dd>
-                    {purchaseOrder.sellingAmount === null
-                      ? "—"
-                      : formatCurrency(purchaseOrder.sellingAmount)}
-                  </dd>
-                </div>
-                <div className="grid grid-cols-[160px_1fr] gap-2">
-                  <dt className="text-muted-foreground">Total Amount</dt>
-                  <dd className="font-semibold">
-                    {formatCurrency(purchaseOrder.poAmount)}
-                  </dd>
-                </div>
-                <div className="grid grid-cols-[160px_1fr] gap-2">
-                  <dt className="text-muted-foreground">Payment Terms</dt>
-                  <dd>
-                    {purchaseOrder.paymentTerms === "Other"
-                      ? (purchaseOrder.paymentTermsCustom ?? "Other")
-                      : (purchaseOrder.paymentTerms ?? "—")}
-                  </dd>
-                </div>
-                <div className="grid grid-cols-[160px_1fr] gap-2">
-                  <dt className="text-muted-foreground">Lead Time</dt>
-                  <dd>
-                    {purchaseOrder.leadTimeDays === null
-                      ? "—"
-                      : `${purchaseOrder.leadTimeDays} day${
-                          purchaseOrder.leadTimeDays === 1 ? "" : "s"
-                        }`}
-                  </dd>
-                </div>
-              </dl>
-            )}
-          </div>
 
-          {canApproveReject ? (
-            <div className="mt-4 space-y-3 rounded-md border bg-muted/20 p-4">
-              <h3 className="text-base font-semibold">PO Approval</h3>
-              <Input
-                value={rejectionReason}
-                onChange={(event) => setRejectionReason(event.target.value)}
-                placeholder="Rejection reason (required for reject)"
-                aria-label="Rejection reason"
-              />
-              <div className="flex justify-end gap-2">
-                <Button onClick={handleApprove} disabled={isSubmitting}>
-                  {isSubmitting ? "Saving..." : "Approve"}
-                </Button>
-                <Button variant="outline" onClick={handleReject} disabled={isSubmitting}>
-                  Reject
-                </Button>
-              </div>
-            </div>
-          ) : null}
-
-          {/* Payment */}
-          <div className="mt-4 space-y-3 rounded-md border p-4 text-sm">
-            <h3 className="text-base font-semibold">Payment</h3>
-
-            <div>
-              <p className="mb-1 text-xs text-muted-foreground">
-                Collected {formatCurrency(purchaseOrder.recognizedAmount)} of{" "}
-                {formatCurrency(purchaseOrder.poAmount)} ({progressOf(purchaseOrder)}%)
-              </p>
-              <div className="h-2 rounded-full bg-muted">
-                <div
-                  className="h-2 rounded-full bg-primary"
-                  style={{ width: `${progressOf(purchaseOrder)}%` }}
-                />
-              </div>
-            </div>
-
-            <dl className="grid gap-3">
-              <div className="grid grid-cols-[160px_1fr] gap-2">
-                <dt className="text-muted-foreground">Total Amount</dt>
-                <dd className="font-semibold">
-                  {formatCurrency(purchaseOrder.poAmount)}
-                </dd>
-              </div>
-              <div className="grid grid-cols-[160px_1fr] gap-2">
-                <dt className="text-muted-foreground">Collected Amount</dt>
-                <dd>{formatCurrency(purchaseOrder.recognizedAmount)}</dd>
-              </div>
-              <div className="grid grid-cols-[160px_1fr] gap-2">
-                <dt className="text-muted-foreground">Remaining Balance</dt>
-                <dd>
-                  {formatCurrency(
-                    Math.max(purchaseOrder.poAmount - purchaseOrder.recognizedAmount, 0),
-                  )}
-                </dd>
-              </div>
-              <div className="grid grid-cols-[160px_1fr] gap-2">
-                <dt className="text-muted-foreground">Payment Status</dt>
-                <dd>
-                  <StatusBadge status={purchaseOrder.paymentStatus} />
-                </dd>
-              </div>
-            </dl>
-
-            {isApproved ? (
-              <div className="mt-2">
-                <div className="mb-2 flex items-center justify-between">
-                  <h4 className="text-sm font-semibold">Collection History</h4>
-                  {isOwner ? (
-                    <Button type="button" onClick={() => setRecordDialogOpen(true)}>
-                      Record Collection
+              {canApproveReject ? (
+                <div className="space-y-3 rounded-md border bg-muted/20 p-4">
+                  <h3 className="text-base font-semibold">PO Approval</h3>
+                  <Input
+                    value={rejectionReason}
+                    onChange={(event) => setRejectionReason(event.target.value)}
+                    placeholder="Rejection reason (required for reject)"
+                    aria-label="Rejection reason"
+                  />
+                  <div className="flex justify-end gap-2">
+                    <Button onClick={handleApprove} disabled={isSubmitting}>
+                      {isSubmitting ? "Saving..." : "Approve"}
                     </Button>
-                  ) : null}
+                    <Button
+                      variant="outline"
+                      onClick={handleReject}
+                      disabled={isSubmitting}
+                    >
+                      Reject
+                    </Button>
+                  </div>
+                </div>
+              ) : null}
+            </TabsContent>
+
+            <TabsContent value="items">
+              <div className="space-y-3 rounded-md border p-4 text-sm">
+                <table className="w-full text-xs">
+                  <thead className="text-left text-muted-foreground">
+                    <tr>
+                      <th className="py-1 pr-3 font-medium">Item</th>
+                      <th className="py-1 pr-3 font-medium">Qty</th>
+                      <th className="py-1 pr-3 font-medium">Unit Cost</th>
+                      <th className="py-1 font-medium">Line Total</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {purchaseOrder.items.map((item) => (
+                      <tr key={item.id} className="border-t">
+                        <td className="py-1 pr-3">{item.description}</td>
+                        <td className="py-1 pr-3">{item.quantity}</td>
+                        <td className="py-1 pr-3">
+                          {item.unitCost === null ? (
+                            <span className="text-muted-foreground">-</span>
+                          ) : (
+                            formatCurrency(item.unitCost)
+                          )}
+                        </td>
+                        <td className="py-1">{formatCurrency(item.lineTotal)}</td>
+                      </tr>
+                    ))}
+                    <tr className="border-t font-semibold">
+                      <td className="py-1 pr-3" colSpan={3}>
+                        Total Cost
+                      </td>
+                      <td className="py-1">{formatCurrency(purchaseOrder.cost ?? 0)}</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </TabsContent>
+
+            <TabsContent value="pricing">
+              <div className="space-y-3 rounded-md border p-4 text-sm">
+                {isEditable ? (
+                  <div className="space-y-4">
+                    <div className="grid grid-cols-[160px_1fr] items-center gap-2">
+                      <Label className="text-muted-foreground">Direct Cost</Label>
+                      <span className="font-medium">{formatCurrency(directCost)}</span>
+                    </div>
+
+                    <div className="grid gap-3 sm:grid-cols-2">
+                      <div>
+                        <Label htmlFor="po-margin-percent">Margin %</Label>
+                        <NumberInput
+                          id="po-margin-percent"
+                          value={marginPercentage}
+                          onValueChange={setMarginPercentage}
+                          className="mt-1"
+                          placeholder="e.g. 25"
+                        />
+                      </div>
+                      <div>
+                        <Label>Margin Amount</Label>
+                        <Input
+                          value={formatCurrency(pricingPreview.marginAmount)}
+                          readOnly
+                          className="mt-1 bg-muted/40"
+                        />
+                      </div>
+                      <div>
+                        <Label htmlFor="po-bank-percent">Bank %</Label>
+                        <NumberInput
+                          id="po-bank-percent"
+                          value={bankPercentage}
+                          onValueChange={setBankPercentage}
+                          className="mt-1"
+                          placeholder="e.g. 3"
+                        />
+                      </div>
+                      <div>
+                        <Label>Bank Amount</Label>
+                        <Input
+                          value={formatCurrency(pricingPreview.bankAmount)}
+                          readOnly
+                          className="mt-1 bg-muted/40"
+                        />
+                      </div>
+                      <div>
+                        <Label htmlFor="po-sop-percent">SOP %</Label>
+                        <NumberInput
+                          id="po-sop-percent"
+                          value={sopPercentage}
+                          onValueChange={setSopPercentage}
+                          className="mt-1"
+                          placeholder="e.g. 5"
+                        />
+                      </div>
+                      <div>
+                        <Label>SOP Amount</Label>
+                        <Input
+                          value={formatCurrency(pricingPreview.sopAmount)}
+                          readOnly
+                          className="mt-1 bg-muted/40"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-[160px_1fr] items-center gap-2 border-t pt-3">
+                      <Label className="font-semibold">Selling / Total Amount</Label>
+                      <span className="text-base font-semibold">
+                        {formatCurrency(pricingPreview.sellingAmount)}
+                      </span>
+                    </div>
+
+                    <div className="grid gap-3 sm:grid-cols-2">
+                      <div>
+                        <Label htmlFor="po-lead-time">Lead Time (days)</Label>
+                        <Input
+                          id="po-lead-time"
+                          type="number"
+                          min={0}
+                          step="1"
+                          value={leadTimeDays}
+                          onChange={(event) => setLeadTimeDays(event.target.value)}
+                          className="mt-1"
+                          placeholder="e.g. 30"
+                        />
+                      </div>
+                      <div>
+                        <Label htmlFor="po-payment-terms">Payment Terms</Label>
+                        <Select
+                          value={paymentTermsSelect || undefined}
+                          onValueChange={(value) => setPaymentTermsSelect(value)}
+                        >
+                          <SelectTrigger id="po-payment-terms" className="mt-1">
+                            <SelectValue placeholder="Select payment terms" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {PAYMENT_TERMS_OPTIONS.map((option) => (
+                              <SelectItem key={option} value={option}>
+                                {option}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
+
+                    {paymentTermsSelect === "Other" ? (
+                      <div>
+                        <Label htmlFor="po-payment-terms-custom">
+                          Custom Payment Terms
+                        </Label>
+                        <Input
+                          id="po-payment-terms-custom"
+                          value={paymentTermsCustom}
+                          onChange={(event) => setPaymentTermsCustom(event.target.value)}
+                          className="mt-1"
+                          placeholder="Describe the agreed payment terms"
+                        />
+                      </div>
+                    ) : null}
+
+                    <div className="flex justify-end gap-2 border-t pt-3">
+                      <Button
+                        variant="outline"
+                        onClick={handleSaveDetails}
+                        disabled={isSubmitting}
+                      >
+                        {isSubmitting ? "Saving..." : "Save Changes"}
+                      </Button>
+                      <Button onClick={handleResubmit} disabled={isSubmitting}>
+                        {isSubmitting ? "Submitting..." : "Submit for Approval"}
+                      </Button>
+                    </div>
+                  </div>
+                ) : (
+                  <dl className="grid gap-3">
+                    <div className="grid grid-cols-[160px_1fr] gap-2">
+                      <dt className="text-muted-foreground">Direct Cost</dt>
+                      <dd>
+                        {purchaseOrder.cost === null
+                          ? "—"
+                          : formatCurrency(purchaseOrder.cost)}
+                      </dd>
+                    </div>
+                    <div className="grid grid-cols-[160px_1fr] gap-2">
+                      <dt className="text-muted-foreground">Margin</dt>
+                      <dd>
+                        {formatPercent(purchaseOrder.marginPercentage)}
+                        {purchaseOrder.marginAmount !== null
+                          ? ` · ${formatCurrency(purchaseOrder.marginAmount)}`
+                          : ""}
+                      </dd>
+                    </div>
+                    <div className="grid grid-cols-[160px_1fr] gap-2">
+                      <dt className="text-muted-foreground">Bank</dt>
+                      <dd>
+                        {formatPercent(purchaseOrder.bankPercentage)}
+                        {purchaseOrder.bankAmount !== null
+                          ? ` · ${formatCurrency(purchaseOrder.bankAmount)}`
+                          : ""}
+                      </dd>
+                    </div>
+                    <div className="grid grid-cols-[160px_1fr] gap-2">
+                      <dt className="text-muted-foreground">SOP</dt>
+                      <dd>
+                        {formatPercent(purchaseOrder.sopPercentage)}
+                        {purchaseOrder.sopAmount !== null
+                          ? ` · ${formatCurrency(purchaseOrder.sopAmount)}`
+                          : ""}
+                      </dd>
+                    </div>
+                    <div className="grid grid-cols-[160px_1fr] gap-2">
+                      <dt className="text-muted-foreground">Selling Amount</dt>
+                      <dd>
+                        {purchaseOrder.sellingAmount === null
+                          ? "—"
+                          : formatCurrency(purchaseOrder.sellingAmount)}
+                      </dd>
+                    </div>
+                    <div className="grid grid-cols-[160px_1fr] gap-2">
+                      <dt className="text-muted-foreground">Total Amount</dt>
+                      <dd className="font-semibold">
+                        {formatCurrency(purchaseOrder.poAmount)}
+                      </dd>
+                    </div>
+                    <div className="grid grid-cols-[160px_1fr] gap-2">
+                      <dt className="text-muted-foreground">Payment Terms</dt>
+                      <dd>
+                        {purchaseOrder.paymentTerms === "Other"
+                          ? (purchaseOrder.paymentTermsCustom ?? "Other")
+                          : (purchaseOrder.paymentTerms ?? "—")}
+                      </dd>
+                    </div>
+                    <div className="grid grid-cols-[160px_1fr] gap-2">
+                      <dt className="text-muted-foreground">Lead Time</dt>
+                      <dd>
+                        {purchaseOrder.leadTimeDays === null
+                          ? "—"
+                          : `${purchaseOrder.leadTimeDays} day${
+                              purchaseOrder.leadTimeDays === 1 ? "" : "s"
+                            }`}
+                      </dd>
+                    </div>
+                  </dl>
+                )}
+              </div>
+            </TabsContent>
+
+            <TabsContent value="payment">
+              <div className="space-y-3 rounded-md border p-4 text-sm">
+                <div>
+                  <p className="mb-1 text-xs text-muted-foreground">
+                    Collected {formatCurrency(purchaseOrder.recognizedAmount)} of{" "}
+                    {formatCurrency(purchaseOrder.poAmount)} ({progressOf(purchaseOrder)}
+                    %)
+                  </p>
+                  <div className="h-2 rounded-full bg-muted">
+                    <div
+                      className="h-2 rounded-full bg-primary"
+                      style={{ width: `${progressOf(purchaseOrder)}%` }}
+                    />
+                  </div>
                 </div>
 
-                <div className="max-h-64 space-y-2 overflow-auto rounded border p-3">
-                  {paymentHistory.length === 0 ? (
-                    <p className="text-sm text-muted-foreground">
-                      No collections recorded yet.
-                    </p>
-                  ) : (
-                    paymentHistory.map((payment) => (
-                      <div
-                        key={payment.id}
-                        className="flex items-start justify-between gap-2 rounded border p-2 text-sm"
-                      >
-                        <div>
-                          <p className="font-medium">
-                            {formatCurrency(payment.amountCollected)}
-                          </p>
-                          <p className="text-xs text-muted-foreground">
-                            {new Date(payment.paymentDate).toLocaleDateString()}
-                            {payment.paymentMethod ? ` • ${payment.paymentMethod}` : ""}
-                            {payment.referenceNumber
-                              ? ` • ${payment.referenceNumber}`
-                              : ""}
-                          </p>
-                        </div>
-                        {isOwner ? (
-                          <div className="flex shrink-0 gap-1">
-                            <Button
-                              type="button"
-                              size="icon"
-                              variant="outline"
-                              className="h-7 w-7"
-                              aria-label={`Edit collection of ${formatCurrency(payment.amountCollected)}`}
-                              onClick={() => setEditingPayment(payment)}
-                            >
-                              <Pencil className="h-3.5 w-3.5" />
-                            </Button>
-                            <Button
-                              type="button"
-                              size="icon"
-                              variant="outline"
-                              className="h-7 w-7"
-                              aria-label={`Delete collection of ${formatCurrency(payment.amountCollected)}`}
-                              onClick={() => setDeletingPayment(payment)}
-                            >
-                              <Trash2 className="h-3.5 w-3.5" />
-                            </Button>
+                <dl className="grid gap-3">
+                  <div className="grid grid-cols-[160px_1fr] gap-2">
+                    <dt className="text-muted-foreground">Total Amount</dt>
+                    <dd className="font-semibold">
+                      {formatCurrency(purchaseOrder.poAmount)}
+                    </dd>
+                  </div>
+                  <div className="grid grid-cols-[160px_1fr] gap-2">
+                    <dt className="text-muted-foreground">Collected Amount</dt>
+                    <dd>{formatCurrency(purchaseOrder.recognizedAmount)}</dd>
+                  </div>
+                  <div className="grid grid-cols-[160px_1fr] gap-2">
+                    <dt className="text-muted-foreground">Remaining Balance</dt>
+                    <dd>
+                      {formatCurrency(
+                        Math.max(
+                          purchaseOrder.poAmount - purchaseOrder.recognizedAmount,
+                          0,
+                        ),
+                      )}
+                    </dd>
+                  </div>
+                  <div className="grid grid-cols-[160px_1fr] gap-2">
+                    <dt className="text-muted-foreground">Payment Status</dt>
+                    <dd>
+                      <StatusBadge status={purchaseOrder.paymentStatus} />
+                    </dd>
+                  </div>
+                </dl>
+
+                {isApproved ? (
+                  <div className="mt-2">
+                    <div className="mb-2 flex items-center justify-between">
+                      <h4 className="text-sm font-semibold">Collection History</h4>
+                      {isOwner ? (
+                        <Button type="button" onClick={() => setRecordDialogOpen(true)}>
+                          Record Collection
+                        </Button>
+                      ) : null}
+                    </div>
+
+                    <div className="max-h-64 space-y-2 overflow-auto rounded border p-3">
+                      {paymentHistory.length === 0 ? (
+                        <p className="text-sm text-muted-foreground">
+                          No collections recorded yet.
+                        </p>
+                      ) : (
+                        paymentHistory.map((payment) => (
+                          <div
+                            key={payment.id}
+                            className="flex items-start justify-between gap-2 rounded border p-2 text-sm"
+                          >
+                            <div>
+                              <p className="font-medium">
+                                {formatCurrency(payment.amountCollected)}
+                              </p>
+                              <p className="text-xs text-muted-foreground">
+                                {new Date(payment.paymentDate).toLocaleDateString()}
+                                {payment.paymentMethod
+                                  ? ` • ${payment.paymentMethod}`
+                                  : ""}
+                                {payment.referenceNumber
+                                  ? ` • ${payment.referenceNumber}`
+                                  : ""}
+                              </p>
+                            </div>
+                            {isOwner ? (
+                              <div className="flex shrink-0 gap-1">
+                                <Button
+                                  type="button"
+                                  size="icon"
+                                  variant="outline"
+                                  className="h-7 w-7"
+                                  aria-label={`Edit collection of ${formatCurrency(payment.amountCollected)}`}
+                                  onClick={() => setEditingPayment(payment)}
+                                >
+                                  <Pencil className="h-3.5 w-3.5" />
+                                </Button>
+                                <Button
+                                  type="button"
+                                  size="icon"
+                                  variant="outline"
+                                  className="h-7 w-7"
+                                  aria-label={`Delete collection of ${formatCurrency(payment.amountCollected)}`}
+                                  onClick={() => setDeletingPayment(payment)}
+                                >
+                                  <Trash2 className="h-3.5 w-3.5" />
+                                </Button>
+                              </div>
+                            ) : null}
                           </div>
-                        ) : null}
-                      </div>
-                    ))
-                  )}
-                </div>
-                {!isOwner ? (
-                  <p className="mt-2 text-xs text-muted-foreground">
-                    Only the sales person who owns this purchase order can record
-                    collections.
-                  </p>
+                        ))
+                      )}
+                    </div>
+                    {!isOwner ? (
+                      <p className="mt-2 text-xs text-muted-foreground">
+                        Only the sales person who owns this purchase order can record
+                        collections.
+                      </p>
+                    ) : null}
+                  </div>
                 ) : null}
               </div>
-            ) : null}
-          </div>
+            </TabsContent>
+          </Tabs>
         </DialogContent>
       </Dialog>
 

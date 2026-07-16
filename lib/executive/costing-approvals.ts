@@ -1,5 +1,13 @@
 import { createClient } from "@/lib/supabase/server";
 
+export type CostingApprovalLineItem = {
+  id: string;
+  description: string;
+  quantity: number;
+  unitCost: number | null;
+  lineTotal: number;
+};
+
 export type CostingApprovalItem = {
   quotationId: string;
   quotationNumber: string;
@@ -7,6 +15,7 @@ export type CostingApprovalItem = {
   subject: string;
   amount: number;
   cost: number | null;
+  items: CostingApprovalLineItem[];
   googleDriveLink: string | null;
   preparedByName: string;
   notes: string | null;
@@ -31,7 +40,7 @@ export async function listPendingCostingApprovals(): Promise<CostingApprovalItem
   const { data, error } = await supabase
     .from("quotations")
     .select(
-      "id, quotation_number, subject, amount, cost, google_drive_link, notes, created_at, clients:client_id(company_name), preparer:prepared_by(full_name, email)",
+      "id, quotation_number, subject, amount, cost, google_drive_link, notes, created_at, clients:client_id(company_name), preparer:prepared_by(full_name, email), quotation_items(id, description, quantity, unit_cost, line_total, sort_order)",
     )
     .eq("phase", "costing")
     .eq("status", "pending")
@@ -44,6 +53,16 @@ export async function listPendingCostingApprovals(): Promise<CostingApprovalItem
   return (data ?? []).map((row) => {
     const client = Array.isArray(row.clients) ? row.clients[0] : row.clients;
     const preparer = Array.isArray(row.preparer) ? row.preparer[0] : row.preparer;
+    const items = (Array.isArray(row.quotation_items) ? row.quotation_items : [])
+      .slice()
+      .sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0))
+      .map((item) => ({
+        id: item.id,
+        description: item.description,
+        quantity: Number(item.quantity),
+        unitCost: item.unit_cost === null ? null : Number(item.unit_cost),
+        lineTotal: Number(item.line_total),
+      }));
     return {
       quotationId: row.id,
       quotationNumber: row.quotation_number,
@@ -51,6 +70,7 @@ export async function listPendingCostingApprovals(): Promise<CostingApprovalItem
       subject: row.subject,
       amount: Number(row.amount),
       cost: row.cost === null ? null : Number(row.cost),
+      items,
       googleDriveLink: row.google_drive_link,
       preparedByName: preparer?.full_name || preparer?.email || "Unknown",
       notes: row.notes,

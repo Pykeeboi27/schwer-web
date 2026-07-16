@@ -483,6 +483,34 @@ export function QuotationDetailsDialog({
           </div>
         </dl>
 
+        {quotation.items.length > 0 ? (
+          <div className="mt-2">
+            <p className="mb-2 text-sm font-medium text-muted-foreground">Line Items</p>
+            <table className="w-full text-xs">
+              <thead className="text-left text-muted-foreground">
+                <tr>
+                  <th className="py-1 pr-3 font-medium">Item</th>
+                  <th className="py-1 pr-3 font-medium">Qty</th>
+                  <th className="py-1 pr-3 font-medium">Unit Cost</th>
+                  <th className="py-1 font-medium">Line Total</th>
+                </tr>
+              </thead>
+              <tbody>
+                {quotation.items.map((item) => (
+                  <tr key={item.id} className="border-t">
+                    <td className="py-1 pr-3">{item.description}</td>
+                    <td className="py-1 pr-3">{item.quantity}</td>
+                    <td className="py-1 pr-3">
+                      {item.unitCost === null ? "—" : formatCurrency(item.unitCost)}
+                    </td>
+                    <td className="py-1">{formatCurrency(item.lineTotal)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        ) : null}
+
         {isEditable ? (
           <div className="mt-5 space-y-4 rounded-md border bg-muted/20 p-4 text-sm">
             <div>

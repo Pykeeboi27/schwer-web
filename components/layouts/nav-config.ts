@@ -2,6 +2,7 @@ import {
   BadgeCheck,
   Building2,
   ClipboardCheck,
+  FilePlus,
   FileText,
   LayoutDashboard,
   LineChart,
@@ -83,6 +84,11 @@ export function getNavConfig(pathname: string, role?: string | null): NavConfig 
           end: true,
         },
         { href: "/protected/sales/clients", label: "Clients", icon: Building2 },
+        {
+          href: "/protected/sales/request-for-quotation",
+          label: "Request for Quotation",
+          icon: FilePlus,
+        },
         { href: "/protected/sales/quotations", label: "Quotations", icon: FileText },
         {
           href: "/protected/sales/purchase-orders",
