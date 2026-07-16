@@ -114,9 +114,6 @@ export function CostingApprovalDetailsDialog({
             <dt className="text-muted-foreground">Amount</dt>
             <dd className="font-medium">{formatCurrency(item.amount)}</dd>
 
-            <dt className="text-muted-foreground">Cost</dt>
-            <dd className="font-medium">{formatCurrency(item.cost)}</dd>
-
             <dt className="text-muted-foreground">Google Drive</dt>
             <dd className="font-medium">
               {item.googleDriveLink ? (
@@ -142,6 +139,42 @@ export function CostingApprovalDetailsDialog({
             <dt className="text-muted-foreground">Created</dt>
             <dd className="font-medium">{formatDate(item.createdAt)}</dd>
           </dl>
+
+          <div>
+            <p className="mb-2 text-sm font-medium text-muted-foreground">Line Items</p>
+            <table className="w-full text-xs">
+              <thead className="text-left text-muted-foreground">
+                <tr>
+                  <th className="py-1 pr-3 font-medium">Item</th>
+                  <th className="py-1 pr-3 font-medium">Qty</th>
+                  <th className="py-1 pr-3 font-medium">Unit Cost</th>
+                  <th className="py-1 font-medium">Line Total</th>
+                </tr>
+              </thead>
+              <tbody>
+                {item.items.map((lineItem) => (
+                  <tr key={lineItem.id} className="border-t">
+                    <td className="py-1 pr-3">{lineItem.description}</td>
+                    <td className="py-1 pr-3">{lineItem.quantity}</td>
+                    <td className="py-1 pr-3">
+                      {lineItem.unitCost === null ? (
+                        <span className="text-muted-foreground">Not costed yet</span>
+                      ) : (
+                        formatCurrency(lineItem.unitCost)
+                      )}
+                    </td>
+                    <td className="py-1">{formatCurrency(lineItem.lineTotal)}</td>
+                  </tr>
+                ))}
+                <tr className="border-t font-semibold">
+                  <td className="py-1 pr-3" colSpan={3}>
+                    Total Cost
+                  </td>
+                  <td className="py-1">{formatCurrency(item.cost)}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
 
           <div className="space-y-2 pt-2">
             <Input

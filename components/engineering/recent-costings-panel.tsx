@@ -20,7 +20,6 @@ type SalesPersonOption = {
 
 type RecentCostingsPanelProps = {
   quotations: CostingQuotation[];
-  currentUserId: string;
   clients: ClientOption[];
   salesPeople: SalesPersonOption[];
 };
@@ -37,7 +36,6 @@ const RECENT_LIMIT = 5;
 
 export function RecentCostingsPanel({
   quotations,
-  currentUserId,
   clients,
   salesPeople,
 }: RecentCostingsPanelProps) {
@@ -74,7 +72,6 @@ export function RecentCostingsPanel({
       <CostingQuotationDetailsDialog
         open={viewing !== null}
         quotation={viewing}
-        currentUserId={currentUserId}
         clients={clients}
         salesPeople={salesPeople}
         onOpenChange={(open) => {

@@ -43,7 +43,7 @@ export default async function EngineeringDashboardPage() {
     <div className="flex flex-col gap-6">
       <PageHeader
         title="Engineering Dashboard"
-        description="Start quotations with cost data and a Google Drive link, then submit them for executive costing approval."
+        description="Set the unit cost for each item on a Sales-raised request for quotation, attach a Google Drive link, then submit for executive costing approval."
       />
 
       <StatCard
@@ -80,7 +80,6 @@ export default async function EngineeringDashboardPage() {
       >
         <RecentCostingsPanel
           quotations={quotations}
-          currentUserId={profile?.id ?? ""}
           clients={clientOptions}
           salesPeople={salesPeople}
         />

@@ -64,14 +64,38 @@ export async function generatePurchaseOrderWorksheetXlsx(
 
   sheet.getCell("D16").value = data.notes ?? "";
 
-  // Item row 1: the PO subject/amount, matching the previous HTML worksheet's
-  // single auto-filled line (qty 1, unit "assy" are static in the template).
-  sheet.getCell("D20").value = data.subject;
-  sheet.getCell("P20").value = data.poAmount;
-  sheet.getCell("R20").value = data.poAmount;
+  // Item rows: the template has 22 pre-formatted rows (20-41), each with
+  // merged Description (D:L) / Qty (M:N) / Unit Cost (P:Q) / Line Cost (R:T)
+  // cells, followed by a GRAND TOTAL row (42) and a "Prepared by" row (43).
+  // Item rows show direct cost per line; the grand total is still the PO's
+  // customer-facing selling amount, not the summed cost.
+  const ITEM_START_ROW = 20;
+  const ITEM_TEMPLATE_ROWS = 22;
+  const items =
+    data.items.length > 0
+      ? data.items
+      : [{ description: data.subject, quantity: 1, unitCost: null, lineTotal: 0 }];
 
-  sheet.getCell("R42").value = data.poAmount;
-  sheet.getCell("J43").value = data.salesPersonName;
+  let totalRow = 42;
+  let preparedByRow = 43;
+
+  if (items.length > ITEM_TEMPLATE_ROWS) {
+    const extraRows = items.length - ITEM_TEMPLATE_ROWS;
+    sheet.duplicateRow(ITEM_START_ROW + ITEM_TEMPLATE_ROWS - 1, extraRows, true);
+    totalRow += extraRows;
+    preparedByRow += extraRows;
+  }
+
+  items.forEach((item, index) => {
+    const row = ITEM_START_ROW + index;
+    sheet.getCell(`D${row}`).value = item.description;
+    sheet.getCell(`M${row}`).value = item.quantity;
+    sheet.getCell(`P${row}`).value = item.unitCost ?? "";
+    sheet.getCell(`R${row}`).value = item.lineTotal;
+  });
+
+  sheet.getCell(`R${totalRow}`).value = data.poAmount;
+  sheet.getCell(`J${preparedByRow}`).value = data.salesPersonName;
 
   const buffer = await workbook.xlsx.writeBuffer();
   return Buffer.from(buffer);

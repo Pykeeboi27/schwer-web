@@ -222,7 +222,8 @@ export function PurchaseOrdersTable({
                     <td className="truncate px-3 py-2" title={purchaseOrder.clientName}>
                       <p className="truncate">{purchaseOrder.clientName}</p>
                       <p className="truncate font-mono text-xs text-muted-foreground">
-                        {purchaseOrder.poNumber}
+                        {purchaseOrder.poNumber} · {purchaseOrder.itemCount}{" "}
+                        {purchaseOrder.itemCount === 1 ? "item" : "items"}
                       </p>
                     </td>
                     <td className="truncate px-3 py-2">
@@ -294,6 +295,7 @@ export function PurchaseOrdersTable({
                 }
               >
                 <DataField label="Total" value={formatCurrency(purchaseOrder.poAmount)} />
+                <DataField label="Items" value={purchaseOrder.itemCount} />
                 <DataField label="Authored By" value={purchaseOrder.createdByName} />
               </DataCard>
             ))

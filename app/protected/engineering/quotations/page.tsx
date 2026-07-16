@@ -1,4 +1,3 @@
-import { CreateCostingQuotationDialog } from "@/components/dialogs/create-costing-quotation-dialog";
 import { CostingHistoryTable } from "@/components/engineering/costing-history-table";
 import { CostingQuotationsTable } from "@/components/engineering/costing-quotations-table";
 import { PageHeader, Panel } from "@/components/patterns";
@@ -23,13 +22,11 @@ export default async function EngineeringQuotationsPage() {
     redirect(redirectPath);
   }
 
-  const isCostingEngineer = profile?.role === "costing_engineer";
-
-  const [quotations, clients, history, salesPeople] = await Promise.all([
+  const [quotations, history, salesPeople, clients] = await Promise.all([
     listCostingQuotations(),
-    isCostingEngineer ? listClients() : Promise.resolve([]),
     listCostingApprovedHistory(),
     listSalesPeople(),
+    listClients(),
   ]);
 
   const clientOptions = clients.map((c) => ({
@@ -42,21 +39,12 @@ export default async function EngineeringQuotationsPage() {
     <div className="flex flex-col gap-6">
       <PageHeader
         title="Costing Quotations"
-        description="Create and manage quotations during the costing phase. Submit for executive approval once cost and Drive link are in place."
-        actions={
-          isCostingEngineer ? (
-            <CreateCostingQuotationDialog
-              clients={clientOptions}
-              salesPeople={salesPeople}
-            />
-          ) : null
-        }
+        description="Requests for quotation raised by Sales. Set the unit cost for every item, attach a Google Drive link, then submit for executive approval."
       />
 
       <Panel>
         <CostingQuotationsTable
           quotations={quotations}
-          currentUserId={profile?.id ?? ""}
           clients={clientOptions}
           salesPeople={salesPeople}
         />

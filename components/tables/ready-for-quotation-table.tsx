@@ -94,18 +94,19 @@ export function ReadyForQuotationTable({
           <table className="w-full table-fixed text-sm">
             <thead className="bg-muted/40 text-left">
               <tr>
-                <th className="w-[22%] px-3 py-2 font-medium">Client</th>
-                <th className="w-[23%] px-3 py-2 font-medium">Subject</th>
-                <th className="w-[14%] px-3 py-2 font-medium">Amount</th>
-                <th className="w-[13%] px-3 py-2 font-medium">Cost</th>
-                <th className="w-[15%] px-3 py-2 font-medium">Authored By</th>
+                <th className="w-[20%] px-3 py-2 font-medium">Client</th>
+                <th className="w-[20%] px-3 py-2 font-medium">Subject</th>
+                <th className="w-[8%] px-3 py-2 font-medium">Items</th>
+                <th className="w-[13%] px-3 py-2 font-medium">Amount</th>
+                <th className="w-[12%] px-3 py-2 font-medium">Cost</th>
+                <th className="w-[14%] px-3 py-2 font-medium">Authored By</th>
                 <th className="w-[13%] px-3 py-2 font-medium">Approved At</th>
               </tr>
             </thead>
             <tbody>
               {filtered.length === 0 ? (
                 <tr>
-                  <td colSpan={6}>{emptyState}</td>
+                  <td colSpan={7}>{emptyState}</td>
                 </tr>
               ) : (
                 filtered.map((quotation) => (
@@ -128,6 +129,9 @@ export function ReadyForQuotationTable({
                       title={quotation.subject || undefined}
                     >
                       {quotation.subject || "-"}
+                    </td>
+                    <td className="truncate px-3 py-2 text-muted-foreground">
+                      {quotation.items.length}
                     </td>
                     <td className="truncate px-3 py-2">
                       {formatCurrency(quotation.amount)}
@@ -171,6 +175,7 @@ export function ReadyForQuotationTable({
                 }
               >
                 <DataField label="Subject" value={quotation.subject || "-"} />
+                <DataField label="Items" value={quotation.items.length} />
                 <DataField
                   label="Cost"
                   value={quotation.cost === null ? "-" : formatCurrency(quotation.cost)}
