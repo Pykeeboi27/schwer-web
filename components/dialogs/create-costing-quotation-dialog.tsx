@@ -13,10 +13,16 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import { fieldClassName, textareaClassName } from "@/components/patterns";
+import { textareaClassName } from "@/components/patterns";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { suggestQuotationNumber } from "@/lib/engineering/suggest-quotation-number";
 import { useToast } from "@/lib/utils/toast-notification";
-import { cn } from "@/lib/utils";
 import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
 
@@ -26,8 +32,14 @@ type ClientOption = {
   isActive: boolean;
 };
 
+type SalesPersonOption = {
+  id: string;
+  name: string;
+};
+
 type CreateCostingQuotationDialogProps = {
   clients: ClientOption[];
+  salesPeople: SalesPersonOption[];
 };
 
 type FieldErrors = {
@@ -49,6 +61,7 @@ function isHttpUrl(value: string): boolean {
 
 export function CreateCostingQuotationDialog({
   clients,
+  salesPeople,
 }: CreateCostingQuotationDialogProps) {
   const router = useRouter();
   const { success, error } = useToast();
@@ -178,23 +191,45 @@ export function CreateCostingQuotationDialog({
 
           <div className="md:col-span-2">
             <Label htmlFor="costing-client">Client</Label>
-            <select
-              id="costing-client"
-              name="clientId"
-              required
-              aria-invalid={Boolean(fieldErrors.clientId)}
-              className={cn(fieldClassName, "mt-1 h-9 py-1")}
-            >
-              <option value="">Select client</option>
-              {activeClients.map((client) => (
-                <option key={client.id} value={client.id}>
-                  {client.companyName}
-                </option>
-              ))}
-            </select>
+            <Select name="clientId" required>
+              <SelectTrigger
+                id="costing-client"
+                className="mt-1"
+                aria-invalid={Boolean(fieldErrors.clientId)}
+              >
+                <SelectValue placeholder="Select client" />
+              </SelectTrigger>
+              <SelectContent>
+                {activeClients.map((client) => (
+                  <SelectItem key={client.id} value={client.id}>
+                    {client.companyName}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
             {fieldErrors.clientId ? (
               <p className="mt-1 text-xs text-destructive">{fieldErrors.clientId}</p>
             ) : null}
+          </div>
+
+          <div className="md:col-span-2">
+            <Label htmlFor="costing-sales-person">Sales Person</Label>
+            <Select name="salesPersonId">
+              <SelectTrigger id="costing-sales-person" className="mt-1">
+                <SelectValue placeholder="Select sales person" />
+              </SelectTrigger>
+              <SelectContent>
+                {salesPeople.map((person) => (
+                  <SelectItem key={person.id} value={person.id}>
+                    {person.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <p className="mt-1 text-xs text-muted-foreground">
+              Can be left blank in a draft, but is required before submitting for
+              approval.
+            </p>
           </div>
 
           <div className="md:col-span-2">

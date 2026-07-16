@@ -49,7 +49,8 @@ CREATE TYPE approval_status_enum AS ENUM (
   'pending',
   'approved',
   'rejected',
-  'cancelled'
+  'cancelled',
+  'closed'
 );
 
 CREATE TYPE payment_status_enum AS ENUM (
@@ -263,6 +264,7 @@ CREATE TABLE public.quotations (
   google_drive_link   TEXT,
   costing_rejection_reason TEXT,
   costing_approved_at TIMESTAMPTZ,
+  sales_person_id     UUID REFERENCES public.profiles(id),
   sales_margin_percent NUMERIC(6, 2),
   payment_terms       TEXT,
   payment_terms_custom TEXT,
@@ -283,6 +285,7 @@ CREATE TABLE public.quotations (
 
 CREATE INDEX idx_quotations_client ON public.quotations(client_id);
 CREATE INDEX idx_quotations_status ON public.quotations(status);
+CREATE INDEX idx_quotations_sales_person ON public.quotations(sales_person_id);
 
 CREATE TABLE public.quotation_approvals (
   id               UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
@@ -368,6 +371,9 @@ CREATE TABLE IF NOT EXISTS public.purchase_orders (
   -- Phase 2 additions: approval lifecycle + sales pricing snapshot.
   status               approval_status_enum NOT NULL DEFAULT 'pending',
   client_po_number     TEXT,
+  -- Free-text reference (e.g. internal project code, or original quotation
+  -- number for manually created POs not linked via converted_po_id).
+  quotation_reference  TEXT,
   margin_percentage    NUMERIC(6, 2),
   bank_percentage      NUMERIC(6, 2),
   bank_amount          NUMERIC(15, 2),
@@ -801,6 +807,22 @@ CREATE POLICY "eng_quotations_executive_costing_update"
   )
   WITH CHECK (
     EXISTS (
+      SELECT 1 FROM public.profiles p
+      WHERE p.id = auth.uid()
+        AND p.department = 'executive'
+        AND p.role = 'executive'
+        AND p.is_active = TRUE
+    )
+  );
+
+-- Quotations: Executive (role='executive') can delete costing-phase rows (e.g. a
+-- costing submission entered in error). Server actions restrict this to rows still
+-- pending costing approval; this policy only gates access.
+CREATE POLICY "eng_quotations_executive_costing_delete"
+  ON public.quotations FOR DELETE
+  USING (
+    phase = 'costing'
+    AND EXISTS (
       SELECT 1 FROM public.profiles p
       WHERE p.id = auth.uid()
         AND p.department = 'executive'

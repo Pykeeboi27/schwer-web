@@ -1,6 +1,13 @@
 "use client";
 
 import { updateClientAction } from "@/app/protected/sales/clients/actions";
+import {
+  addClientContactAction,
+  fetchClientContactsAction,
+  setPrimaryContactAction,
+} from "@/app/protected/sales/actions";
+import { DriveUploadField } from "@/components/dialogs/drive-upload-field";
+import { SectorBadge } from "@/components/sales/sector-badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -11,10 +18,17 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { fieldClassName } from "@/components/patterns";
-import type { SalesClient } from "@/lib/sales/clients";
-import { useToast } from "@/lib/utils/toast-notification";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import type { SalesClient, SalesClientContact } from "@/lib/sales/clients";
 import { cn } from "@/lib/utils";
+import { sanitizePhoneInput, validatePhone } from "@/lib/utils/form-validation";
+import { useToast } from "@/lib/utils/toast-notification";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 
@@ -72,6 +86,24 @@ export function ClientDetailsDialog({
     sector: "commercial",
   });
 
+  const [contacts, setContacts] = useState<SalesClientContact[]>([]);
+  const [contactsLoading, setContactsLoading] = useState(false);
+  const [isAddingContact, setIsAddingContact] = useState(false);
+  const [contactFormError, setContactFormError] = useState<string | null>(null);
+  const [contactFieldErrors, setContactFieldErrors] = useState<{
+    phone?: string;
+    mobile?: string;
+  }>({});
+  const [updatingPrimaryId, setUpdatingPrimaryId] = useState<string | null>(null);
+  const [newContact, setNewContact] = useState({
+    fullName: "",
+    position: "",
+    phone: "",
+    mobile: "",
+    email: "",
+    isPrimary: false,
+  });
+
   useEffect(() => {
     if (!open || !client) {
       return;
@@ -81,11 +113,121 @@ export function ClientDetailsDialog({
     setIsEditing(startInEditMode);
     setFormError(null);
     setFieldErrors({});
+    setNewContact({
+      fullName: "",
+      position: "",
+      phone: "",
+      mobile: "",
+      email: "",
+      isPrimary: false,
+    });
+    setContactFormError(null);
+    setContactFieldErrors({});
   }, [open, client, startInEditMode]);
+
+  useEffect(() => {
+    if (!open || !client) {
+      return;
+    }
+
+    let cancelled = false;
+    setContactsLoading(true);
+
+    fetchClientContactsAction(client.id).then((response) => {
+      if (cancelled) return;
+      setContacts(response.data);
+      setContactsLoading(false);
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [open, client]);
 
   if (!client) {
     return null;
   }
+
+  const reloadContacts = async () => {
+    const response = await fetchClientContactsAction(client.id);
+    setContacts(response.data);
+  };
+
+  const handleAddContact = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    setContactFormError(null);
+    setContactFieldErrors({});
+
+    if (!newContact.fullName.trim()) {
+      setContactFormError("Contact name is required.");
+      return;
+    }
+
+    const phoneError = validatePhone(newContact.phone);
+    const mobileError = validatePhone(newContact.mobile);
+    if (phoneError || mobileError) {
+      setContactFieldErrors({
+        phone: phoneError ?? undefined,
+        mobile: mobileError ?? undefined,
+      });
+      setContactFormError("Please correct the highlighted fields.");
+      return;
+    }
+
+    setIsAddingContact(true);
+
+    const formData = new FormData();
+    formData.set("clientId", client.id);
+    formData.set("fullName", newContact.fullName.trim());
+    formData.set("position", newContact.position.trim());
+    formData.set("phone", newContact.phone.trim());
+    formData.set("mobile", newContact.mobile.trim());
+    formData.set("email", newContact.email.trim());
+    if (newContact.isPrimary) {
+      formData.set("isPrimary", "on");
+    }
+
+    const response = await addClientContactAction(formData);
+
+    if (!response.ok) {
+      const message = response.error ?? "Failed to add contact.";
+      setContactFormError(message);
+      error(message);
+      setIsAddingContact(false);
+      return;
+    }
+
+    success("Contact added.");
+    setNewContact({
+      fullName: "",
+      position: "",
+      phone: "",
+      mobile: "",
+      email: "",
+      isPrimary: false,
+    });
+    await reloadContacts();
+    setIsAddingContact(false);
+  };
+
+  const handleMakePrimary = async (contactId: string) => {
+    setUpdatingPrimaryId(contactId);
+    const formData = new FormData();
+    formData.set("clientId", client.id);
+    formData.set("contactId", contactId);
+
+    const response = await setPrimaryContactAction(formData);
+
+    if (!response.ok) {
+      error(response.error ?? "Failed to set primary contact.");
+      setUpdatingPrimaryId(null);
+      return;
+    }
+
+    success("Primary contact updated.");
+    await reloadContacts();
+    setUpdatingPrimaryId(null);
+  };
 
   const handleEditCancel = () => {
     setFormValues(toFormValues(client));
@@ -136,7 +278,13 @@ export function ClientDetailsDialog({
         if (!next) onOpenChange(false);
       }}
     >
-      <DialogContent className="max-h-[85vh] max-w-xl overflow-y-auto">
+      <DialogContent
+        className={cn(
+          "max-h-[85vh] w-[calc(100%-2rem)] max-w-xl overflow-x-hidden overflow-y-auto",
+          "data-[state=open]:slide-in-from-left-1/2 data-[state=open]:slide-in-from-top-[48%]",
+          "data-[state=closed]:slide-out-to-left-1/2 data-[state=closed]:slide-out-to-top-[48%]",
+        )}
+      >
         <DialogHeader>
           <DialogTitle>Client Details</DialogTitle>
           <DialogDescription>
@@ -160,8 +308,8 @@ export function ClientDetailsDialog({
         ) : null}
 
         {isEditing ? (
-          <form onSubmit={handleSave} className="grid gap-4">
-            <div>
+          <form onSubmit={handleSave} className="grid min-w-0 gap-4">
+            <div className="min-w-0">
               <Label htmlFor="client-code">Code</Label>
               <Input
                 id="client-code"
@@ -171,7 +319,7 @@ export function ClientDetailsDialog({
               />
             </div>
 
-            <div>
+            <div className="min-w-0">
               <Label htmlFor="client-name">Name</Label>
               <Input
                 id="client-name"
@@ -186,9 +334,9 @@ export function ClientDetailsDialog({
               ) : null}
             </div>
 
-            <div className="grid gap-4 md:grid-cols-2">
-              <div>
-                <Label htmlFor="client-contact-person">Contact</Label>
+            <div className="grid min-w-0 gap-4 md:grid-cols-2">
+              <div className="min-w-0">
+                <Label htmlFor="client-contact-person">Contact (notes)</Label>
                 <Input
                   id="client-contact-person"
                   value={formValues.contactPerson}
@@ -200,29 +348,37 @@ export function ClientDetailsDialog({
                   }
                   className="mt-1"
                 />
+                {fieldErrors.contactPerson ? (
+                  <p className="mt-1 text-xs text-destructive">
+                    {fieldErrors.contactPerson}
+                  </p>
+                ) : null}
               </div>
-              <div>
+              <div className="min-w-0">
                 <Label htmlFor="client-sector">Sector</Label>
-                <select
-                  id="client-sector"
+                <Select
                   value={formValues.sector}
-                  onChange={(event) =>
+                  onValueChange={(value) =>
                     setFormValues((current) => ({
                       ...current,
-                      sector: event.target.value as ClientFormValues["sector"],
+                      sector: value as ClientFormValues["sector"],
                     }))
                   }
-                  className={cn(fieldClassName, "mt-1 h-9 py-1")}
                 >
-                  <option value="commercial">Commercial</option>
-                  <option value="industrial">Industrial</option>
-                  <option value="solar">Solar</option>
-                </select>
+                  <SelectTrigger id="client-sector" className="mt-1">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="commercial">Commercial</SelectItem>
+                    <SelectItem value="industrial">Industrial</SelectItem>
+                    <SelectItem value="solar">Solar</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
             </div>
 
-            <div className="grid gap-4 md:grid-cols-2">
-              <div>
+            <div className="grid min-w-0 gap-4 md:grid-cols-2">
+              <div className="min-w-0">
                 <Label htmlFor="client-email">Email</Label>
                 <Input
                   id="client-email"
@@ -240,7 +396,7 @@ export function ClientDetailsDialog({
                   <p className="mt-1 text-xs text-destructive">{fieldErrors.email}</p>
                 ) : null}
               </div>
-              <div>
+              <div className="min-w-0">
                 <Label htmlFor="client-phone">Phone</Label>
                 <Input
                   id="client-phone"
@@ -248,10 +404,11 @@ export function ClientDetailsDialog({
                   onChange={(event) =>
                     setFormValues((current) => ({
                       ...current,
-                      phone: event.target.value,
+                      phone: sanitizePhoneInput(event.target.value),
                     }))
                   }
                   className="mt-1"
+                  inputMode="tel"
                 />
                 {fieldErrors.phone ? (
                   <p className="mt-1 text-xs text-destructive">{fieldErrors.phone}</p>
@@ -259,7 +416,7 @@ export function ClientDetailsDialog({
               </div>
             </div>
 
-            <div>
+            <div className="min-w-0">
               <Label htmlFor="client-address">Address</Label>
               <Input
                 id="client-address"
@@ -272,10 +429,13 @@ export function ClientDetailsDialog({
                 }
                 className="mt-1"
               />
+              {fieldErrors.address ? (
+                <p className="mt-1 text-xs text-destructive">{fieldErrors.address}</p>
+              ) : null}
             </div>
 
-            <div className="grid gap-4 md:grid-cols-2">
-              <div>
+            <div className="grid min-w-0 gap-4 md:grid-cols-2">
+              <div className="min-w-0">
                 <Label htmlFor="client-tin">TIN</Label>
                 <Input
                   id="client-tin"
@@ -286,21 +446,22 @@ export function ClientDetailsDialog({
                   className="mt-1"
                   placeholder="000-000-000-000"
                 />
+                {fieldErrors.tin ? (
+                  <p className="mt-1 text-xs text-destructive">{fieldErrors.tin}</p>
+                ) : null}
               </div>
-              <div>
-                <Label htmlFor="client-bir">BIR Registration Link</Label>
-                <Input
+              <div className="min-w-0">
+                <DriveUploadField
                   id="client-bir"
-                  type="url"
+                  label="BIR Registration"
                   value={formValues.birRegistrationLink}
-                  onChange={(event) =>
+                  onChange={(link) =>
                     setFormValues((current) => ({
                       ...current,
-                      birRegistrationLink: event.target.value,
+                      birRegistrationLink: link,
                     }))
                   }
-                  className="mt-1"
-                  placeholder="https://drive.google.com/..."
+                  onError={error}
                 />
               </div>
             </div>
@@ -317,40 +478,42 @@ export function ClientDetailsDialog({
             </div>
           </form>
         ) : (
-          <dl className="grid gap-3 text-sm">
-            <div className="grid grid-cols-[140px_1fr] gap-2">
+          <dl className="grid min-w-0 gap-3 text-sm">
+            <div className="grid grid-cols-[minmax(100px,140px)_minmax(0,1fr)] gap-2">
               <dt className="text-muted-foreground">Code</dt>
-              <dd className="font-medium">{client.clientCode}</dd>
+              <dd className="break-words font-medium">{client.clientCode}</dd>
             </div>
-            <div className="grid grid-cols-[140px_1fr] gap-2">
+            <div className="grid grid-cols-[minmax(100px,140px)_minmax(0,1fr)] gap-2">
               <dt className="text-muted-foreground">Name</dt>
-              <dd>{client.companyName}</dd>
+              <dd className="break-words">{client.companyName}</dd>
             </div>
-            <div className="grid grid-cols-[140px_1fr] gap-2">
+            <div className="grid grid-cols-[minmax(100px,140px)_minmax(0,1fr)] gap-2">
               <dt className="text-muted-foreground">Sector</dt>
-              <dd className="capitalize">{client.sector}</dd>
+              <dd>
+                <SectorBadge sector={client.sector} />
+              </dd>
             </div>
-            <div className="grid grid-cols-[140px_1fr] gap-2">
-              <dt className="text-muted-foreground">Contact</dt>
-              <dd>{client.contactPerson ?? "Not provided"}</dd>
+            <div className="grid grid-cols-[minmax(100px,140px)_minmax(0,1fr)] gap-2">
+              <dt className="text-muted-foreground">Contact (notes)</dt>
+              <dd className="break-words">{client.contactPerson ?? "Not provided"}</dd>
             </div>
-            <div className="grid grid-cols-[140px_1fr] gap-2">
+            <div className="grid grid-cols-[minmax(100px,140px)_minmax(0,1fr)] gap-2">
               <dt className="text-muted-foreground">Email</dt>
-              <dd>{client.email ?? "Not provided"}</dd>
+              <dd className="break-words">{client.email ?? "Not provided"}</dd>
             </div>
-            <div className="grid grid-cols-[140px_1fr] gap-2">
+            <div className="grid grid-cols-[minmax(100px,140px)_minmax(0,1fr)] gap-2">
               <dt className="text-muted-foreground">Phone</dt>
-              <dd>{client.phone ?? "Not provided"}</dd>
+              <dd className="break-words">{client.phone ?? "Not provided"}</dd>
             </div>
-            <div className="grid grid-cols-[140px_1fr] gap-2">
+            <div className="grid grid-cols-[minmax(100px,140px)_minmax(0,1fr)] gap-2">
               <dt className="text-muted-foreground">Address</dt>
-              <dd>{client.address ?? "Not provided"}</dd>
+              <dd className="break-words">{client.address ?? "Not provided"}</dd>
             </div>
-            <div className="grid grid-cols-[140px_1fr] gap-2">
+            <div className="grid grid-cols-[minmax(100px,140px)_minmax(0,1fr)] gap-2">
               <dt className="text-muted-foreground">TIN</dt>
-              <dd>{client.tin ?? "Not provided"}</dd>
+              <dd className="break-words">{client.tin ?? "Not provided"}</dd>
             </div>
-            <div className="grid grid-cols-[140px_1fr] gap-2">
+            <div className="grid grid-cols-[minmax(100px,140px)_minmax(0,1fr)] gap-2">
               <dt className="text-muted-foreground">BIR Registration</dt>
               <dd>
                 {client.birRegistrationLink ? (
@@ -367,12 +530,185 @@ export function ClientDetailsDialog({
                 )}
               </dd>
             </div>
-            <div className="grid grid-cols-[140px_1fr] gap-2">
+            <div className="grid grid-cols-[minmax(100px,140px)_minmax(0,1fr)] gap-2">
               <dt className="text-muted-foreground">Created</dt>
               <dd>{new Date(client.createdAt).toLocaleString()}</dd>
             </div>
           </dl>
         )}
+
+        <div className="min-w-0 border-t pt-4">
+          <h3 className="text-sm font-semibold">Contacts</h3>
+          <p className="mt-1 text-xs text-muted-foreground">
+            The primary contact here is what appears on the PO worksheet — the
+            &ldquo;Contact (notes)&rdquo; field above does not.
+          </p>
+
+          {contactsLoading ? (
+            <p className="mt-3 text-sm text-muted-foreground">Loading contacts...</p>
+          ) : contacts.length === 0 ? (
+            <p className="mt-3 text-sm text-muted-foreground">No contacts yet.</p>
+          ) : (
+            <ul className="mt-3 grid gap-2">
+              {contacts.map((contact) => (
+                <li
+                  key={contact.id}
+                  className="flex items-start justify-between gap-3 rounded-md border p-2.5 text-sm"
+                >
+                  <div className="min-w-0">
+                    <div className="flex min-w-0 flex-wrap items-center gap-2">
+                      <span className="break-words font-medium">{contact.fullName}</span>
+                      {contact.isPrimary ? (
+                        <span className="shrink-0 rounded-full bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary">
+                          Primary
+                        </span>
+                      ) : null}
+                    </div>
+                    {contact.position ? (
+                      <p className="break-words text-muted-foreground">
+                        {contact.position}
+                      </p>
+                    ) : null}
+                    <p className="break-words text-muted-foreground">
+                      {[contact.mobile, contact.phone, contact.email]
+                        .filter(Boolean)
+                        .join(" · ") || "No contact details"}
+                    </p>
+                  </div>
+                  {!contact.isPrimary ? (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="shrink-0"
+                      disabled={updatingPrimaryId === contact.id}
+                      onClick={() => handleMakePrimary(contact.id)}
+                    >
+                      {updatingPrimaryId === contact.id ? "Saving..." : "Make Primary"}
+                    </Button>
+                  ) : null}
+                </li>
+              ))}
+            </ul>
+          )}
+
+          <form onSubmit={handleAddContact} className="mt-4 grid gap-3">
+            <div className="grid gap-3 md:grid-cols-2">
+              <div>
+                <Label htmlFor="new-contact-name">Contact Name</Label>
+                <Input
+                  id="new-contact-name"
+                  value={newContact.fullName}
+                  onChange={(event) =>
+                    setNewContact((current) => ({
+                      ...current,
+                      fullName: event.target.value,
+                    }))
+                  }
+                  className="mt-1"
+                  placeholder="Full name"
+                />
+              </div>
+              <div>
+                <Label htmlFor="new-contact-position">Position</Label>
+                <Input
+                  id="new-contact-position"
+                  value={newContact.position}
+                  onChange={(event) =>
+                    setNewContact((current) => ({
+                      ...current,
+                      position: event.target.value,
+                    }))
+                  }
+                  className="mt-1"
+                  placeholder="e.g. Purchasing Manager"
+                />
+              </div>
+            </div>
+
+            <div className="grid gap-3 md:grid-cols-3">
+              <div>
+                <Label htmlFor="new-contact-mobile">Mobile</Label>
+                <Input
+                  id="new-contact-mobile"
+                  value={newContact.mobile}
+                  onChange={(event) =>
+                    setNewContact((current) => ({
+                      ...current,
+                      mobile: sanitizePhoneInput(event.target.value),
+                    }))
+                  }
+                  className="mt-1"
+                  inputMode="tel"
+                />
+                {contactFieldErrors.mobile ? (
+                  <p className="mt-1 text-xs text-destructive">
+                    {contactFieldErrors.mobile}
+                  </p>
+                ) : null}
+              </div>
+              <div>
+                <Label htmlFor="new-contact-phone">Phone</Label>
+                <Input
+                  id="new-contact-phone"
+                  value={newContact.phone}
+                  inputMode="tel"
+                  onChange={(event) =>
+                    setNewContact((current) => ({
+                      ...current,
+                      phone: sanitizePhoneInput(event.target.value),
+                    }))
+                  }
+                  className="mt-1"
+                />
+                {contactFieldErrors.phone ? (
+                  <p className="mt-1 text-xs text-destructive">
+                    {contactFieldErrors.phone}
+                  </p>
+                ) : null}
+              </div>
+              <div>
+                <Label htmlFor="new-contact-email">Email</Label>
+                <Input
+                  id="new-contact-email"
+                  type="email"
+                  value={newContact.email}
+                  onChange={(event) =>
+                    setNewContact((current) => ({
+                      ...current,
+                      email: event.target.value,
+                    }))
+                  }
+                  className="mt-1"
+                />
+              </div>
+            </div>
+
+            <label className="flex items-center gap-2 text-sm">
+              <input
+                type="checkbox"
+                checked={newContact.isPrimary}
+                onChange={(event) =>
+                  setNewContact((current) => ({
+                    ...current,
+                    isPrimary: event.target.checked,
+                  }))
+                }
+              />
+              Set as primary contact
+            </label>
+
+            {contactFormError ? (
+              <p className="text-sm text-destructive">{contactFormError}</p>
+            ) : null}
+
+            <div className="flex justify-end">
+              <Button type="submit" variant="outline" disabled={isAddingContact}>
+                {isAddingContact ? "Adding..." : "Add Contact"}
+              </Button>
+            </div>
+          </form>
+        </div>
       </DialogContent>
     </Dialog>
   );

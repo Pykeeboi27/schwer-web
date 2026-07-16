@@ -8,6 +8,10 @@ export type CostingApprovedHistoryItem = {
   amount: number;
   cost: number | null;
   googleDriveLink: string | null;
+  notes: string | null;
+  salesPersonId: string | null;
+  salesPersonName: string | null;
+  createdAt: string;
   approvedAt: string;
 };
 
@@ -24,6 +28,8 @@ export type CostingQuotation = {
   status: "draft" | "pending" | "approved" | "rejected" | "cancelled";
   costingRejectionReason: string | null;
   preparedBy: string;
+  salesPersonId: string | null;
+  salesPersonName: string | null;
   createdAt: string;
 };
 
@@ -59,7 +65,7 @@ export async function listCostingQuotations(): Promise<CostingQuotation[]> {
   const { data, error } = await supabase
     .from("quotations")
     .select(
-      "id, quotation_number, client_id, subject, amount, cost, google_drive_link, costing_rejection_reason, notes, status, prepared_by, created_at, clients:client_id(company_name)",
+      "id, quotation_number, client_id, subject, amount, cost, google_drive_link, costing_rejection_reason, notes, status, prepared_by, sales_person_id, created_at, clients:client_id(company_name), sales_person:sales_person_id(full_name, email)",
     )
     .eq("phase", "costing")
     .order("created_at", { ascending: false });
@@ -70,6 +76,9 @@ export async function listCostingQuotations(): Promise<CostingQuotation[]> {
 
   return (data ?? []).map((row) => {
     const client = Array.isArray(row.clients) ? row.clients[0] : row.clients;
+    const salesPerson = Array.isArray(row.sales_person)
+      ? row.sales_person[0]
+      : row.sales_person;
     return {
       id: row.id,
       quotationNumber: row.quotation_number,
@@ -83,6 +92,8 @@ export async function listCostingQuotations(): Promise<CostingQuotation[]> {
       status: row.status,
       costingRejectionReason: row.costing_rejection_reason,
       preparedBy: row.prepared_by,
+      salesPersonId: row.sales_person_id,
+      salesPersonName: salesPerson?.full_name || salesPerson?.email || null,
       createdAt: row.created_at,
     };
   });
@@ -95,7 +106,7 @@ export async function listCostingApprovedHistory(): Promise<
   const { data, error } = await supabase
     .from("quotations")
     .select(
-      "id, quotation_number, subject, amount, cost, google_drive_link, costing_approved_at, clients:client_id(company_name)",
+      "id, quotation_number, subject, amount, cost, google_drive_link, notes, sales_person_id, created_at, costing_approved_at, clients:client_id(company_name), sales_person:sales_person_id(full_name, email)",
     )
     .not("costing_approved_at", "is", null)
     .order("costing_approved_at", { ascending: false });
@@ -106,6 +117,9 @@ export async function listCostingApprovedHistory(): Promise<
 
   return (data ?? []).map((row) => {
     const client = Array.isArray(row.clients) ? row.clients[0] : row.clients;
+    const salesPerson = Array.isArray(row.sales_person)
+      ? row.sales_person[0]
+      : row.sales_person;
     return {
       quotationId: row.id,
       quotationNumber: row.quotation_number,
@@ -114,6 +128,10 @@ export async function listCostingApprovedHistory(): Promise<
       amount: Number(row.amount),
       cost: row.cost === null ? null : Number(row.cost),
       googleDriveLink: row.google_drive_link,
+      notes: row.notes,
+      salesPersonId: row.sales_person_id,
+      salesPersonName: salesPerson?.full_name || salesPerson?.email || null,
+      createdAt: row.created_at,
       approvedAt: row.costing_approved_at,
     };
   });
@@ -126,6 +144,7 @@ export async function createCostingQuotation(input: {
   cost: number;
   googleDriveLink: string;
   notes?: string | null;
+  salesPersonId?: string | null;
 }): Promise<{ quotationId: string }> {
   const supabase = await createClient();
   const {
@@ -160,6 +179,7 @@ export async function createCostingQuotation(input: {
       cost: input.cost,
       google_drive_link: input.googleDriveLink,
       notes: input.notes ?? null,
+      sales_person_id: input.salesPersonId ?? null,
       prepared_by: user.id,
       status: "draft",
       phase: "costing",
@@ -185,6 +205,7 @@ export async function updateCostingQuotation(input: {
   cost: number;
   googleDriveLink: string;
   notes?: string | null;
+  salesPersonId?: string | null;
 }): Promise<void> {
   const supabase = await createClient();
   const {
@@ -235,6 +256,7 @@ export async function updateCostingQuotation(input: {
     cost: input.cost,
     google_drive_link: input.googleDriveLink,
     notes: input.notes ?? null,
+    sales_person_id: input.salesPersonId ?? null,
     costing_rejection_reason: null,
   };
 
@@ -313,7 +335,7 @@ export async function submitCostingForApproval(quotationId: string): Promise<voi
 
   const { data: row, error: rowError } = await supabase
     .from("quotations")
-    .select("id, status, phase, prepared_by, google_drive_link, cost")
+    .select("id, status, phase, prepared_by, google_drive_link, cost, sales_person_id")
     .eq("id", quotationId)
     .single();
 
@@ -344,6 +366,12 @@ export async function submitCostingForApproval(quotationId: string): Promise<voi
   if (!row.google_drive_link) {
     throw new Error(
       "A Google Drive link is required before submitting for costing approval.",
+    );
+  }
+
+  if (!row.sales_person_id) {
+    throw new Error(
+      "A sales person must be assigned before submitting for costing approval.",
     );
   }
 

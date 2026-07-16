@@ -3,14 +3,17 @@
 import {
   addPoPayment,
   approvePoApproval,
+  deletePoPayment,
   fetchPurchaseOrders,
   findPendingPoApprovalForRole,
   parsePoAmount,
   rejectPoApproval,
   resubmitPurchaseOrderForApproval,
+  updatePoPayment,
+  updatePurchaseOrderDetails,
   type SalesPurchaseOrder,
 } from "@/lib/sales/purchase-orders";
-import { createClient } from "@/lib/supabase/server";
+import { parseLeadTimeDays, parsePercentInput } from "@/lib/sales/quotations";
 import { revalidatePath } from "next/cache";
 
 type ActionResponse<T> = {
@@ -20,6 +23,11 @@ type ActionResponse<T> = {
 };
 
 type RequiredApproverRole = "sales_manager" | "owner" | "executive";
+
+function asOptionalString(value: string | null | undefined): string | null {
+  const normalized = String(value ?? "").trim();
+  return normalized ? normalized : null;
+}
 
 function normalizeRole(role: string | undefined): RequiredApproverRole | null {
   const normalized = String(role ?? "")
@@ -66,6 +74,72 @@ export async function recordCollectionAction(
     return {
       success: false,
       error: error instanceof Error ? error.message : "Failed to record collection.",
+    };
+  }
+}
+
+export async function updateCollectionAction(
+  paymentId: string,
+  purchaseOrderId: string,
+  amount: number,
+): Promise<ActionResponse<{ poId: string }>> {
+  const normalizedPaymentId = String(paymentId ?? "").trim();
+  const normalizedPoId = String(purchaseOrderId ?? "").trim();
+
+  if (!normalizedPaymentId) {
+    return { success: false, error: "Collection id is required." };
+  }
+  if (!normalizedPoId) {
+    return { success: false, error: "Purchase order id is required." };
+  }
+
+  try {
+    const normalizedAmount = parsePoAmount(amount);
+
+    await updatePoPayment({
+      paymentId: normalizedPaymentId,
+      purchaseOrderId: normalizedPoId,
+      amountCollected: normalizedAmount,
+    });
+
+    revalidatePath("/protected/sales/purchase-orders");
+
+    return { success: true, data: { poId: normalizedPoId } };
+  } catch (error) {
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Failed to update collection.",
+    };
+  }
+}
+
+export async function deleteCollectionAction(
+  paymentId: string,
+  purchaseOrderId: string,
+): Promise<ActionResponse<{ poId: string }>> {
+  const normalizedPaymentId = String(paymentId ?? "").trim();
+  const normalizedPoId = String(purchaseOrderId ?? "").trim();
+
+  if (!normalizedPaymentId) {
+    return { success: false, error: "Collection id is required." };
+  }
+  if (!normalizedPoId) {
+    return { success: false, error: "Purchase order id is required." };
+  }
+
+  try {
+    await deletePoPayment({
+      paymentId: normalizedPaymentId,
+      purchaseOrderId: normalizedPoId,
+    });
+
+    revalidatePath("/protected/sales/purchase-orders");
+
+    return { success: true, data: { poId: normalizedPoId } };
+  } catch (error) {
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Failed to delete collection.",
     };
   }
 }
@@ -168,26 +242,63 @@ export async function resubmitPurchaseOrderAction(
   }
 }
 
-export async function updatePurchaseOrderReferencesAction(
+export type PurchaseOrderDetailsInput = {
+  marginPercentage: string;
+  bankPercentage: string;
+  sopPercentage: string;
+  paymentTerms: string;
+  paymentTermsCustom: string;
+  leadTimeDays: string;
+  clientPoNumber: string;
+  quotationReference: string;
+};
+
+/**
+ * Re-prices a rejected PO (margin/bank/sop %, lead time, payment terms) and
+ * updates its references. Only permitted while the PO is `rejected`.
+ */
+export async function updatePurchaseOrderDetailsAction(
   poId: string,
-  clientPoNumber: string | null,
-  quotationReference: string | null,
+  input: PurchaseOrderDetailsInput,
 ): Promise<ActionResponse<{ poId: string }>> {
   const normalizedId = String(poId ?? "").trim();
   if (!normalizedId) {
     return { success: false, error: "Purchase order id is required." };
   }
-  try {
-    const supabase = await createClient();
-    const { error } = await supabase
-      .from("purchase_orders")
-      .update({
-        client_po_number: clientPoNumber ? clientPoNumber.toUpperCase() : null,
-        quotation_reference: quotationReference ? quotationReference.toUpperCase() : null,
-      })
-      .eq("id", normalizedId);
 
-    if (error) throw new Error(error.message);
+  try {
+    const rawMargin = String(input.marginPercentage ?? "").trim();
+    const marginPercentage =
+      rawMargin === "" ? null : parsePercentInput(rawMargin, "Margin percentage");
+
+    const rawBank = String(input.bankPercentage ?? "").trim();
+    const bankPercentage =
+      rawBank === "" ? null : parsePercentInput(rawBank, "Bank percentage");
+
+    const rawSop = String(input.sopPercentage ?? "").trim();
+    const sopPercentage =
+      rawSop === "" ? null : parsePercentInput(rawSop, "SOP percentage");
+
+    const rawLeadTime = String(input.leadTimeDays ?? "").trim();
+    const leadTimeDays = rawLeadTime === "" ? null : parseLeadTimeDays(rawLeadTime);
+
+    const paymentTerms = asOptionalString(input.paymentTerms);
+    const paymentTermsCustom =
+      paymentTerms === "Other"
+        ? (asOptionalString(input.paymentTermsCustom)?.toUpperCase() ?? null)
+        : null;
+
+    await updatePurchaseOrderDetails({
+      purchaseOrderId: normalizedId,
+      marginPercentage,
+      bankPercentage,
+      sopPercentage,
+      paymentTerms,
+      paymentTermsCustom,
+      leadTimeDays,
+      clientPoNumber: asOptionalString(input.clientPoNumber),
+      quotationReference: asOptionalString(input.quotationReference),
+    });
 
     revalidatePath("/protected/sales/purchase-orders");
     return { success: true, data: { poId: normalizedId } };
@@ -197,7 +308,7 @@ export async function updatePurchaseOrderReferencesAction(
       error:
         error instanceof Error
           ? error.message
-          : "Failed to update purchase order references.",
+          : "Failed to update purchase order details.",
     };
   }
 }

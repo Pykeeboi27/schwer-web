@@ -40,8 +40,10 @@ function toSector(value: unknown): SectorPerformanceSlice["sector"] | null {
 }
 
 /**
- * Aggregates approved sales quotations (booked revenue) for the two dashboard
- * charts: total value by client sector, and value/count per client.
+ * Aggregates booked-revenue sales quotations (status `approved` or `closed` —
+ * `closed` is an approved quotation already converted to a purchase order) for
+ * the two dashboard charts: total value by client sector, and value/count per
+ * client.
  */
 export async function getSalesDashboardCharts(): Promise<SalesDashboardCharts> {
   const supabase = await createClient();
@@ -49,7 +51,7 @@ export async function getSalesDashboardCharts(): Promise<SalesDashboardCharts> {
     .from("quotations")
     .select("amount, client_id, clients:client_id(company_name, sector)")
     .eq("phase", "sales")
-    .eq("status", "approved");
+    .in("status", ["approved", "closed"]);
 
   if (error) {
     throw new Error(error.message || "Failed to load sales dashboard charts.");

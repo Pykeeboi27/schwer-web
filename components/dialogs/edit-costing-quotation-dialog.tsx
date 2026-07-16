@@ -6,11 +6,17 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { NumberInput } from "@/components/ui/number-input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Callout, fieldClassName, textareaClassName } from "@/components/patterns";
+import { Callout, textareaClassName } from "@/components/patterns";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import type { CostingQuotation } from "@/lib/engineering/costing-quotations";
 import { suggestQuotationNumber } from "@/lib/engineering/suggest-quotation-number";
 import { useToast } from "@/lib/utils/toast-notification";
-import { cn } from "@/lib/utils";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 
@@ -20,10 +26,16 @@ type ClientOption = {
   isActive: boolean;
 };
 
+type SalesPersonOption = {
+  id: string;
+  name: string;
+};
+
 type EditCostingQuotationDialogProps = {
   open: boolean;
   quotation: CostingQuotation | null;
   clients: ClientOption[];
+  salesPeople: SalesPersonOption[];
   onOpenChange: (open: boolean) => void;
 };
 
@@ -48,6 +60,7 @@ export function EditCostingQuotationDialog({
   open,
   quotation,
   clients,
+  salesPeople,
   onOpenChange,
 }: EditCostingQuotationDialogProps) {
   const router = useRouter();
@@ -182,24 +195,48 @@ export function EditCostingQuotationDialog({
 
           <div className="md:col-span-2">
             <Label htmlFor="edit-costing-client">Client</Label>
-            <select
-              id="edit-costing-client"
-              name="clientId"
-              required
-              defaultValue={quotation.clientId}
-              aria-invalid={Boolean(fieldErrors.clientId)}
-              className={cn(fieldClassName, "mt-1 h-9 py-1")}
-            >
-              <option value="">Select client</option>
-              {activeClients.map((client) => (
-                <option key={client.id} value={client.id}>
-                  {client.companyName}
-                </option>
-              ))}
-            </select>
+            <Select name="clientId" required defaultValue={quotation.clientId}>
+              <SelectTrigger
+                id="edit-costing-client"
+                className="mt-1"
+                aria-invalid={Boolean(fieldErrors.clientId)}
+              >
+                <SelectValue placeholder="Select client" />
+              </SelectTrigger>
+              <SelectContent>
+                {activeClients.map((client) => (
+                  <SelectItem key={client.id} value={client.id}>
+                    {client.companyName}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
             {fieldErrors.clientId ? (
               <p className="mt-1 text-xs text-destructive">{fieldErrors.clientId}</p>
             ) : null}
+          </div>
+
+          <div className="md:col-span-2">
+            <Label htmlFor="edit-costing-sales-person">Sales Person</Label>
+            <Select
+              name="salesPersonId"
+              defaultValue={quotation.salesPersonId ?? undefined}
+            >
+              <SelectTrigger id="edit-costing-sales-person" className="mt-1">
+                <SelectValue placeholder="Select sales person" />
+              </SelectTrigger>
+              <SelectContent>
+                {salesPeople.map((person) => (
+                  <SelectItem key={person.id} value={person.id}>
+                    {person.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <p className="mt-1 text-xs text-muted-foreground">
+              Can be left blank in a draft, but is required before submitting for
+              approval.
+            </p>
           </div>
 
           <div className="md:col-span-2">

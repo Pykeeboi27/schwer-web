@@ -20,16 +20,18 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { Callout, StatusBadge, textareaClassName } from "@/components/patterns";
 import {
-  Callout,
-  fieldClassName,
-  StatusBadge,
-  textareaClassName,
-} from "@/components/patterns";
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { computeSalesPricing, computeVatBreakdown } from "@/lib/sales/pricing";
 import type { SalesQuotation } from "@/lib/sales/quotations";
-import { formatCurrency } from "@/lib/utils/number-format";
 import { cn } from "@/lib/utils";
+import { formatCurrency } from "@/lib/utils/number-format";
 import { useToast } from "@/lib/utils/toast-notification";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
@@ -127,7 +129,10 @@ export function QuotationDetailsDialog({
     [currentUserRole],
   );
 
-  void currentUserId;
+  // Only the sales person a quotation is assigned to may edit it; everyone else
+  // in the department sees the same details read-only (approvers are exempt —
+  // see canApproveReject below, which is role-based, not ownership-based).
+  const isOwner = Boolean(quotation && quotation.salesPersonId === currentUserId);
 
   const isDraft = quotation?.status === "draft";
   const isRejected = quotation?.status === "rejected";
@@ -138,8 +143,8 @@ export function QuotationDetailsDialog({
   // Approved + client provided their PO + not yet converted -> re-open for editing.
   const isReopenedForPo = isApproved && isClientConfirmed && !isConverted;
   // Approved but client PO not yet recorded -> offer the "client confirmed" step.
-  const canEnterClientPo = isApproved && !isClientConfirmed && !isConverted;
-  const isEditable = isDraft || isReopenedForPo;
+  const canEnterClientPo = isApproved && !isClientConfirmed && !isConverted && isOwner;
+  const isEditable = (isDraft || isRejected || isReopenedForPo) && isOwner;
 
   const canApproveReject =
     quotation?.status === "pending" &&
@@ -166,7 +171,7 @@ export function QuotationDetailsDialog({
       setIsSubmitting(false);
       return;
     }
-    success("Quotation returned to draft. You can now edit and resubmit for approval.");
+    success("Quotation resubmitted for approval.");
     handleClose();
     router.refresh();
     setIsSubmitting(false);
@@ -401,15 +406,34 @@ export function QuotationDetailsDialog({
         if (!next) handleClose();
       }}
     >
-      <DialogContent className="max-h-[90vh] max-w-2xl overflow-y-auto">
+      <DialogContent
+        className={cn(
+          "max-h-[90vh] max-w-2xl overflow-y-auto",
+          "data-[state=open]:slide-in-from-left-1/2 data-[state=open]:slide-in-from-top-[48%]",
+          "data-[state=closed]:slide-out-to-left-1/2 data-[state=closed]:slide-out-to-top-[48%]",
+        )}
+      >
         <DialogHeader>
           <DialogTitle>Quotation Details</DialogTitle>
           <DialogDescription>
-            {isDraft
-              ? "Add the sales details, then submit for approval."
-              : "Review details and process approval actions."}
+            {!isOwner && !canApproveReject
+              ? "This quotation belongs to another sales person and is read-only."
+              : isDraft
+                ? "Add the sales details, then submit for approval."
+                : isRejected
+                  ? "This quotation was rejected. Update the sales details, then resubmit for approval."
+                  : "Review details and process approval actions."}
           </DialogDescription>
         </DialogHeader>
+
+        {isRejected && quotation.rejectionReason ? (
+          <Callout
+            tone="destructive"
+            title={`Rejected by ${quotation.rejectedByName ?? "Unknown"}`}
+          >
+            <p className="text-foreground">{quotation.rejectionReason}</p>
+          </Callout>
+        ) : null}
 
         <dl className="grid gap-3 text-sm">
           <div className="grid grid-cols-[160px_1fr] gap-2">
@@ -419,6 +443,10 @@ export function QuotationDetailsDialog({
           <div className="grid grid-cols-[160px_1fr] gap-2">
             <dt className="text-muted-foreground">Client</dt>
             <dd>{quotation.clientName}</dd>
+          </div>
+          <div className="grid grid-cols-[160px_1fr] gap-2">
+            <dt className="text-muted-foreground">Authored By</dt>
+            <dd>{quotation.salesPersonName ?? "Unassigned"}</dd>
           </div>
           <div className="grid grid-cols-[160px_1fr] gap-2">
             <dt className="text-muted-foreground">Subject</dt>
@@ -462,7 +490,9 @@ export function QuotationDetailsDialog({
               <p className="text-xs text-muted-foreground">
                 {isReopenedForPo
                   ? "Re-opened after the client provided their PO. Adjust the pricing, then convert to a purchase order."
-                  : "Amounts are computed automatically from the direct cost. Margin, payment terms, and lead time are required before submitting for approval."}
+                  : isRejected
+                    ? "Rejected. Adjust the pricing, then resubmit for approval."
+                    : "Amounts are computed automatically from the direct cost. Margin, payment terms, and lead time are required before submitting for approval."}
               </p>
             </div>
 
@@ -588,19 +618,21 @@ export function QuotationDetailsDialog({
               </div>
               <div>
                 <Label htmlFor="sales-payment-terms">Payment Terms</Label>
-                <select
-                  id="sales-payment-terms"
-                  value={paymentTermsSelect}
-                  onChange={(event) => setPaymentTermsSelect(event.target.value)}
-                  className={cn(fieldClassName, "mt-1 h-9 py-1")}
+                <Select
+                  value={paymentTermsSelect || undefined}
+                  onValueChange={(value) => setPaymentTermsSelect(value)}
                 >
-                  <option value="">Select payment terms</option>
-                  {PAYMENT_TERMS_OPTIONS.map((option) => (
-                    <option key={option} value={option}>
-                      {option}
-                    </option>
-                  ))}
-                </select>
+                  <SelectTrigger id="sales-payment-terms" className="mt-1">
+                    <SelectValue placeholder="Select payment terms" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {PAYMENT_TERMS_OPTIONS.map((option) => (
+                      <SelectItem key={option} value={option}>
+                        {option}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
             </div>
 
@@ -833,7 +865,7 @@ export function QuotationDetailsDialog({
         ) : null}
 
         <div className="mt-5 flex flex-wrap justify-end gap-2">
-          {isDraft ? (
+          {isDraft && isOwner ? (
             <>
               <Button
                 variant="outline"
@@ -857,7 +889,7 @@ export function QuotationDetailsDialog({
             </Button>
           ) : null}
 
-          {isReopenedForPo ? (
+          {isReopenedForPo && isOwner ? (
             <>
               <Button
                 variant="outline"
@@ -886,10 +918,22 @@ export function QuotationDetailsDialog({
             </>
           ) : null}
 
-          {isRejected ? (
-            <Button onClick={handleResubmit} disabled={isSubmitting}>
-              {isSubmitting ? "Resubmitting..." : "Resubmit for Approval"}
-            </Button>
+          {isRejected && isOwner ? (
+            <>
+              <Button
+                variant="outline"
+                onClick={handleSaveSalesDetails}
+                disabled={isSubmitting}
+              >
+                {isSubmitting ? "Saving..." : "Save Changes"}
+              </Button>
+              <Button
+                onClick={handleResubmit}
+                disabled={isSubmitting || !salesDetailsComplete}
+              >
+                {isSubmitting ? "Resubmitting..." : "Resubmit for Approval"}
+              </Button>
+            </>
           ) : null}
 
           {isClosed ? (

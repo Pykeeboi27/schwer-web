@@ -82,6 +82,7 @@ describe("listSalesQuotations", () => {
     notes: null,
     status: "pending",
     prepared_by: "u1",
+    sales_person_id: "u1",
     created_at: "2026-01-01",
     costing_approved_at: null,
     sales_margin_percent: "10",
@@ -111,6 +112,7 @@ describe("listSalesQuotations", () => {
           data: [
             {
               ...baseRow,
+              preparer: { full_name: "Jane Author", email: "jane@example.com" },
               quotation_approvals: [
                 { approver_role: "sales_manager", status: "pending" },
                 { approver_role: "sales_manager", status: "pending" },
@@ -135,6 +137,24 @@ describe("listSalesQuotations", () => {
     expect(quotation.leadTimeDays).toBe(14);
     expect(quotation.pendingApprovalRoles).toEqual(["sales_manager"]);
     expect(quotation.convertedPoStatus).toBeNull();
+    expect(quotation.preparedByName).toBe("Jane Author");
+  });
+
+  it("falls back to the email username when the preparer has no full name", async () => {
+    mockClient = createSupabaseMock({
+      tables: {
+        quotations: {
+          data: [
+            { ...baseRow, preparer: { full_name: null, email: "jane@example.com" } },
+          ],
+          error: null,
+        },
+      },
+    });
+
+    const [quotation] = await listSalesQuotations();
+
+    expect(quotation.preparedByName).toBe("jane");
   });
 
   it("reads converted PO status from an array relation and falls back on unknown clients", async () => {
@@ -157,6 +177,7 @@ describe("listSalesQuotations", () => {
 
     expect(quotation.clientName).toBe("Unknown client");
     expect(quotation.convertedPoStatus).toBe("approved");
+    expect(quotation.preparedByName).toBe("Unknown");
   });
 
   it("throws when the query fails", async () => {
@@ -165,6 +186,53 @@ describe("listSalesQuotations", () => {
     });
 
     await expect(listSalesQuotations()).rejects.toThrow("db down");
+  });
+
+  it("surfaces the most recent rejection's reason and rejector name", async () => {
+    mockClient = createSupabaseMock({
+      tables: {
+        quotations: {
+          data: [
+            {
+              ...baseRow,
+              quotation_approvals: [
+                {
+                  approver_role: "sales_manager",
+                  status: "rejected",
+                  rejection_reason: "Margin too low",
+                  updated_at: "2026-01-01T00:00:00.000Z",
+                  approver: { full_name: "Mark Manager", email: "mark@example.com" },
+                },
+                {
+                  approver_role: "owner",
+                  status: "rejected",
+                  rejection_reason: "Stale reason",
+                  updated_at: "2025-12-01T00:00:00.000Z",
+                  approver: { full_name: "Old Owner", email: "old@example.com" },
+                },
+              ],
+            },
+          ],
+          error: null,
+        },
+      },
+    });
+
+    const [quotation] = await listSalesQuotations();
+
+    expect(quotation.rejectionReason).toBe("Margin too low");
+    expect(quotation.rejectedByName).toBe("Mark Manager");
+  });
+
+  it("has no rejection info when nothing was rejected", async () => {
+    mockClient = createSupabaseMock({
+      tables: { quotations: { data: [{ ...baseRow }], error: null } },
+    });
+
+    const [quotation] = await listSalesQuotations();
+
+    expect(quotation.rejectionReason).toBeNull();
+    expect(quotation.rejectedByName).toBeNull();
   });
 });
 
@@ -190,6 +258,14 @@ describe("listPendingApprovalsForCurrentUser", () => {
                 quotation_number: "Q-1",
                 subject: "Roof upgrade",
                 amount: "1500000",
+                cost: "900000",
+                margin_amount: "150000",
+                sector: "residential",
+                google_drive_link: "https://drive.example/q1",
+                notes: "Rush order",
+                created_at: "2026-01-05T00:00:00.000Z",
+                clients: { company_name: "Acme Corp" },
+                preparer: { full_name: "Jane Author", email: "jane@example.com" },
               },
             },
           ],
@@ -208,6 +284,14 @@ describe("listPendingApprovalsForCurrentUser", () => {
       amount: 1500000,
       approverRole: "owner",
       status: "pending",
+      clientName: "Acme Corp",
+      cost: 900000,
+      marginAmount: 150000,
+      sector: "residential",
+      googleDriveLink: "https://drive.example/q1",
+      notes: "Rush order",
+      createdAt: "2026-01-05T00:00:00.000Z",
+      preparedByName: "Jane Author",
     });
   });
 });

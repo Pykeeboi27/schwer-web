@@ -43,7 +43,16 @@
       "mcp__ide__getDiagnostics",
       "Bash(npm install *)",
       "Bash(py *)",
-      "PowerShell(Out-Null *)"
+      "PowerShell(Out-Null *)",
+      "Skill(artifact-design)",
+      "Artifact",
+      "PowerShell(npm run *)",
+      "PowerShell(Rename-Item *)",
+      "PowerShell(git stash *)",
+      "PowerShell(Get-Content .env | ForEach-Object { ($_ -split '=')[0] })",
+      "PowerShell(git *)",
+      "PowerShell(Get-Process *)",
+      "PowerShell(Get-NetTCPConnection *)"
     ]
   },
   "enableAllProjectMcpServers": true,

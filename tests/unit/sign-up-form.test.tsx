@@ -28,7 +28,7 @@ describe("SignUpForm", () => {
 
     expect(screen.getByRole("option", { name: "hr" })).toBeInTheDocument();
     expect(screen.getByRole("option", { name: "engineering" })).toBeInTheDocument();
-    expect(screen.getByRole("option", { name: "executive" })).toBeInTheDocument();
+    expect(screen.queryByRole("option", { name: "executive" })).not.toBeInTheDocument();
   });
 
   it("toggles password and repeat password visibility", () => {

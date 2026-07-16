@@ -48,17 +48,19 @@ export function ForgotPasswordForm({
       {success ? (
         <Card className="border-none bg-transparent shadow-none">
           <CardHeader className="px-0">
-            <CardTitle className="text-2xl font-semibold tracking-tight">
+            <CardTitle className="text-3xl font-semibold tracking-tight">
               Check your email
             </CardTitle>
-            <CardDescription>Password reset instructions sent</CardDescription>
+            <CardDescription className="text-base">
+              Password reset instructions sent
+            </CardDescription>
           </CardHeader>
           <CardContent className="px-0">
-            <p className="text-sm text-muted-foreground">
+            <p className="text-base text-muted-foreground">
               If you registered using your email and password, you will receive a password
               reset email shortly.
             </p>
-            <div className="mt-5 text-center text-sm text-muted-foreground">
+            <div className="mt-5 text-center text-base text-muted-foreground">
               <Link
                 href="/auth/login"
                 className="font-medium text-foreground underline-offset-4 hover:underline"
@@ -71,10 +73,10 @@ export function ForgotPasswordForm({
       ) : (
         <Card className="border-none bg-transparent shadow-none">
           <CardHeader className="px-0">
-            <CardTitle className="text-2xl font-semibold tracking-tight">
+            <CardTitle className="text-3xl font-semibold tracking-tight">
               Reset password
             </CardTitle>
-            <CardDescription>
+            <CardDescription className="text-base">
               Enter your email and we&apos;ll send you a reset link
             </CardDescription>
           </CardHeader>
@@ -82,7 +84,9 @@ export function ForgotPasswordForm({
             <form onSubmit={handleForgotPassword}>
               <div className="flex flex-col gap-5">
                 <div className="grid gap-1.5">
-                  <Label htmlFor="email">Email</Label>
+                  <Label htmlFor="email" className="text-base">
+                    Email
+                  </Label>
                   <Input
                     id="email"
                     type="email"
@@ -90,6 +94,7 @@ export function ForgotPasswordForm({
                     required
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
+                    className="md:text-base"
                   />
                 </div>
 
@@ -99,12 +104,12 @@ export function ForgotPasswordForm({
                   </div>
                 )}
 
-                <Button type="submit" className="w-full" disabled={isLoading}>
+                <Button type="submit" className="w-full text-base" disabled={isLoading}>
                   {isLoading ? "Sending…" : "Send reset email"}
                 </Button>
               </div>
 
-              <div className="mt-5 text-center text-sm text-muted-foreground">
+              <div className="mt-5 text-center text-base text-muted-foreground">
                 Remembered it?{" "}
                 <Link
                   href="/auth/login"

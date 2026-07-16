@@ -51,16 +51,51 @@ export default async function SalesDashboardPage() {
       </div>
 
       <Panel title={<BeamTick>Quotations by Status</BeamTick>}>
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="grid gap-3 sm:grid-cols-3 lg:grid-cols-5">
           {[
-            { label: "Draft", value: summary.quotations.draft },
-            { label: "Pending", value: summary.quotations.pending },
-            { label: "Approved", value: summary.quotations.approved },
-            { label: "Rejected", value: summary.quotations.rejected },
+            {
+              label: "Draft",
+              value: summary.quotations.draft,
+              className:
+                "border-slate-200 bg-slate-50 dark:border-slate-700 dark:bg-slate-900/40",
+              valueClassName: "text-slate-600 dark:text-slate-300",
+            },
+            {
+              label: "Pending",
+              value: summary.quotations.pending,
+              className:
+                "border-amber-200 bg-amber-50 dark:border-amber-900 dark:bg-amber-950/40",
+              valueClassName: "text-amber-700 dark:text-amber-300",
+            },
+            {
+              label: "Approved",
+              value: summary.quotations.approved,
+              className:
+                "border-green-200 bg-green-50 dark:border-green-900 dark:bg-green-950/40",
+              valueClassName: "text-green-700 dark:text-green-300",
+            },
+            {
+              label: "Closed",
+              value: summary.quotations.closed,
+              className:
+                "border-blue-200 bg-blue-50 dark:border-blue-900 dark:bg-blue-950/40",
+              valueClassName: "text-blue-700 dark:text-blue-300",
+            },
+            {
+              label: "Rejected",
+              value: summary.quotations.rejected,
+              className:
+                "border-red-200 bg-red-50 dark:border-red-900 dark:bg-red-950/40",
+              valueClassName: "text-red-700 dark:text-red-300",
+            },
           ].map((item) => (
-            <div key={item.label} className="rounded-md border bg-muted/30 p-3">
+            <div key={item.label} className={`rounded-md border p-3 ${item.className}`}>
               <p className="text-sm text-muted-foreground">{item.label}</p>
-              <p className="mt-1 text-xl font-semibold tabular-nums">{item.value}</p>
+              <p
+                className={`mt-1 text-xl font-semibold tabular-nums ${item.valueClassName}`}
+              >
+                {item.value}
+              </p>
             </div>
           ))}
         </div>
@@ -78,7 +113,11 @@ export default async function SalesDashboardPage() {
           title="Client Quotation Distribution"
           description="Approved quotation value per client, highest first."
         >
-          <ClientDistributionChart bars={charts.clientDistribution} />
+          <ClientDistributionChart
+            bars={charts.clientDistribution}
+            limit={charts.clientDistribution.length}
+            scrollable
+          />
         </Panel>
       </div>
     </div>

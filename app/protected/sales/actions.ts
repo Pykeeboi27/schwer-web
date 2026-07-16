@@ -5,10 +5,12 @@ import {
   buildPaymentTermsNotes,
   createSalesClient,
   inactivateSalesClient,
+  listClientContacts,
   parseOptionalDownpaymentPercent,
   parsePaymentNetDays,
   parseSector,
   setClientPrimaryContact,
+  type SalesClientContact,
   updateSalesClient,
 } from "@/lib/sales/clients";
 import {
@@ -17,6 +19,7 @@ import {
   submitQuotationForApproval,
 } from "@/lib/sales/quotations";
 import { addPoPayment, parsePoAmount } from "@/lib/sales/purchase-orders";
+import { validatePhone } from "@/lib/utils/form-validation";
 
 export type SalesActionResult = {
   ok: boolean;
@@ -107,6 +110,27 @@ export async function inactivateClientAction(
   }
 }
 
+export type FetchClientContactsResult = {
+  ok: boolean;
+  error: string | null;
+  data: SalesClientContact[];
+};
+
+export async function fetchClientContactsAction(
+  clientId: string,
+): Promise<FetchClientContactsResult> {
+  try {
+    const contacts = await listClientContacts(clientId);
+    return { ok: true, error: null, data: contacts };
+  } catch (error) {
+    return {
+      ok: false,
+      error: error instanceof Error ? error.message : "Failed to load contacts.",
+      data: [],
+    };
+  }
+}
+
 export async function addClientContactAction(
   formData: FormData,
 ): Promise<SalesActionResult> {
@@ -118,6 +142,15 @@ export async function addClientContactAction(
     const mobile = String(formData.get("mobile") ?? "").trim() || null;
     const position = String(formData.get("position") ?? "").trim() || null;
     const isPrimary = String(formData.get("isPrimary") ?? "") === "on";
+
+    const phoneError = validatePhone(phone);
+    if (phoneError) {
+      throw new Error(phoneError);
+    }
+    const mobileError = validatePhone(mobile);
+    if (mobileError) {
+      throw new Error(mobileError);
+    }
 
     await addClientContact({
       clientId,

@@ -16,6 +16,7 @@ import {
   markClientPoReceived,
   rejectPoApproval,
   resubmitPurchaseOrderForApproval,
+  updatePurchaseOrderDetails,
 } from "@/lib/sales/purchase-orders";
 
 const ok = { data: null, error: null };
@@ -333,7 +334,7 @@ describe("approvePoApproval", () => {
 });
 
 describe("rejectPoApproval", () => {
-  it("rejects the approval and returns the PO to draft", async () => {
+  it("rejects the approval and returns the PO to rejected", async () => {
     mockClient = createSupabaseMock({
       tables: { po_approvals: ok, purchase_orders: ok },
     });
@@ -356,7 +357,7 @@ describe("resubmitPurchaseOrderForApproval", () => {
     await expect(resubmitPurchaseOrderForApproval("p1")).rejects.toThrow(/was not found/);
   });
 
-  it("only resubmits draft purchase orders", async () => {
+  it("only resubmits rejected purchase orders", async () => {
     mockClient = createSupabaseMock({
       tables: {
         purchase_orders: {
@@ -366,16 +367,16 @@ describe("resubmitPurchaseOrderForApproval", () => {
       },
     });
     await expect(resubmitPurchaseOrderForApproval("p1")).rejects.toThrow(
-      /Only draft purchase orders/,
+      /Only rejected purchase orders/,
     );
   });
 
-  it("resubmits a draft PO and recreates approval assignments", async () => {
+  it("resubmits a rejected PO and recreates approval assignments", async () => {
     mockClient = createSupabaseMock({
       tables: {
         // 1) select PO, 2) update PO to pending
         purchase_orders: [
-          { data: { id: "p1", status: "draft", po_amount: "1000000" }, error: null },
+          { data: { id: "p1", status: "rejected", po_amount: "1000000" }, error: null },
           ok,
         ],
         // 1) delete old approvals, 2) insert new approvals
@@ -384,6 +385,84 @@ describe("resubmitPurchaseOrderForApproval", () => {
       },
     });
     await expect(resubmitPurchaseOrderForApproval("p1")).resolves.toBeUndefined();
+  });
+});
+
+describe("updatePurchaseOrderDetails", () => {
+  const input = {
+    purchaseOrderId: "p1",
+    marginPercentage: 10,
+    bankPercentage: null,
+    sopPercentage: null,
+    paymentTerms: "30 Days",
+    paymentTermsCustom: null,
+    leadTimeDays: 14,
+    clientPoNumber: "cpo-1",
+    quotationReference: "q-1",
+  };
+
+  it("throws when the purchase order is missing", async () => {
+    mockClient = createSupabaseMock({ tables: { purchase_orders: fail } });
+    await expect(updatePurchaseOrderDetails(input)).rejects.toThrow(/was not found/);
+  });
+
+  it("only allows editing a rejected purchase order", async () => {
+    mockClient = createSupabaseMock({
+      tables: {
+        purchase_orders: {
+          data: { id: "p1", status: "pending", cost: "700000" },
+          error: null,
+        },
+      },
+    });
+    await expect(updatePurchaseOrderDetails(input)).rejects.toThrow(
+      /Only rejected purchase orders/,
+    );
+  });
+
+  it("recomputes pricing from the direct cost and saves it, uppercasing references", async () => {
+    let updatePayload: Record<string, unknown> | undefined;
+    mockClient = createSupabaseMock({
+      tables: {
+        purchase_orders: [
+          { data: { id: "p1", status: "rejected", cost: "700000" }, error: null },
+          ok,
+        ],
+      },
+    });
+    const originalUpdate = mockClient.from;
+    mockClient.from = vi.fn((table: string) => {
+      const builder = originalUpdate(table);
+      const originalUpdateFn = builder.update;
+      builder.update = vi.fn((payload: Record<string, unknown>) => {
+        updatePayload = payload;
+        return originalUpdateFn(payload);
+      });
+      return builder;
+    });
+
+    await expect(updatePurchaseOrderDetails(input)).resolves.toBeUndefined();
+
+    expect(updatePayload).toMatchObject({
+      margin_percentage: 10,
+      margin_amount: 70000,
+      selling_amount: 770000,
+      po_amount: 770000,
+      client_po_number: "CPO-1",
+      quotation_reference: "Q-1",
+    });
+  });
+
+  it("throws when the update fails", async () => {
+    mockClient = createSupabaseMock({
+      tables: {
+        purchase_orders: [
+          { data: { id: "p1", status: "rejected", cost: "700000" }, error: null },
+          fail,
+        ],
+      },
+    });
+    await expect(updatePurchaseOrderDetails(input)).rejects.toThrow("boom");
   });
 });
 
@@ -400,7 +479,12 @@ describe("addPoPayment", () => {
       user,
       tables: {
         purchase_orders: {
-          data: { id: "p1", status: "pending", po_amount: "1000000" },
+          data: {
+            id: "p1",
+            status: "pending",
+            po_amount: "1000000",
+            created_by: user.id,
+          },
           error: null,
         },
       },
@@ -420,6 +504,7 @@ describe("addPoPayment", () => {
             status: "approved",
             po_amount: "100000",
             recognized_amount: "0",
+            created_by: user.id,
           },
           error: null,
         },
@@ -443,6 +528,7 @@ describe("addPoPayment", () => {
               status: "approved",
               po_amount: "1000000",
               recognized_amount: "300000",
+              created_by: user.id,
             },
             error: null,
           },

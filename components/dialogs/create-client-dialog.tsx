@@ -12,12 +12,20 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import { fieldClassName } from "@/components/patterns";
-import { generateClientCode } from "@/lib/utils/client-code-generator";
-import { useToast } from "@/lib/utils/toast-notification";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { DriveUploadField } from "@/components/dialogs/drive-upload-field";
 import { cn } from "@/lib/utils";
+import { generateClientCode } from "@/lib/utils/client-code-generator";
+import { sanitizePhoneInput } from "@/lib/utils/form-validation";
+import { useToast } from "@/lib/utils/toast-notification";
 import { useRouter } from "next/navigation";
-import { useRef, useState } from "react";
+import { useState } from "react";
 
 type CreateClientDialogProps = {
   onCreated?: () => void;
@@ -48,11 +56,8 @@ export function CreateClientDialog({
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [tin, setTin] = useState("");
   const [nameDupError, setNameDupError] = useState<string | null>(null);
-  const [birUploading, setBirUploading] = useState(false);
-  const [birUploadedName, setBirUploadedName] = useState<string | null>(null);
-  const [birNotConfigured, setBirNotConfigured] = useState(false);
-  const [birLinkFallback, setBirLinkFallback] = useState("");
-  const birLinkRef = useRef<HTMLInputElement>(null);
+  const [phone, setPhone] = useState("");
+  const [birRegistrationLink, setBirRegistrationLink] = useState("");
 
   const closeDialog = () => {
     setOpen(false);
@@ -60,10 +65,8 @@ export function CreateClientDialog({
     setFieldErrors({});
     setTin("");
     setNameDupError(null);
-    setBirUploading(false);
-    setBirUploadedName(null);
-    setBirNotConfigured(false);
-    setBirLinkFallback("");
+    setPhone("");
+    setBirRegistrationLink("");
   };
 
   const openDialog = () => {
@@ -80,39 +83,6 @@ export function CreateClientDialog({
     if (!normalized) return;
     const isDup = existingNames.some((n) => n.trim().toLowerCase() === normalized);
     setNameDupError(isDup ? "A client with this name already exists." : null);
-  };
-
-  const handleBirFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    setBirUploading(true);
-    setBirUploadedName(null);
-    setBirNotConfigured(false);
-
-    const fd = new FormData();
-    fd.append("file", file);
-
-    try {
-      const res = await fetch("/api/drive-upload", { method: "POST", body: fd });
-      if (res.status === 503) {
-        setBirNotConfigured(true);
-        setBirUploading(false);
-        return;
-      }
-      if (!res.ok) {
-        error("File upload failed. Please try again.");
-        setBirUploading(false);
-        return;
-      }
-      const data = (await res.json()) as { webViewLink: string };
-      if (birLinkRef.current) birLinkRef.current.value = data.webViewLink;
-      setBirUploadedName(file.name);
-    } catch {
-      error("Upload failed. Check your connection.");
-    } finally {
-      setBirUploading(false);
-    }
   };
 
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
@@ -134,8 +104,9 @@ export function CreateClientDialog({
     const formData = new FormData(event.currentTarget);
     formData.set("code", clientCode);
     formData.set("tin", tin);
-    if (birLinkRef.current?.value) {
-      formData.set("birRegistrationLink", birLinkRef.current.value);
+    formData.set("phone", phone);
+    if (birRegistrationLink) {
+      formData.set("birRegistrationLink", birRegistrationLink);
     }
 
     const response = await createClientAction(formData);
@@ -166,7 +137,13 @@ export function CreateClientDialog({
       <DialogTrigger asChild>
         <Button>Create Client</Button>
       </DialogTrigger>
-      <DialogContent className="max-h-[85vh] max-w-2xl overflow-y-auto">
+      <DialogContent
+        className={cn(
+          "max-h-[85vh] w-[calc(100%-2rem)] max-w-2xl overflow-y-auto",
+          "data-[state=open]:slide-in-from-left-1/2 data-[state=open]:slide-in-from-top-[48%]",
+          "data-[state=closed]:slide-out-to-left-1/2 data-[state=closed]:slide-out-to-top-[48%]",
+        )}
+      >
         <DialogHeader>
           <DialogTitle>Create Client</DialogTitle>
           <DialogDescription>
@@ -174,7 +151,7 @@ export function CreateClientDialog({
           </DialogDescription>
         </DialogHeader>
 
-        <form onSubmit={handleSubmit} className="grid gap-4 md:grid-cols-2">
+        <form onSubmit={handleSubmit} className="grid min-w-0 gap-4 md:grid-cols-2">
           <div className="md:col-span-2">
             <Label htmlFor="code">Client Code</Label>
             <div className="mt-1 flex gap-2">
@@ -203,7 +180,7 @@ export function CreateClientDialog({
             ) : null}
           </div>
 
-          <div>
+          <div className="min-w-0">
             <Label htmlFor="contactPerson">Contact Person</Label>
             <Input
               id="contactPerson"
@@ -217,21 +194,21 @@ export function CreateClientDialog({
             ) : null}
           </div>
 
-          <div>
+          <div className="min-w-0">
             <Label htmlFor="sector">Sector</Label>
-            <select
-              id="sector"
-              name="sector"
-              defaultValue="commercial"
-              className={cn(fieldClassName, "mt-1 h-9 py-1")}
-            >
-              <option value="commercial">Commercial</option>
-              <option value="industrial">Industrial</option>
-              <option value="solar">Solar</option>
-            </select>
+            <Select name="sector" defaultValue="commercial">
+              <SelectTrigger id="sector" className="mt-1">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="commercial">Commercial</SelectItem>
+                <SelectItem value="industrial">Industrial</SelectItem>
+                <SelectItem value="solar">Solar</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
 
-          <div>
+          <div className="min-w-0">
             <Label htmlFor="email">Email</Label>
             <Input
               id="email"
@@ -246,7 +223,7 @@ export function CreateClientDialog({
             ) : null}
           </div>
 
-          <div>
+          <div className="min-w-0">
             <Label htmlFor="phone">Phone</Label>
             <Input
               id="phone"
@@ -254,13 +231,16 @@ export function CreateClientDialog({
               required
               className="mt-1"
               placeholder="0917-555-1234"
+              value={phone}
+              onChange={(e) => setPhone(sanitizePhoneInput(e.target.value))}
+              inputMode="tel"
             />
             {fieldErrors.phone ? (
               <p className="mt-1 text-xs text-destructive">{fieldErrors.phone}</p>
             ) : null}
           </div>
 
-          <div className="md:col-span-2">
+          <div className="min-w-0 md:col-span-2">
             <Label htmlFor="address">Address</Label>
             <Input
               id="address"
@@ -274,7 +254,7 @@ export function CreateClientDialog({
             ) : null}
           </div>
 
-          <div>
+          <div className="min-w-0">
             <Label htmlFor="tin">TIN</Label>
             <Input
               id="tin"
@@ -291,60 +271,14 @@ export function CreateClientDialog({
             ) : null}
           </div>
 
-          <div>
-            <Label htmlFor="birDocument">BIR Registration</Label>
-            {birUploadedName ? (
-              <div className="mt-1 flex items-center gap-2 text-sm">
-                <a
-                  href={birLinkRef.current?.value}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="text-primary underline"
-                >
-                  {birUploadedName}
-                </a>
-                <button
-                  type="button"
-                  className="text-xs text-muted-foreground underline"
-                  onClick={() => {
-                    setBirUploadedName(null);
-                    if (birLinkRef.current) birLinkRef.current.value = "";
-                  }}
-                >
-                  Remove
-                </button>
-              </div>
-            ) : birNotConfigured ? (
-              <>
-                <Input
-                  id="birRegistrationLink"
-                  name="birRegistrationLink"
-                  type="url"
-                  className="mt-1"
-                  placeholder="https://drive.google.com/..."
-                  value={birLinkFallback}
-                  onChange={(e) => setBirLinkFallback(e.target.value)}
-                />
-                <p className="mt-1 text-xs text-muted-foreground">
-                  Drive upload not configured — paste the link manually.
-                </p>
-              </>
-            ) : (
-              <div className="mt-1">
-                <input
-                  id="birDocument"
-                  type="file"
-                  accept="application/pdf,image/*"
-                  className="w-full text-sm"
-                  disabled={birUploading}
-                  onChange={handleBirFileChange}
-                />
-                {birUploading ? (
-                  <p className="mt-1 text-xs text-muted-foreground">Uploading...</p>
-                ) : null}
-              </div>
-            )}
-            <input type="hidden" name="birRegistrationLink" ref={birLinkRef} />
+          <div className="min-w-0">
+            <DriveUploadField
+              id="birDocument"
+              label="BIR Registration"
+              value={birRegistrationLink}
+              onChange={setBirRegistrationLink}
+              onError={error}
+            />
           </div>
 
           {formError ? (

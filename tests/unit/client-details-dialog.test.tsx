@@ -1,8 +1,11 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mockRefresh = vi.fn();
 const mockUpdateClientAction = vi.fn();
+const mockFetchClientContactsAction = vi.fn();
+const mockAddClientContactAction = vi.fn();
+const mockSetPrimaryContactAction = vi.fn();
 
 vi.mock("next/navigation", () => ({
   useRouter: () => ({
@@ -19,8 +22,15 @@ vi.mock("@/app/protected/sales/clients/actions", () => ({
   updateClientAction: (formData: FormData) => mockUpdateClientAction(formData),
 }));
 
+vi.mock("@/app/protected/sales/actions", () => ({
+  fetchClientContactsAction: (clientId: string) =>
+    mockFetchClientContactsAction(clientId),
+  addClientContactAction: (formData: FormData) => mockAddClientContactAction(formData),
+  setPrimaryContactAction: (formData: FormData) => mockSetPrimaryContactAction(formData),
+}));
+
 import { ClientDetailsDialog } from "@/components/dialogs/client-details-dialog";
-import type { SalesClient } from "@/lib/sales/clients";
+import type { SalesClient, SalesClientContact } from "@/lib/sales/clients";
 
 const client: SalesClient = {
   id: "c1",
@@ -51,6 +61,17 @@ const bareClient: SalesClient = {
 };
 
 describe("ClientDetailsDialog", () => {
+  beforeEach(() => {
+    mockFetchClientContactsAction.mockReset();
+    mockAddClientContactAction.mockReset();
+    mockSetPrimaryContactAction.mockReset();
+    mockFetchClientContactsAction.mockResolvedValue({
+      ok: true,
+      error: null,
+      data: [] as SalesClientContact[],
+    });
+  });
+
   it("renders nothing when there is no selected client", () => {
     const { container } = render(
       <ClientDetailsDialog open={true} client={null} onOpenChange={vi.fn()} />,
@@ -152,5 +173,92 @@ describe("ClientDetailsDialog", () => {
     );
 
     expect(screen.getByRole("button", { name: "Save Changes" })).toBeInTheDocument();
+  });
+
+  it("loads and displays existing contacts, flagging the primary one", async () => {
+    const contacts: SalesClientContact[] = [
+      {
+        id: "ct1",
+        clientId: "c1",
+        fullName: "Maria Santos",
+        email: "maria@alpha.com",
+        phone: null,
+        mobile: "0917 000 0000",
+        position: "Purchasing Manager",
+        isPrimary: true,
+      },
+      {
+        id: "ct2",
+        clientId: "c1",
+        fullName: "Jose Reyes",
+        email: null,
+        phone: null,
+        mobile: null,
+        position: null,
+        isPrimary: false,
+      },
+    ];
+    mockFetchClientContactsAction.mockResolvedValue({
+      ok: true,
+      error: null,
+      data: contacts,
+    });
+
+    render(<ClientDetailsDialog open={true} client={client} onOpenChange={vi.fn()} />);
+
+    await waitFor(() => expect(mockFetchClientContactsAction).toHaveBeenCalledWith("c1"));
+    expect(await screen.findByText("Maria Santos")).toBeInTheDocument();
+    expect(screen.getByText("Primary")).toBeInTheDocument();
+    expect(screen.getByText("Jose Reyes")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Make Primary" })).toBeInTheDocument();
+  });
+
+  it("adds a new contact and reloads the contact list", async () => {
+    mockAddClientContactAction.mockResolvedValue({ ok: true, error: null });
+
+    render(<ClientDetailsDialog open={true} client={client} onOpenChange={vi.fn()} />);
+
+    await waitFor(() => expect(mockFetchClientContactsAction).toHaveBeenCalledTimes(1));
+
+    fireEvent.change(screen.getByLabelText("Contact Name"), {
+      target: { value: "Ana Cruz" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Add Contact" }));
+
+    await waitFor(() => expect(mockAddClientContactAction).toHaveBeenCalledTimes(1));
+    const submitted = mockAddClientContactAction.mock.calls[0][0] as FormData;
+    expect(submitted.get("clientId")).toBe("c1");
+    expect(submitted.get("fullName")).toBe("Ana Cruz");
+    await waitFor(() => expect(mockFetchClientContactsAction).toHaveBeenCalledTimes(2));
+  });
+
+  it("promotes a contact to primary", async () => {
+    const contacts: SalesClientContact[] = [
+      {
+        id: "ct1",
+        clientId: "c1",
+        fullName: "Jose Reyes",
+        email: null,
+        phone: null,
+        mobile: null,
+        position: null,
+        isPrimary: false,
+      },
+    ];
+    mockFetchClientContactsAction.mockResolvedValue({
+      ok: true,
+      error: null,
+      data: contacts,
+    });
+    mockSetPrimaryContactAction.mockResolvedValue({ ok: true, error: null });
+
+    render(<ClientDetailsDialog open={true} client={client} onOpenChange={vi.fn()} />);
+
+    fireEvent.click(await screen.findByRole("button", { name: "Make Primary" }));
+
+    await waitFor(() => expect(mockSetPrimaryContactAction).toHaveBeenCalledTimes(1));
+    const submitted = mockSetPrimaryContactAction.mock.calls[0][0] as FormData;
+    expect(submitted.get("clientId")).toBe("c1");
+    expect(submitted.get("contactId")).toBe("ct1");
   });
 });

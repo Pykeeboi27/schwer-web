@@ -24,6 +24,11 @@ import { getSalesDashboardCharts } from "@/lib/sales/dashboard-charts";
 import { getQuarterlyTargets } from "@/lib/executive/targets";
 import { createClient } from "@/lib/supabase/server";
 
+export type SalesRosterEntry = {
+  ownerId: string;
+  ownerName: string;
+};
+
 export type PurchaseOrderMetricRow = {
   po_amount: number | string | null;
   margin_amount: number | string | null;
@@ -39,6 +44,8 @@ type PurchaseOrderRange = {
 export type ExecutiveDashboardQueryOptions = {
   viewer?: CurrentProfile | null;
   referenceDate?: Date;
+  /** Month (1-12) to bucket the Monthly-view weekly revenue breakdown by. */
+  breakdownMonth?: number;
 };
 
 export const EMPTY_EXECUTIVE_KPIS: ExecutiveKpiSummary = {
@@ -152,7 +159,36 @@ export const executiveDashboardQueries = {
     return toNumber(data.target_amount);
   },
 
-  async fetchProfileNames(profileIds: string[]): Promise<Map<string, string>> {
+  /** Active sales-department roster, so everyone appears even with no POs yet. */
+  async fetchSalesRoster(): Promise<SalesRosterEntry[]> {
+    const supabase = await createClient();
+    const { data, error } = await supabase
+      .from("profiles")
+      .select("id, email")
+      .eq("department", "sales")
+      .eq("is_active", true);
+
+    if (error) {
+      return [];
+    }
+
+    const roster: SalesRosterEntry[] = [];
+
+    for (const row of data ?? []) {
+      const id = String(row.id ?? "");
+      const email = String(row.email ?? "").trim();
+      if (!id || !email) {
+        continue;
+      }
+
+      roster.push({ ownerId: id, ownerName: email.split("@")[0] });
+    }
+
+    return roster;
+  },
+
+  /** Email-username fallback for owner ids not covered by the sales roster (e.g. a manager). */
+  async fetchProfileUsernames(profileIds: string[]): Promise<Map<string, string>> {
     if (profileIds.length === 0) {
       return new Map();
     }
@@ -160,14 +196,14 @@ export const executiveDashboardQueries = {
     const supabase = await createClient();
     const { data, error } = await supabase
       .from("profiles")
-      .select("id, full_name")
+      .select("id, email")
       .in("id", profileIds);
 
     if (error) {
       return new Map();
     }
 
-    const nameMap = new Map<string, string>();
+    const usernameMap = new Map<string, string>();
 
     for (const row of data ?? []) {
       const id = String(row.id ?? "");
@@ -175,13 +211,13 @@ export const executiveDashboardQueries = {
         continue;
       }
 
-      const fullName = String(row.full_name ?? "").trim();
-      if (fullName) {
-        nameMap.set(id, fullName);
+      const email = String(row.email ?? "").trim();
+      if (email) {
+        usernameMap.set(id, email.split("@")[0]);
       }
     }
 
-    return nameMap;
+    return usernameMap;
   },
 };
 
@@ -228,9 +264,10 @@ export function buildRevenueBreakdownFromRows(
   rowsForYear: PurchaseOrderMetricRow[],
   rowsForYtd: PurchaseOrderMetricRow[],
   referenceDate: Date,
+  targetMonth: number = referenceDate.getMonth() + 1,
 ): ExecutiveRevenueBreakdown {
   const currentYear = getCurrentYear(referenceDate);
-  const currentMonth = referenceDate.getMonth() + 1;
+  const currentMonth = targetMonth;
 
   const monthlyMap = new Map<number, number>();
   const quarterlyMap = new Map<number, number>();
@@ -303,6 +340,7 @@ export function buildPoSummaryFromRows(
 export function buildSalesPerformanceFromRows(
   rows: PurchaseOrderMetricRow[],
   ownerNameMap: Map<string, string>,
+  seedOwners?: SalesRosterEntry[],
 ): ExecutiveSalesPerformanceRow[] {
   const aggregateMap = new Map<
     string,
@@ -314,10 +352,18 @@ export function buildSalesPerformanceFromRows(
     }
   >();
 
+  for (const owner of seedOwners ?? []) {
+    aggregateMap.set(owner.ownerId, {
+      ownerId: owner.ownerId,
+      ownerName: owner.ownerName,
+      bookedRevenue: 0,
+      marginAmount: 0,
+    });
+  }
+
   for (const row of rows) {
     const ownerId = row.created_by ? String(row.created_by) : "unassigned";
-    const fallbackOwnerName =
-      ownerId === "unassigned" ? "Unassigned" : `Owner ${ownerId.slice(0, 8)}`;
+    const fallbackOwnerName = ownerId === "unassigned" ? "Unassigned" : "Unknown";
     const ownerName = ownerNameMap.get(ownerId) ?? fallbackOwnerName;
 
     if (!aggregateMap.has(ownerId)) {
@@ -395,7 +441,12 @@ export async function getExecutiveRevenueBreakdown(
     }),
   ]);
 
-  return buildRevenueBreakdownFromRows(rowsForYear, rowsForYtd, referenceDate);
+  return buildRevenueBreakdownFromRows(
+    rowsForYear,
+    rowsForYtd,
+    referenceDate,
+    options.breakdownMonth,
+  );
 }
 
 export async function getExecutivePoSummary(
@@ -418,22 +469,35 @@ export async function getExecutiveSalesPerformance(
 ): Promise<ExecutiveSalesPerformanceRow[]> {
   const referenceDate = options.referenceDate ?? new Date();
   const periodRange = getPeriodDateRange(periodFilter, referenceDate);
-  const rows = await executiveDashboardQueries.fetchPurchaseOrderRows({
-    startDate: periodRange.startDate,
-    endDate: periodRange.endDate,
-  });
 
-  const ownerIds = Array.from(
+  const [rows, roster] = await Promise.all([
+    executiveDashboardQueries.fetchPurchaseOrderRows({
+      startDate: periodRange.startDate,
+      endDate: periodRange.endDate,
+    }),
+    executiveDashboardQueries.fetchSalesRoster(),
+  ]);
+
+  const rosterIds = new Set(roster.map((entry) => entry.ownerId));
+  const extraOwnerIds = Array.from(
     new Set(
       rows
         .map((row) => row.created_by)
-        .filter((ownerId): ownerId is string => Boolean(ownerId)),
+        .filter(
+          (ownerId): ownerId is string => Boolean(ownerId) && !rosterIds.has(ownerId!),
+        ),
     ),
   );
 
-  const ownerNameMap = await executiveDashboardQueries.fetchProfileNames(ownerIds);
+  const extraUsernames =
+    await executiveDashboardQueries.fetchProfileUsernames(extraOwnerIds);
 
-  return buildSalesPerformanceFromRows(rows, ownerNameMap);
+  const ownerNameMap = new Map<string, string>(extraUsernames);
+  for (const entry of roster) {
+    ownerNameMap.set(entry.ownerId, entry.ownerName);
+  }
+
+  return buildSalesPerformanceFromRows(rows, ownerNameMap, roster);
 }
 
 export async function getExecutiveDashboardData(

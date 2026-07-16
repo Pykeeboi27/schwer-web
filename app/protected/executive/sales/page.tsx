@@ -1,5 +1,6 @@
 import { ClientDistributionChart } from "@/components/sales/client-distribution-chart";
 import { SectorPerformanceChart } from "@/components/sales/sector-performance-chart";
+import { RevenueMonthSelect } from "@/components/executive/revenue-month-select";
 import { RevenueTrendChart } from "@/components/executive/revenue-trend-chart";
 import { EmptyState } from "@/components/patterns";
 import {
@@ -12,6 +13,7 @@ import {
 import { getExecutiveAccessRedirect } from "@/lib/executive/access";
 import { getExecutiveDashboardData } from "@/lib/executive/dashboard";
 import { formatCurrency } from "@/lib/executive/format";
+import { getMonthLabel } from "@/lib/executive/period";
 import { PERIOD_FILTERS, type PeriodFilter } from "@/lib/executive/types";
 import { cn } from "@/lib/utils";
 import { getCurrentProfile } from "@/lib/profile/get-current-profile";
@@ -19,7 +21,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 
 type SalesDashboardPageProps = {
-  searchParams?: Promise<{ period?: string }>;
+  searchParams?: Promise<{ period?: string; month?: string }>;
 };
 
 function parsePeriodFilter(period: string | undefined): PeriodFilter {
@@ -27,6 +29,14 @@ function parsePeriodFilter(period: string | undefined): PeriodFilter {
     return period as PeriodFilter;
   }
   return "ytd";
+}
+
+function parseBreakdownMonth(month: string | undefined, currentMonth: number): number {
+  const parsed = Number(month);
+  if (!Number.isInteger(parsed) || parsed < 1) {
+    return currentMonth;
+  }
+  return Math.min(parsed, currentMonth);
 }
 
 const PERIOD_LABELS: Record<PeriodFilter, string> = {
@@ -48,10 +58,17 @@ export default async function ExecutiveSalesDashboardPage({
     redirect(redirectPath);
   }
 
+  const now = new Date();
+  const currentMonth = now.getMonth() + 1;
+  const selectedMonth = parseBreakdownMonth(resolvedSearchParams?.month, currentMonth);
+
   let dashboard;
 
   try {
-    dashboard = await getExecutiveDashboardData(selectedPeriod, { viewer: profile });
+    dashboard = await getExecutiveDashboardData(selectedPeriod, {
+      viewer: profile,
+      breakdownMonth: selectedMonth,
+    });
   } catch {
     return (
       <div className="flex flex-col gap-6">
@@ -154,14 +171,26 @@ export default async function ExecutiveSalesDashboardPage({
       {/* Revenue Breakdown */}
       <Card>
         <CardHeader>
-          <CardTitle>Revenue Breakdown</CardTitle>
-          <CardDescription>
-            {selectedPeriod === "quarterly"
-              ? "Quarterly booked revenue for the current year"
-              : selectedPeriod === "monthly"
-                ? "Booked revenue by week for the current month"
-                : "Month-by-month booked revenue, year to date"}
-          </CardDescription>
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <CardTitle>Revenue Breakdown</CardTitle>
+              <CardDescription>
+                {selectedPeriod === "quarterly"
+                  ? "Quarterly booked revenue for the current year"
+                  : selectedPeriod === "monthly"
+                    ? `Booked revenue by week for ${getMonthLabel(selectedMonth)} ${now.getFullYear()}${
+                        selectedMonth === currentMonth ? " · current" : ""
+                      }`
+                    : "Month-by-month booked revenue, year to date"}
+              </CardDescription>
+            </div>
+            {selectedPeriod === "monthly" ? (
+              <RevenueMonthSelect
+                selectedMonth={selectedMonth}
+                currentMonth={currentMonth}
+              />
+            ) : null}
+          </div>
         </CardHeader>
         <CardContent>
           {hasBreakdownData ? (

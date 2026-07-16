@@ -1,6 +1,7 @@
 "use client";
 
 import { ClientDetailsDialog } from "@/components/dialogs/client-details-dialog";
+import { SectorBadge } from "@/components/sales/sector-badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -12,7 +13,7 @@ import {
 } from "@/components/ui/select";
 import { DataCard, DataField, EmptyState, ResponsiveTable } from "@/components/patterns";
 import type { SalesClient } from "@/lib/sales/clients";
-import { SearchX } from "lucide-react";
+import { Pencil, SearchX } from "lucide-react";
 import { useMemo, useState, type KeyboardEvent } from "react";
 
 type ClientsTableProps = {
@@ -121,16 +122,16 @@ export function ClientsTable({ clients }: ClientsTableProps) {
 
       <ResponsiveTable
         table={
-          <table className="w-full min-w-[760px] text-sm">
+          <table className="w-full table-fixed text-sm">
             <thead className="bg-muted/40 text-left">
               <tr>
-                <th className="px-3 py-2 font-medium">Code</th>
-                <th className="px-3 py-2 font-medium">Name</th>
-                <th className="px-3 py-2 font-medium">Sector</th>
-                <th className="px-3 py-2 font-medium">Contact</th>
-                <th className="px-3 py-2 font-medium">Email</th>
-                <th className="px-3 py-2 font-medium">Phone</th>
-                <th className="px-3 py-2 text-right font-medium">Actions</th>
+                <th className="w-[10%] px-2 py-2 font-medium">Code</th>
+                <th className="w-[24%] px-2 py-2 font-medium">Name</th>
+                <th className="w-[16%] px-2 py-2 font-medium">Sector</th>
+                <th className="w-[12%] px-2 py-2 font-medium">Contact</th>
+                <th className="w-[17%] px-2 py-2 font-medium">Email</th>
+                <th className="w-[13%] px-2 py-2 font-medium">Phone</th>
+                <th className="w-[8%] px-2 py-2 text-right font-medium">Actions</th>
               </tr>
             </thead>
             <tbody>
@@ -151,23 +152,38 @@ export function ClientsTable({ clients }: ClientsTableProps) {
                       onRowKeyDown(event, () => openClient(client, false))
                     }
                   >
-                    <td className="px-3 py-2 font-mono text-xs">{client.clientCode}</td>
-                    <td className="px-3 py-2">{client.companyName}</td>
-                    <td className="px-3 py-2 capitalize">{client.sector}</td>
-                    <td className="px-3 py-2">{client.contactPerson ?? "-"}</td>
-                    <td className="px-3 py-2">{client.email ?? "-"}</td>
-                    <td className="px-3 py-2">{client.phone ?? "-"}</td>
-                    <td className="px-3 py-2 text-right">
+                    <td className="truncate px-2 py-2 font-mono text-xs">
+                      {client.clientCode}
+                    </td>
+                    <td className="truncate px-2 py-2" title={client.companyName}>
+                      {client.companyName}
+                    </td>
+                    <td className="overflow-hidden px-2 py-2">
+                      <SectorBadge sector={client.sector} className="px-2" />
+                    </td>
+                    <td
+                      className="truncate px-2 py-2"
+                      title={client.contactPerson ?? undefined}
+                    >
+                      {client.contactPerson ?? "-"}
+                    </td>
+                    <td className="truncate px-2 py-2" title={client.email ?? undefined}>
+                      {client.email ?? "-"}
+                    </td>
+                    <td className="px-2 py-2">{client.phone ?? "-"}</td>
+                    <td className="px-2 py-2 text-right">
                       <Button
                         type="button"
-                        size="sm"
+                        size="icon"
                         variant="outline"
+                        className="h-8 w-8"
+                        aria-label={`Edit ${client.companyName}`}
                         onClick={(event) => {
                           event.stopPropagation();
                           openClient(client, true);
                         }}
                       >
-                        Edit
+                        <Pencil className="h-3.5 w-3.5" />
                       </Button>
                     </td>
                   </tr>
@@ -193,9 +209,7 @@ export function ClientsTable({ clients }: ClientsTableProps) {
                         {client.clientCode}
                       </p>
                     </div>
-                    <span className="shrink-0 rounded-full bg-muted px-2 py-0.5 text-xs capitalize text-muted-foreground">
-                      {client.sector}
-                    </span>
+                    <SectorBadge sector={client.sector} className="shrink-0" />
                   </>
                 }
                 footer={

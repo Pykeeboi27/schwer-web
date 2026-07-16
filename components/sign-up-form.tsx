@@ -44,7 +44,7 @@ export function SignUpForm({
 
   useEffect(() => {
     if (state.success) {
-      router.push("/protected");
+      router.push("/auth/sign-up-success");
     }
   }, [router, state.success]);
 
@@ -52,54 +52,65 @@ export function SignUpForm({
     <div className={cn("flex flex-col gap-6", className)} {...props}>
       <Card className="border-none bg-transparent shadow-none">
         <CardHeader className="px-0">
-          <CardTitle className="text-2xl font-semibold tracking-tight">
+          <CardTitle className="text-3xl font-semibold tracking-tight">
             Create account
           </CardTitle>
-          <CardDescription>Create your Schwer Online Management account</CardDescription>
+          <CardDescription className="text-base">
+            Create your Schwer Online Management account
+          </CardDescription>
         </CardHeader>
         <CardContent className="px-0">
           <form action={formAction}>
             <div className="flex flex-col gap-5">
               <div className="grid gap-1.5">
-                <Label htmlFor="email">Email</Label>
+                <Label htmlFor="email" className="text-base">
+                  Email
+                </Label>
                 <Input
                   id="email"
                   name="email"
                   type="email"
                   placeholder="m@example.com"
                   required
+                  className="md:text-base"
                 />
               </div>
 
               <div className="grid gap-1.5">
-                <Label htmlFor="department">Department</Label>
+                <Label htmlFor="department" className="text-base">
+                  Department
+                </Label>
                 <Select name="department" required>
                   <SelectTrigger id="department" className="capitalize">
                     <SelectValue placeholder="Select department" />
                   </SelectTrigger>
                   <SelectContent>
-                    {DEPARTMENTS.map((department) => (
-                      <SelectItem
-                        key={department}
-                        value={department}
-                        className="capitalize"
-                      >
-                        {department}
-                      </SelectItem>
-                    ))}
+                    {DEPARTMENTS.filter((department) => department !== "executive").map(
+                      (department) => (
+                        <SelectItem
+                          key={department}
+                          value={department}
+                          className="capitalize"
+                        >
+                          {department}
+                        </SelectItem>
+                      ),
+                    )}
                   </SelectContent>
                 </Select>
               </div>
 
               <div className="grid gap-1.5">
-                <Label htmlFor="password">Password</Label>
+                <Label htmlFor="password" className="text-base">
+                  Password
+                </Label>
                 <div className="relative">
                   <Input
                     id="password"
                     name="password"
                     type={isPasswordVisible ? "text" : "password"}
                     required
-                    className="pr-10"
+                    className="pr-10 md:text-base"
                   />
                   <button
                     type="button"
@@ -113,14 +124,16 @@ export function SignUpForm({
               </div>
 
               <div className="grid gap-1.5">
-                <Label htmlFor="repeat-password">Repeat password</Label>
+                <Label htmlFor="repeat-password" className="text-base">
+                  Repeat password
+                </Label>
                 <div className="relative">
                   <Input
                     id="repeat-password"
                     name="repeatPassword"
                     type={isRepeatPasswordVisible ? "text" : "password"}
                     required
-                    className="pr-10"
+                    className="pr-10 md:text-base"
                   />
                   <button
                     type="button"
@@ -143,12 +156,12 @@ export function SignUpForm({
                 </div>
               )}
 
-              <Button type="submit" className="w-full" disabled={isPending}>
+              <Button type="submit" className="w-full text-base" disabled={isPending}>
                 {isPending ? "Creating account…" : "Create account"}
               </Button>
             </div>
 
-            <div className="mt-5 text-center text-sm text-muted-foreground">
+            <div className="mt-5 text-center text-base text-muted-foreground">
               Already have an account?{" "}
               <Link
                 href="/auth/login"

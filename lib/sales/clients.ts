@@ -115,6 +115,40 @@ export function buildPaymentTermsNotes(input: PaymentTermsInput): string | null 
   return JSON.stringify(payload);
 }
 
+export type ClientContactNotes = {
+  contactPerson: string | null;
+  email: string | null;
+  phone: string | null;
+};
+
+/**
+ * `clients` has no dedicated contact_person/email/phone columns — the Create/Edit
+ * Client dialog stores them as a JSON blob in `notes`. Shared here so every
+ * reader (client list, PO worksheet) parses it the same way.
+ */
+export function parseClientContactNotes(notes: string | null): ClientContactNotes {
+  if (!notes) {
+    return { contactPerson: null, email: null, phone: null };
+  }
+
+  try {
+    const payload = JSON.parse(notes) as {
+      contactPerson?: string;
+      email?: string;
+      phone?: string;
+    };
+
+    return {
+      contactPerson: payload.contactPerson ?? null,
+      email: payload.email ?? null,
+      phone: payload.phone ?? null,
+    };
+  } catch {
+    // Keep backward compatibility for non-JSON notes.
+    return { contactPerson: null, email: null, phone: null };
+  }
+}
+
 export async function listClients(): Promise<SalesClient[]> {
   const supabase = await createClient();
   const { data, error } = await supabase
@@ -129,25 +163,7 @@ export async function listClients(): Promise<SalesClient[]> {
   }
 
   return (data ?? []).map((row) => {
-    let contactPerson: string | null = null;
-    let email: string | null = null;
-    let phone: string | null = null;
-
-    if (row.notes) {
-      try {
-        const payload = JSON.parse(row.notes) as {
-          contactPerson?: string;
-          email?: string;
-          phone?: string;
-        };
-
-        contactPerson = payload.contactPerson ?? null;
-        email = payload.email ?? null;
-        phone = payload.phone ?? null;
-      } catch {
-        // Keep backward compatibility for non-JSON notes.
-      }
-    }
+    const { contactPerson, email, phone } = parseClientContactNotes(row.notes);
 
     return {
       id: row.id,

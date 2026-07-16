@@ -7,6 +7,7 @@ import {
   listCostingApprovedHistory,
   listCostingQuotations,
 } from "@/lib/engineering/costing-quotations";
+import { listSalesPeople } from "@/lib/engineering/sales-people";
 import { getCurrentProfile } from "@/lib/profile/get-current-profile";
 import { listClients } from "@/lib/sales/clients";
 import { redirect } from "next/navigation";
@@ -24,11 +25,18 @@ export default async function EngineeringQuotationsPage() {
 
   const isCostingEngineer = profile?.role === "costing_engineer";
 
-  const [quotations, clients, history] = await Promise.all([
+  const [quotations, clients, history, salesPeople] = await Promise.all([
     listCostingQuotations(),
     isCostingEngineer ? listClients() : Promise.resolve([]),
     listCostingApprovedHistory(),
+    listSalesPeople(),
   ]);
+
+  const clientOptions = clients.map((c) => ({
+    id: c.id,
+    companyName: c.companyName,
+    isActive: c.isActive,
+  }));
 
   return (
     <div className="flex flex-col gap-6">
@@ -38,11 +46,8 @@ export default async function EngineeringQuotationsPage() {
         actions={
           isCostingEngineer ? (
             <CreateCostingQuotationDialog
-              clients={clients.map((c) => ({
-                id: c.id,
-                companyName: c.companyName,
-                isActive: c.isActive,
-              }))}
+              clients={clientOptions}
+              salesPeople={salesPeople}
             />
           ) : null
         }
@@ -52,11 +57,8 @@ export default async function EngineeringQuotationsPage() {
         <CostingQuotationsTable
           quotations={quotations}
           currentUserId={profile?.id ?? ""}
-          clients={clients.map((c) => ({
-            id: c.id,
-            companyName: c.companyName,
-            isActive: c.isActive,
-          }))}
+          clients={clientOptions}
+          salesPeople={salesPeople}
         />
       </Panel>
 

@@ -1,8 +1,11 @@
 "use client";
 
-import { recordCollectionAction } from "@/app/protected/sales/purchase-orders/actions";
+import {
+  recordCollectionAction,
+  updateCollectionAction,
+} from "@/app/protected/sales/purchase-orders/actions";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import { NumberInput } from "@/components/ui/number-input";
 import {
   Dialog,
   DialogContent,
@@ -10,16 +13,21 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import type { SalesPurchaseOrder } from "@/lib/sales/purchase-orders";
+import type { SalesPoPayment, SalesPurchaseOrder } from "@/lib/sales/purchase-orders";
+import { cn } from "@/lib/utils";
 import { validateCollectionAmount } from "@/lib/utils/form-validation";
 import { useToast } from "@/lib/utils/toast-notification";
 import { useRouter } from "next/navigation";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+
+type CollectionDialogMode = "record" | "edit";
 
 type RecordCollectionDialogProps = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   purchaseOrder: SalesPurchaseOrder | null;
+  mode?: CollectionDialogMode;
+  payment?: SalesPoPayment | null;
 };
 
 function formatCurrency(amount: number): string {
@@ -34,6 +42,8 @@ export function RecordCollectionDialog({
   open,
   onOpenChange,
   purchaseOrder,
+  mode = "record",
+  payment = null,
 }: RecordCollectionDialogProps) {
   const router = useRouter();
   const { success, error } = useToast();
@@ -42,13 +52,20 @@ export function RecordCollectionDialog({
   const [amountError, setAmountError] = useState<string | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
 
+  const isEdit = mode === "edit" && Boolean(payment);
+
   const remainingBalance = useMemo(() => {
     if (!purchaseOrder) {
       return 0;
     }
 
-    return Math.max(purchaseOrder.poAmount - purchaseOrder.recognizedAmount, 0);
-  }, [purchaseOrder]);
+    const recognizedExcludingCurrent =
+      isEdit && payment
+        ? purchaseOrder.recognizedAmount - payment.amountCollected
+        : purchaseOrder.recognizedAmount;
+
+    return Math.max(purchaseOrder.poAmount - recognizedExcludingCurrent, 0);
+  }, [purchaseOrder, isEdit, payment]);
 
   const resetState = () => {
     setAmount("");
@@ -56,6 +73,15 @@ export function RecordCollectionDialog({
     setFormError(null);
     setIsSubmitting(false);
   };
+
+  useEffect(() => {
+    if (!open) {
+      return;
+    }
+    setAmount(isEdit && payment ? String(payment.amountCollected) : "");
+    setAmountError(null);
+    setFormError(null);
+  }, [open, isEdit, payment]);
 
   const handleClose = () => {
     resetState();
@@ -88,16 +114,32 @@ export function RecordCollectionDialog({
       return;
     }
 
-    const response = await recordCollectionAction(purchaseOrder.id, parsedAmount);
-    if (!response.success) {
-      const message = response.error ?? "Failed to record collection.";
+    if (isEdit && !payment) {
+      const message = "Collection record not found.";
       setFormError(message);
       error(message);
       setIsSubmitting(false);
       return;
     }
 
-    success("Collection recorded successfully.");
+    const response =
+      isEdit && payment
+        ? await updateCollectionAction(payment.id, purchaseOrder.id, parsedAmount)
+        : await recordCollectionAction(purchaseOrder.id, parsedAmount);
+
+    if (!response.success) {
+      const message =
+        response.error ??
+        (isEdit ? "Failed to update collection." : "Failed to record collection.");
+      setFormError(message);
+      error(message);
+      setIsSubmitting(false);
+      return;
+    }
+
+    success(
+      isEdit ? "Collection updated successfully." : "Collection recorded successfully.",
+    );
     handleClose();
     router.refresh();
     setIsSubmitting(false);
@@ -114,11 +156,19 @@ export function RecordCollectionDialog({
         if (!next) handleClose();
       }}
     >
-      <DialogContent className="max-h-[85vh] overflow-y-auto">
+      <DialogContent
+        className={cn(
+          "max-h-[85vh] overflow-y-auto",
+          "data-[state=open]:slide-in-from-left-1/2 data-[state=open]:slide-in-from-top-[48%]",
+          "data-[state=closed]:slide-out-to-left-1/2 data-[state=closed]:slide-out-to-top-[48%]",
+        )}
+      >
         <DialogHeader>
-          <DialogTitle>Record Collection</DialogTitle>
+          <DialogTitle>{isEdit ? "Edit Collection" : "Record Collection"}</DialogTitle>
           <DialogDescription>
-            Add a payment against this purchase order.
+            {isEdit
+              ? "Update this payment's amount."
+              : "Add a payment against this purchase order."}
           </DialogDescription>
         </DialogHeader>
 
@@ -140,15 +190,10 @@ export function RecordCollectionDialog({
             <label htmlFor="collection-amount" className="text-sm font-medium">
               Collection Amount
             </label>
-            <Input
+            <NumberInput
               id="collection-amount"
-              type="number"
-              min={0.01}
-              step="0.01"
-              inputMode="decimal"
               value={amount}
-              onChange={(event) => {
-                const nextAmount = event.target.value;
+              onValueChange={(nextAmount) => {
                 setAmount(nextAmount);
                 if (amountError || formError) {
                   const nextError = validateCollectionAmount(
@@ -184,7 +229,7 @@ export function RecordCollectionDialog({
               Cancel
             </Button>
             <Button type="submit" disabled={isSubmitting}>
-              {isSubmitting ? "Saving..." : "Record Collection"}
+              {isSubmitting ? "Saving..." : isEdit ? "Save Changes" : "Record Collection"}
             </Button>
           </div>
         </form>

@@ -3,6 +3,13 @@
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
   DataCard,
   DataField,
   EmptyState,
@@ -119,8 +126,8 @@ export function QuotationsTable({
 
   return (
     <>
-      <div className="mb-4 space-y-3">
-        <div className="relative">
+      <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center">
+        <div className="relative flex-1">
           <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
           <Input
             placeholder="Search by client, quotation #, or subject…"
@@ -129,44 +136,43 @@ export function QuotationsTable({
             className="pl-8"
           />
         </div>
-        <div className="flex flex-wrap items-center gap-2">
-          <span className="text-xs text-muted-foreground">Filter:</span>
-          <Button
-            type="button"
-            variant={statusFilter === "all" ? "default" : "outline"}
-            size="sm"
-            onClick={() => setStatusFilter("all")}
+        <div className="flex items-center gap-2">
+          <Select
+            value={statusFilter}
+            onValueChange={(value) => setStatusFilter(value as StatusFilter)}
           >
-            All
-          </Button>
-          {ALL_STATUSES.map((s) => (
+            <SelectTrigger className="w-[150px]" aria-label="Filter by status">
+              <SelectValue placeholder="All statuses" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All statuses</SelectItem>
+              {ALL_STATUSES.map((s) => (
+                <SelectItem key={s} value={s}>
+                  {statusLabel(s)}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <div className="flex overflow-hidden rounded-md border">
             <Button
-              key={s}
               type="button"
-              variant={statusFilter === s ? "default" : "outline"}
+              variant={sortBy === "createdAt" ? "secondary" : "ghost"}
               size="sm"
-              onClick={() => setStatusFilter(s)}
+              className="rounded-none border-r"
+              onClick={() => toggleSort("createdAt")}
             >
-              {statusLabel(s)}
+              Date {sortBy === "createdAt" ? (sortDirection === "asc" ? "↑" : "↓") : ""}
             </Button>
-          ))}
-          <span className="ml-2 text-xs text-muted-foreground">Sort:</span>
-          <Button
-            type="button"
-            variant={sortBy === "createdAt" ? "default" : "outline"}
-            size="sm"
-            onClick={() => toggleSort("createdAt")}
-          >
-            Date {sortBy === "createdAt" ? (sortDirection === "asc" ? "↑" : "↓") : ""}
-          </Button>
-          <Button
-            type="button"
-            variant={sortBy === "amount" ? "default" : "outline"}
-            size="sm"
-            onClick={() => toggleSort("amount")}
-          >
-            Amount {sortBy === "amount" ? (sortDirection === "asc" ? "↑" : "↓") : ""}
-          </Button>
+            <Button
+              type="button"
+              variant={sortBy === "amount" ? "secondary" : "ghost"}
+              size="sm"
+              className="rounded-none"
+              onClick={() => toggleSort("amount")}
+            >
+              Amount {sortBy === "amount" ? (sortDirection === "asc" ? "↑" : "↓") : ""}
+            </Button>
+          </div>
         </div>
       </div>
 
@@ -178,6 +184,7 @@ export function QuotationsTable({
                 <th className="px-3 py-2 font-medium">ID</th>
                 <th className="px-3 py-2 font-medium">Client Name</th>
                 <th className="px-3 py-2 font-medium">Amount</th>
+                <th className="px-3 py-2 font-medium">Authored By</th>
                 <th className="px-3 py-2 font-medium">Status</th>
                 <th className="px-3 py-2 font-medium">Date</th>
               </tr>
@@ -185,7 +192,7 @@ export function QuotationsTable({
             <tbody>
               {filteredAndSorted.length === 0 ? (
                 <tr>
-                  <td colSpan={5}>{emptyState}</td>
+                  <td colSpan={6}>{emptyState}</td>
                 </tr>
               ) : (
                 filteredAndSorted.map((quotation) => (
@@ -205,6 +212,9 @@ export function QuotationsTable({
                     </td>
                     <td className="px-3 py-2">{quotation.clientName}</td>
                     <td className="px-3 py-2">{formatCurrency(quotation.amount)}</td>
+                    <td className="px-3 py-2 text-muted-foreground">
+                      {quotation.salesPersonName ?? "Unassigned"}
+                    </td>
                     <td className="px-3 py-2">
                       <StatusBadge status={quotation.status} />
                     </td>
@@ -239,6 +249,10 @@ export function QuotationsTable({
                 }
               >
                 <DataField label="Amount" value={formatCurrency(quotation.amount)} />
+                <DataField
+                  label="Authored By"
+                  value={quotation.salesPersonName ?? "Unassigned"}
+                />
                 <DataField
                   label="Date"
                   value={new Date(quotation.createdAt).toLocaleDateString()}

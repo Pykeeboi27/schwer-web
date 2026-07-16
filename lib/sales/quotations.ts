@@ -15,7 +15,12 @@ export type SalesQuotation = {
   notes: string | null;
   status: "draft" | "pending" | "approved" | "rejected" | "cancelled" | "closed";
   preparedBy: string;
+  preparedByName: string;
+  salesPersonId: string | null;
+  salesPersonName: string | null;
   pendingApprovalRoles: RequiredApproverRole[];
+  rejectionReason: string | null;
+  rejectedByName: string | null;
   createdAt: string;
   costingApprovedAt: string | null;
   salesMarginPercent: number | null;
@@ -44,6 +49,14 @@ export type PendingApprovalItem = {
   amount: number;
   approverRole: string;
   status: string;
+  clientName?: string;
+  cost?: number | null;
+  marginAmount?: number | null;
+  sector?: string | null;
+  googleDriveLink?: string | null;
+  notes?: string | null;
+  createdAt?: string;
+  preparedByName?: string;
 };
 
 export async function fetchQuotations(_departmentId?: string): Promise<SalesQuotation[]> {
@@ -74,6 +87,23 @@ function toUniqueRoles(roles: RequiredApproverRole[]): RequiredApproverRole[] {
 
 function numberOrNull(value: unknown): number | null {
   return value === null || value === undefined ? null : Number(value);
+}
+
+/** Full name if set, else the email username (before the "@"), else null. */
+function resolveDisplayName(
+  profile: { full_name?: string | null; email?: string | null } | null | undefined,
+): string | null {
+  const fullName = profile?.full_name?.trim();
+  if (fullName) {
+    return fullName;
+  }
+
+  const email = profile?.email?.trim();
+  if (email) {
+    return email.split("@")[0];
+  }
+
+  return null;
 }
 
 export function parseQuotationAmount(raw: unknown): number {
@@ -155,7 +185,7 @@ export async function listSalesQuotations(): Promise<SalesQuotation[]> {
   const { data, error } = await supabase
     .from("quotations")
     .select(
-      "id, quotation_number, client_id, subject, amount, cost, google_drive_link, notes, status, prepared_by, created_at, costing_approved_at, sales_margin_percent, margin_percentage, margin_amount, bank_percentage, bank_amount, sop_percentage, sop_amount, selling_amount, payment_terms, payment_terms_custom, lead_time_days, client_po_number, client_confirmed_at, converted_po_id, po_converted_at, clients:client_id(company_name), converted_po:converted_po_id(status), quotation_approvals(approver_role, status)",
+      "id, quotation_number, client_id, subject, amount, cost, google_drive_link, notes, status, prepared_by, sales_person_id, created_at, costing_approved_at, sales_margin_percent, margin_percentage, margin_amount, bank_percentage, bank_amount, sop_percentage, sop_amount, selling_amount, payment_terms, payment_terms_custom, lead_time_days, client_po_number, client_confirmed_at, converted_po_id, po_converted_at, clients:client_id(company_name), converted_po:converted_po_id(status), quotation_approvals(approver_role, status, rejection_reason, updated_at, approver:approver_id(full_name, email)), preparer:prepared_by(full_name, email), sales_person:sales_person_id(full_name, email)",
     )
     .eq("phase", "sales")
     .order("created_at", { ascending: false });
@@ -166,6 +196,10 @@ export async function listSalesQuotations(): Promise<SalesQuotation[]> {
 
   return (data ?? []).map((row) => {
     const client = Array.isArray(row.clients) ? row.clients[0] : row.clients;
+    const preparer = Array.isArray(row.preparer) ? row.preparer[0] : row.preparer;
+    const salesPerson = Array.isArray(row.sales_person)
+      ? row.sales_person[0]
+      : row.sales_person;
     const approvals = Array.isArray(row.quotation_approvals)
       ? row.quotation_approvals
       : [];
@@ -176,6 +210,18 @@ export async function listSalesQuotations(): Promise<SalesQuotation[]> {
         .map((approval) => toRequiredApproverRole(approval.approver_role))
         .filter((role): role is RequiredApproverRole => role !== null),
     );
+
+    const rejectedApproval = approvals
+      .filter((approval) => approval.status === "rejected")
+      .sort(
+        (a, b) =>
+          new Date(b.updated_at ?? 0).getTime() - new Date(a.updated_at ?? 0).getTime(),
+      )[0];
+    const rejectedByProfile = rejectedApproval
+      ? Array.isArray(rejectedApproval.approver)
+        ? rejectedApproval.approver[0]
+        : rejectedApproval.approver
+      : null;
 
     return {
       id: row.id,
@@ -189,7 +235,12 @@ export async function listSalesQuotations(): Promise<SalesQuotation[]> {
       notes: row.notes,
       status: row.status,
       preparedBy: row.prepared_by,
+      preparedByName: resolveDisplayName(preparer) ?? "Unknown",
+      salesPersonId: row.sales_person_id ?? null,
+      salesPersonName: resolveDisplayName(salesPerson),
       pendingApprovalRoles,
+      rejectionReason: rejectedApproval?.rejection_reason ?? null,
+      rejectedByName: resolveDisplayName(rejectedByProfile),
       createdAt: row.created_at,
       costingApprovedAt: row.costing_approved_at ?? null,
       salesMarginPercent:
@@ -265,9 +316,11 @@ export async function updateSalesQuotationDetails(input: {
     quotationRow.client_confirmed_at !== null &&
     quotationRow.converted_po_id === null;
 
-  if (quotationRow.status !== "draft" && !isReopenedForPo) {
+  const isRejected = quotationRow.status === "rejected";
+
+  if (quotationRow.status !== "draft" && !isReopenedForPo && !isRejected) {
     throw new Error(
-      "Sales details can only be edited while the quotation is a draft or re-opened for a PO.",
+      "Sales details can only be edited while the quotation is a draft, rejected, or re-opened for a PO.",
     );
   }
 
@@ -326,6 +379,25 @@ export async function findApproversForRole(
   return data.map((row) => ({ id: row.id }));
 }
 
+function assertQuotationReadyForApproval(row: {
+  sales_margin_percent: unknown;
+  payment_terms: unknown;
+  lead_time_days: unknown;
+}): void {
+  if (
+    row.sales_margin_percent === null ||
+    row.sales_margin_percent === undefined ||
+    !row.payment_terms ||
+    String(row.payment_terms).trim() === "" ||
+    row.lead_time_days === null ||
+    row.lead_time_days === undefined
+  ) {
+    throw new Error(
+      "Margin, payment terms, and lead time are required before submitting.",
+    );
+  }
+}
+
 export async function submitQuotationForApproval(quotationId: string): Promise<void> {
   const supabase = await createClient();
   const {
@@ -357,18 +429,7 @@ export async function submitQuotationForApproval(quotationId: string): Promise<v
     throw new Error("Only draft quotations can be submitted for approval.");
   }
 
-  if (
-    quotation.sales_margin_percent === null ||
-    quotation.sales_margin_percent === undefined ||
-    !quotation.payment_terms ||
-    String(quotation.payment_terms).trim() === "" ||
-    quotation.lead_time_days === null ||
-    quotation.lead_time_days === undefined
-  ) {
-    throw new Error(
-      "Margin, payment terms, and lead time are required before submitting.",
-    );
-  }
+  assertQuotationReadyForApproval(quotation);
 
   const roles = requiredApproverRolesForAmount(Number(quotation.amount));
   const rows = [] as Array<{
@@ -456,7 +517,7 @@ export async function listPendingApprovalsForCurrentUser(): Promise<
   const { data, error } = await supabase
     .from("quotation_approvals")
     .select(
-      "id, quotation_id, approver_role, status, quotations:quotation_id(quotation_number, subject, amount)",
+      "id, quotation_id, approver_role, status, quotations:quotation_id(quotation_number, subject, amount, cost, margin_amount, sector, google_drive_link, notes, created_at, clients:client_id(company_name), preparer:prepared_by(full_name, email))",
     )
     .eq("approver_id", user.id)
     .eq("status", "pending")
@@ -468,6 +529,16 @@ export async function listPendingApprovalsForCurrentUser(): Promise<
 
   return (data ?? []).map((row) => {
     const quotation = Array.isArray(row.quotations) ? row.quotations[0] : row.quotations;
+    const client = quotation
+      ? Array.isArray(quotation.clients)
+        ? quotation.clients[0]
+        : quotation.clients
+      : null;
+    const preparer = quotation
+      ? Array.isArray(quotation.preparer)
+        ? quotation.preparer[0]
+        : quotation.preparer
+      : null;
 
     return {
       approvalId: row.id,
@@ -477,6 +548,20 @@ export async function listPendingApprovalsForCurrentUser(): Promise<
       amount: Number(quotation?.amount ?? 0),
       approverRole: row.approver_role,
       status: row.status,
+      clientName: client?.company_name ?? undefined,
+      cost:
+        quotation?.cost === null || quotation?.cost === undefined
+          ? null
+          : Number(quotation.cost),
+      marginAmount:
+        quotation?.margin_amount === null || quotation?.margin_amount === undefined
+          ? null
+          : Number(quotation.margin_amount),
+      sector: quotation?.sector ?? null,
+      googleDriveLink: quotation?.google_drive_link ?? null,
+      notes: quotation?.notes ?? null,
+      createdAt: quotation?.created_at ?? undefined,
+      preparedByName: resolveDisplayName(preparer) ?? undefined,
     };
   });
 }
@@ -525,7 +610,7 @@ export async function resubmitQuotationForApproval(quotationId: string): Promise
 
   const { data: row, error: fetchError } = await supabase
     .from("quotations")
-    .select("id, status, created_by")
+    .select("id, status, amount, sales_margin_percent, payment_terms, lead_time_days")
     .eq("id", quotationId)
     .single();
 
@@ -537,12 +622,50 @@ export async function resubmitQuotationForApproval(quotationId: string): Promise
     throw new Error("Only rejected quotations can be resubmitted.");
   }
 
+  assertQuotationReadyForApproval(row);
+
   const { error: updateError } = await supabase
     .from("quotations")
-    .update({ status: "draft", rejection_reason: null })
+    .update({
+      status: "pending",
+      rejection_reason: null,
+      submitted_at: new Date().toISOString(),
+    })
     .eq("id", quotationId);
 
   if (updateError) {
     throw new Error(updateError.message || "Failed to resubmit quotation.");
+  }
+
+  // Clear previous approval rows and create a fresh cycle.
+  await supabase.from("quotation_approvals").delete().eq("quotation_id", quotationId);
+
+  const roles = requiredApproverRolesForAmount(Number(row.amount));
+  const rows: Array<{
+    quotation_id: string;
+    approver_id: string;
+    approver_role: RequiredApproverRole;
+    status: "pending";
+  }> = [];
+
+  for (const role of roles) {
+    const approvers = await findApproversForRole(role);
+    for (const approver of approvers) {
+      rows.push({
+        quotation_id: quotationId,
+        approver_id: approver.id,
+        approver_role: role,
+        status: "pending",
+      });
+    }
+  }
+
+  if (rows.length > 0) {
+    const { error: insertError } = await supabase
+      .from("quotation_approvals")
+      .insert(rows);
+    if (insertError) {
+      throw new Error(insertError.message || "Failed to create approval assignments.");
+    }
   }
 }

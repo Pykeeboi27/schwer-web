@@ -27,7 +27,9 @@ describe("listPurchaseOrders", () => {
     cost: "1000000",
     margin_percentage: "10",
     margin_amount: "100000",
+    bank_percentage: null,
     bank_amount: null,
+    sop_percentage: null,
     sop_amount: null,
     selling_amount: "1500000",
     recognized_amount: "500000",
@@ -38,6 +40,7 @@ describe("listPurchaseOrders", () => {
     status: "approved",
     approved_at: "2026-02-01",
     created_at: "2026-01-01",
+    created_by: "u1",
     clients: { company_name: "Alpha Corp" },
     po_approvals: [],
   };
@@ -49,6 +52,7 @@ describe("listPurchaseOrders", () => {
           data: [
             {
               ...baseRow,
+              creator: { full_name: "Jane Author", email: "jane@example.com" },
               po_approvals: [
                 { approver_role: "owner", status: "pending" },
                 { approver_role: "owner", status: "pending" },
@@ -70,6 +74,22 @@ describe("listPurchaseOrders", () => {
     expect(po.paymentStatus).toBe("partial");
     expect(po.status).toBe("approved");
     expect(po.pendingApprovalRoles).toEqual(["owner"]);
+    expect(po.createdByName).toBe("Jane Author");
+  });
+
+  it("falls back to the email username when the creator has no full name", async () => {
+    mockClient = createSupabaseMock({
+      tables: {
+        purchase_orders: {
+          data: [{ ...baseRow, creator: { full_name: null, email: "jane@example.com" } }],
+          error: null,
+        },
+      },
+    });
+
+    const [po] = await listPurchaseOrders();
+
+    expect(po.createdByName).toBe("jane");
   });
 
   it("applies defaults for missing client, status, and recognized amount", async () => {
@@ -96,6 +116,7 @@ describe("listPurchaseOrders", () => {
     expect(po.status).toBe("pending");
     expect(po.recognizedAmount).toBe(0);
     expect(po.paymentStatus).toBe("unpaid");
+    expect(po.createdByName).toBe("Unknown");
   });
 
   it("throws when the query fails", async () => {
@@ -104,6 +125,53 @@ describe("listPurchaseOrders", () => {
     });
 
     await expect(listPurchaseOrders()).rejects.toThrow("po fail");
+  });
+
+  it("surfaces the most recent rejection's reason and rejector name", async () => {
+    mockClient = createSupabaseMock({
+      tables: {
+        purchase_orders: {
+          data: [
+            {
+              ...baseRow,
+              po_approvals: [
+                {
+                  approver_role: "owner",
+                  status: "rejected",
+                  rejection_reason: "Pricing needs revision",
+                  updated_at: "2026-01-01T00:00:00.000Z",
+                  approver: { full_name: "Olive Owner", email: "olive@example.com" },
+                },
+                {
+                  approver_role: "sales_manager",
+                  status: "rejected",
+                  rejection_reason: "Stale reason",
+                  updated_at: "2025-12-01T00:00:00.000Z",
+                  approver: { full_name: "Old Manager", email: "old@example.com" },
+                },
+              ],
+            },
+          ],
+          error: null,
+        },
+      },
+    });
+
+    const [po] = await listPurchaseOrders();
+
+    expect(po.rejectionReason).toBe("Pricing needs revision");
+    expect(po.rejectedByName).toBe("Olive Owner");
+  });
+
+  it("has no rejection info when nothing was rejected", async () => {
+    mockClient = createSupabaseMock({
+      tables: { purchase_orders: { data: [{ ...baseRow }], error: null } },
+    });
+
+    const [po] = await listPurchaseOrders();
+
+    expect(po.rejectionReason).toBeNull();
+    expect(po.rejectedByName).toBeNull();
   });
 });
 
@@ -129,6 +197,12 @@ describe("listPendingPoApprovalsForCurrentUser", () => {
                 po_number: "PO-2026-0001",
                 subject: "Roof upgrade",
                 po_amount: "1500000",
+                cost: "1000000",
+                margin_amount: "100000",
+                sector: "residential",
+                po_date: "2026-01-05",
+                clients: { company_name: "Acme Corp" },
+                creator: { full_name: "Jane Author", email: "jane@example.com" },
               },
             },
           ],
@@ -147,6 +221,12 @@ describe("listPendingPoApprovalsForCurrentUser", () => {
       amount: 1500000,
       approverRole: "executive",
       status: "pending",
+      clientName: "Acme Corp",
+      cost: 1000000,
+      marginAmount: 100000,
+      sector: "residential",
+      poDate: "2026-01-05",
+      createdByName: "Jane Author",
     });
   });
 });
