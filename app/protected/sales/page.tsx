@@ -3,9 +3,14 @@ import { getSalesDashboardCharts } from "@/lib/sales/dashboard-charts";
 import { SectorPerformanceChart } from "@/components/sales/sector-performance-chart";
 import { ClientDistributionChart } from "@/components/sales/client-distribution-chart";
 import { BeamTick, PageHeader, Panel, StatCard } from "@/components/patterns";
+import { QuotaRail } from "@/components/executive/quota-rail";
+import { getMonthLabel } from "@/lib/executive/period";
+import { getMyQuotaProgress } from "@/lib/executive/quotas";
 import { getCurrentProfile } from "@/lib/profile/get-current-profile";
 import { getSalesAccessRedirect } from "@/lib/sales/access";
 import { redirect } from "next/navigation";
+
+const QUOTA_HOLDER_ROLES = new Set(["sales_staff", "sales_manager"]);
 
 function formatCurrency(amount: number): string {
   return new Intl.NumberFormat("en-PH", {
@@ -23,9 +28,18 @@ export default async function SalesDashboardPage() {
     redirect(redirectPath);
   }
 
-  const [summary, charts] = await Promise.all([
+  const isQuotaHolder = Boolean(profile?.role && QUOTA_HOLDER_ROLES.has(profile.role));
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = now.getMonth() + 1;
+  const monthLabel = getMonthLabel(month);
+
+  const [summary, charts, myQuota] = await Promise.all([
     getSalesSummary(),
     getSalesDashboardCharts(),
+    isQuotaHolder && profile
+      ? getMyQuotaProgress(profile.id, year, month)
+      : Promise.resolve(null),
   ]);
 
   return (
@@ -41,6 +55,21 @@ export default async function SalesDashboardPage() {
         accent
         size="hero"
       />
+
+      {myQuota ? (
+        <StatCard
+          label={`My quota — ${monthLabel}`}
+          value={formatCurrency(myQuota.achieved)}
+        >
+          <QuotaRail
+            quotaAmount={myQuota.quotaAmount}
+            achieved={myQuota.achieved}
+            year={year}
+            month={month}
+            monthLabel={monthLabel}
+          />
+        </StatCard>
+      ) : null}
 
       <div className="grid gap-3 sm:grid-cols-2">
         <StatCard label="Active Clients" value={summary.totalClients} />

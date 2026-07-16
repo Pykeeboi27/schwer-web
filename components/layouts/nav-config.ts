@@ -7,6 +7,7 @@ import {
   LayoutDashboard,
   LineChart,
   Receipt,
+  Target,
   type LucideIcon,
 } from "lucide-react";
 
@@ -44,6 +45,7 @@ export function getNavConfig(pathname: string, role?: string | null): NavConfig 
           end: true,
         },
         { href: "/protected/executive/sales", label: "Sales", icon: LineChart },
+        { href: "/protected/executive/quotas", label: "Quotas", icon: Target },
         { href: "/protected/executive/approvals", label: "Approvals", icon: BadgeCheck },
         {
           href: "/protected/executive/costing-approvals",
