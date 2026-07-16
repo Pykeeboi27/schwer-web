@@ -52,9 +52,15 @@
       "PowerShell(Get-Content .env | ForEach-Object { ($_ -split '=')[0] })",
       "PowerShell(git *)",
       "PowerShell(Get-Process *)",
-      "PowerShell(Get-NetTCPConnection *)"
+      "PowerShell(Get-NetTCPConnection *)",
+      "PowerShell(claude mcp *)",
+      "PowerShell(npx vitest run tests/unit/auth-actions.test.ts 2>&1 | Select-Object -Last 60)",
+      "PowerShell(npx vitest run tests/unit/auth-actions.test.ts 2>&1 | Select-Object -Last 40)",
+      "PowerShell(npx eslint app/auth/sign-up/actions.ts 2>&1 | Select-Object -Last 40)"
     ]
   },
   "enableAllProjectMcpServers": true,
-  "enabledMcpjsonServers": ["supabase"]
+  "enabledMcpjsonServers": [
+    "supabase"
+  ]
 }
