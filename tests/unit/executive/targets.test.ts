@@ -17,6 +17,20 @@ import {
 
 const noQuarters = { data: [], error: null };
 const user = { id: "u1" };
+// upsertAnnualTarget/upsertQuarterlyTarget resolve the actor via
+// getCurrentProfile(), which does its own `.from("profiles")` lookup
+// (separate from any `revenue_targets` queue) after auth.getClaims().
+const profileRow = {
+  data: {
+    id: "u1",
+    email: "u1@example.com",
+    department: "executive",
+    is_active: true,
+    role: "executive",
+    is_executive_viewer: false,
+  },
+  error: null,
+};
 
 describe("getAnnualTarget", () => {
   it("returns the mapped record when a target exists", async () => {
@@ -128,6 +142,7 @@ describe("upsertAnnualTarget", () => {
     mockClient = createSupabaseMock({
       user,
       tables: {
+        profiles: profileRow,
         revenue_targets: [
           noQuarters, // getQuarterlyTargets
           { data: [], error: null }, // select existing rows -> none -> insert
@@ -146,6 +161,7 @@ describe("upsertAnnualTarget", () => {
     mockClient = createSupabaseMock({
       user,
       tables: {
+        profiles: profileRow,
         revenue_targets: [noQuarters, { data: null, error: { message: "x" } }],
       },
     });
@@ -159,6 +175,7 @@ describe("upsertAnnualTarget", () => {
     mockClient = createSupabaseMock({
       user,
       tables: {
+        profiles: profileRow,
         revenue_targets: [
           noQuarters, // getQuarterlyTargets
           { data: [{ id: "row-2" }, { id: "row-1" }], error: null }, // existing rows, newest first
@@ -207,6 +224,7 @@ describe("upsertQuarterlyTarget", () => {
     mockClient = createSupabaseMock({
       user,
       tables: {
+        profiles: profileRow,
         revenue_targets: [
           { data: { year: 2026, target_amount: "1000000" }, error: null }, // getAnnualTarget
           { data: [{ month: 6, target_amount: "300000" }], error: null }, // getQuarterlyTargets
@@ -223,6 +241,7 @@ describe("upsertQuarterlyTarget", () => {
     mockClient = createSupabaseMock({
       user,
       tables: {
+        profiles: profileRow,
         revenue_targets: [
           { data: { year: 2026, target_amount: "1000000" }, error: null },
           { data: [{ month: 6, target_amount: "300000" }], error: null },

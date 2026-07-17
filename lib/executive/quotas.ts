@@ -2,7 +2,10 @@ import { isTargetEditor } from "@/lib/executive/access";
 import { executiveDashboardQueries } from "@/lib/executive/dashboard";
 import { getPeriodDateRange } from "@/lib/executive/period";
 import type { PeriodFilter } from "@/lib/executive/types";
-import type { CurrentProfile } from "@/lib/profile/get-current-profile";
+import {
+  getCurrentProfile,
+  type CurrentProfile,
+} from "@/lib/profile/get-current-profile";
 import { createClient } from "@/lib/supabase/server";
 
 export type SalesQuotaRosterEntry = {
@@ -52,14 +55,29 @@ export async function getSalesRoster(): Promise<SalesQuotaRosterEntry[]> {
   return roster.map((entry) => ({ profileId: entry.ownerId, name: entry.ownerName }));
 }
 
-async function fetchApprovedPurchaseOrders(
+type ApprovedPoWithQuotationOwnerRow = {
+  po_amount: number | string | null;
+  created_by: string | null;
+  quotation_id: string | null;
+  quotations:
+    { sales_person_id: string | null } | { sales_person_id: string | null }[] | null;
+};
+
+/**
+ * Fetches approved POs together with their linked quotation's
+ * `sales_person_id` via an embedded join, instead of a separate follow-up
+ * query resolving each distinct `quotation_id` — one round-trip instead of two.
+ */
+async function fetchApprovedPurchaseOrdersWithQuotationOwner(
   startDate: string,
   endDate: string,
-): Promise<ApprovedPoRow[]> {
+): Promise<ApprovedPoWithQuotationOwnerRow[]> {
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("purchase_orders")
-    .select("po_amount, created_by, quotation_id")
+    .select(
+      "po_amount, created_by, quotation_id, quotations:quotation_id(sales_person_id)",
+    )
     .eq("status", "approved")
     .gte("approved_at", startDate)
     .lte("approved_at", `${endDate}T23:59:59.999Z`);
@@ -68,32 +86,7 @@ async function fetchApprovedPurchaseOrders(
     throw new Error("Failed to load purchase orders for quota progress.");
   }
 
-  return (data ?? []) as ApprovedPoRow[];
-}
-
-async function fetchQuotationSalesPersonMap(
-  quotationIds: string[],
-): Promise<Map<string, string | null>> {
-  if (quotationIds.length === 0) {
-    return new Map();
-  }
-
-  const supabase = await createClient();
-  const { data, error } = await supabase
-    .from("quotations")
-    .select("id, sales_person_id")
-    .in("id", quotationIds);
-
-  if (error) {
-    throw new Error("Failed to load quotations for quota attribution.");
-  }
-
-  const map = new Map<string, string | null>();
-  for (const row of data ?? []) {
-    map.set(String(row.id), row.sales_person_id ? String(row.sales_person_id) : null);
-  }
-
-  return map;
+  return (data ?? []) as ApprovedPoWithQuotationOwnerRow[];
 }
 
 /**
@@ -132,13 +125,20 @@ export async function getMonthlyPoBySalesPerson(
   const startDate = `${year}-${String(month).padStart(2, "0")}-01`;
   const endDate = new Date(year, month, 0).toISOString().slice(0, 10);
 
-  const rows = await fetchApprovedPurchaseOrders(startDate, endDate);
-  const quotationIds = Array.from(
-    new Set(
-      rows.map((row) => row.quotation_id).filter((id): id is string => Boolean(id)),
-    ),
-  );
-  const quotationSalesPersonMap = await fetchQuotationSalesPersonMap(quotationIds);
+  const rawRows = await fetchApprovedPurchaseOrdersWithQuotationOwner(startDate, endDate);
+
+  const rows: ApprovedPoRow[] = rawRows.map((row) => ({
+    po_amount: row.po_amount,
+    created_by: row.created_by,
+    quotation_id: row.quotation_id,
+  }));
+
+  const quotationSalesPersonMap = new Map<string, string | null>();
+  for (const row of rawRows) {
+    if (!row.quotation_id) continue;
+    const quotation = Array.isArray(row.quotations) ? row.quotations[0] : row.quotations;
+    quotationSalesPersonMap.set(row.quotation_id, quotation?.sales_person_id ?? null);
+  }
 
   return attributePurchaseOrdersToSalesPerson(rows, quotationSalesPersonMap);
 }
@@ -187,23 +187,19 @@ export async function upsertSalesQuota(
 ): Promise<void> {
   const quotaAmount = validateQuotaAmountInput(quotaAmountInput);
 
-  const supabase = await createClient();
-  const {
-    data: { user },
-    error: authError,
-  } = await supabase.auth.getUser();
-
-  if (authError || !user) {
+  const profile = await getCurrentProfile();
+  if (!profile) {
     throw new Error("You must be signed in to update sales quotas.");
   }
 
+  const supabase = await createClient();
   const { error } = await supabase.from("sales_quotas").upsert(
     {
       profile_id: profileId,
       year,
       month,
       quota_amount: quotaAmount,
-      set_by: user.id,
+      set_by: profile.id,
     },
     { onConflict: "profile_id,year,month" },
   );

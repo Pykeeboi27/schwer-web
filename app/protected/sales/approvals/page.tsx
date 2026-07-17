@@ -2,6 +2,7 @@ import { fetchQuotationsAction } from "@/app/protected/sales/quotations/actions"
 import { fetchPurchaseOrdersAction } from "@/app/protected/sales/purchase-orders/actions";
 import { QuotationsTable } from "@/components/tables/quotations-table";
 import { PurchaseOrdersTable } from "@/components/tables/purchase-orders-table";
+import { RealtimeRefresh } from "@/components/realtime/realtime-refresh";
 import { PageHeader, Panel } from "@/components/patterns";
 import { getCurrentProfile } from "@/lib/profile/get-current-profile";
 import { getSalesAccessRedirect } from "@/lib/sales/access";
@@ -61,6 +62,9 @@ export default async function SalesApprovalsPage() {
 
   return (
     <div className="flex flex-col gap-6">
+      <RealtimeRefresh
+        tables={["quotations", "quotation_approvals", "purchase_orders", "po_approvals"]}
+      />
       <PageHeader
         title="Quotation Approvals"
         description="Quotations submitted by the sales team for your review. Approve to advance through the workflow, or reject to return them for correction."

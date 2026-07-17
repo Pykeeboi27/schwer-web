@@ -1,5 +1,6 @@
 import { CostingStatusBreakdown } from "@/components/engineering/costing-status-breakdown";
 import { RecentCostingsPanel } from "@/components/engineering/recent-costings-panel";
+import { RealtimeRefresh } from "@/components/realtime/realtime-refresh";
 import { PageHeader, Panel, StatCard } from "@/components/patterns";
 import { getCurrentProfile } from "@/lib/profile/get-current-profile";
 import { getEngineeringAccessRedirect } from "@/lib/engineering/access";
@@ -41,6 +42,7 @@ export default async function EngineeringDashboardPage() {
 
   return (
     <div className="flex flex-col gap-6">
+      <RealtimeRefresh tables={["quotations"]} />
       <PageHeader
         title="Engineering Dashboard"
         description="Set the unit cost for each item on a Sales-raised request for quotation, attach a Google Drive link, then submit for executive costing approval."

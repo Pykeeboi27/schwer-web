@@ -35,7 +35,7 @@ export default async function SalesDashboardPage() {
   const monthLabel = getMonthLabel(month);
 
   const [summary, charts, myQuota] = await Promise.all([
-    getSalesSummary(),
+    getSalesSummary(profile?.id ?? ""),
     getSalesDashboardCharts(),
     isQuotaHolder && profile
       ? getMyQuotaProgress(profile.id, year, month)
@@ -49,12 +49,18 @@ export default async function SalesDashboardPage() {
         description="Snapshot of client volume, quotation pipeline, and closed vs recognized sales."
       />
 
-      <StatCard
-        label="Closed Sales"
-        value={formatCurrency(summary.closedSaleTotal)}
-        accent
-        size="hero"
-      />
+      <div className="grid gap-3 sm:grid-cols-2">
+        <StatCard
+          label="My Closed Sales"
+          value={formatCurrency(summary.myClosedSaleTotal)}
+          accent
+        />
+        <StatCard
+          label="Company Closed Sales"
+          value={formatCurrency(summary.companyClosedSaleTotal)}
+          accent
+        />
+      </div>
 
       {myQuota ? (
         <StatCard

@@ -3,6 +3,7 @@ import { QuotationsScopePanel } from "@/components/sales/quotations-scope-panel"
 import { QuotationsTable } from "@/components/tables/quotations-table";
 import { ReadyForPurchaseOrderTable } from "@/components/tables/ready-for-purchase-order-table";
 import { ReadyForQuotationTable } from "@/components/tables/ready-for-quotation-table";
+import { RealtimeRefresh } from "@/components/realtime/realtime-refresh";
 import { BeamTick, PageHeader, Panel } from "@/components/patterns";
 import { getCurrentProfile } from "@/lib/profile/get-current-profile";
 import { getSalesAccessRedirect } from "@/lib/sales/access";
@@ -75,6 +76,7 @@ export default async function SalesQuotationsPage() {
 
   return (
     <div className="flex flex-col gap-6">
+      <RealtimeRefresh tables={["quotations", "quotation_approvals"]} />
       <PageHeader
         title="Quotations"
         description="Quotations originate in engineering and reach this page after executive approves the costing. Add the sales details, then submit through the approval workflow."

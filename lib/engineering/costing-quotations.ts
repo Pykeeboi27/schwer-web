@@ -1,3 +1,4 @@
+import { getCurrentProfile } from "@/lib/profile/get-current-profile";
 import { createClient } from "@/lib/supabase/server";
 
 export type CostingQuotationItem = {
@@ -190,33 +191,14 @@ export async function setQuotationItemCosts(input: {
   notes?: string | null;
   salesPersonId?: string | null;
 }): Promise<void> {
-  const supabase = await createClient();
-  const {
-    data: { user },
-    error: userError,
-  } = await supabase.auth.getUser();
-
-  if (userError || !user) {
+  // getCurrentProfile() verifies the session via local JWT claims, avoiding
+  // the network round-trip that auth.getUser() makes to the auth server.
+  const profile = await getCurrentProfile();
+  if (!profile) {
     throw new Error("You must be signed in.");
   }
 
-  const { data: row, error: rowError } = await supabase
-    .from("quotations")
-    .select("id, status, phase")
-    .eq("id", input.quotationId)
-    .single();
-
-  if (rowError || !row) {
-    throw new Error("Quotation was not found.");
-  }
-
-  if (row.phase !== "costing") {
-    throw new Error("Only costing-phase quotations can be edited here.");
-  }
-
-  if (row.status !== "draft") {
-    throw new Error("Only draft costing quotations can be edited.");
-  }
+  const supabase = await createClient();
 
   const { data: clientRow, error: clientError } = await supabase
     .from("clients")
@@ -242,10 +224,17 @@ export async function setQuotationItemCosts(input: {
     updatePayload.quotation_number = input.quotationNumber;
   }
 
-  const { error: updateError } = await supabase
+  // The guard (phase='costing', status='draft') is folded into the UPDATE's
+  // WHERE clause rather than a separate SELECT-then-UPDATE, saving a
+  // round-trip: a null result means either not found or not editable.
+  const { data: updatedRow, error: updateError } = await supabase
     .from("quotations")
     .update(updatePayload)
-    .eq("id", input.quotationId);
+    .eq("id", input.quotationId)
+    .eq("phase", "costing")
+    .eq("status", "draft")
+    .select("id")
+    .maybeSingle();
 
   if (updateError) {
     if (updateError.code === "23505") {
@@ -254,6 +243,16 @@ export async function setQuotationItemCosts(input: {
     throw new Error(updateError.message || "Failed to update costing quotation.");
   }
 
+  if (!updatedRow) {
+    throw new Error("Only draft costing quotations can be edited.");
+  }
+
+  // Sequential, not Promise.all: every quotation_items write fires
+  // trg_sync_quotation_cost_from_items, which UPDATEs the shared parent
+  // quotations row. Concurrent item writes for the same quotation all
+  // contend for that same row's lock — Postgres serializes them regardless,
+  // so running them concurrently buys nothing and risks a lock pile-up
+  // (this caused a real `statement timeout` under load).
   for (const item of input.items) {
     const { error: itemError } = await supabase
       .from("quotation_items")
@@ -268,54 +267,38 @@ export async function setQuotationItemCosts(input: {
 }
 
 export async function deleteCostingQuotation(quotationId: string): Promise<void> {
-  const supabase = await createClient();
-  const {
-    data: { user },
-    error: userError,
-  } = await supabase.auth.getUser();
-
-  if (userError || !user) {
+  const profile = await getCurrentProfile();
+  if (!profile) {
     throw new Error("You must be signed in.");
   }
 
-  const { data: row, error: rowError } = await supabase
-    .from("quotations")
-    .select("id, status, phase")
-    .eq("id", quotationId)
-    .single();
+  const supabase = await createClient();
 
-  if (rowError || !row) {
-    throw new Error("Quotation was not found.");
-  }
-
-  if (row.phase !== "costing") {
-    throw new Error("Only costing-phase quotations can be deleted here.");
-  }
-
-  if (row.status !== "draft") {
-    throw new Error("Only draft costing quotations can be deleted.");
-  }
-
-  const { error: deleteError } = await supabase
+  const { data, error: deleteError } = await supabase
     .from("quotations")
     .delete()
-    .eq("id", quotationId);
+    .eq("id", quotationId)
+    .eq("phase", "costing")
+    .eq("status", "draft")
+    .select("id")
+    .maybeSingle();
 
   if (deleteError) {
     throw new Error(deleteError.message || "Failed to delete costing quotation.");
   }
+
+  if (!data) {
+    throw new Error("Only draft costing quotations can be deleted.");
+  }
 }
 
 export async function submitCostingForApproval(quotationId: string): Promise<void> {
-  const supabase = await createClient();
-  const {
-    data: { user },
-    error: userError,
-  } = await supabase.auth.getUser();
-
-  if (userError || !user) {
+  const profile = await getCurrentProfile();
+  if (!profile) {
     throw new Error("You must be signed in.");
   }
+
+  const supabase = await createClient();
 
   const { data: row, error: rowError } = await supabase
     .from("quotations")
@@ -364,12 +347,20 @@ export async function submitCostingForApproval(quotationId: string): Promise<voi
     );
   }
 
-  const { error: updateError } = await supabase
+  const { data: updatedRow, error: updateError } = await supabase
     .from("quotations")
     .update({ status: "pending", costing_rejection_reason: null })
-    .eq("id", quotationId);
+    .eq("id", quotationId)
+    .eq("phase", "costing")
+    .eq("status", "draft")
+    .select("id")
+    .maybeSingle();
 
   if (updateError) {
     throw new Error(updateError.message || "Failed to submit costing quotation.");
+  }
+
+  if (!updatedRow) {
+    throw new Error("Only draft costing quotations can be submitted.");
   }
 }

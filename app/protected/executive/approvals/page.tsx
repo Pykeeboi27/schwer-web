@@ -1,6 +1,7 @@
 import { PageHeader, Panel } from "@/components/patterns";
 import { QuotationsTable } from "@/components/tables/quotations-table";
 import { PurchaseOrdersTable } from "@/components/tables/purchase-orders-table";
+import { RealtimeRefresh } from "@/components/realtime/realtime-refresh";
 import { fetchQuotationsAction } from "@/app/protected/sales/quotations/actions";
 import { fetchPurchaseOrdersAction } from "@/app/protected/sales/purchase-orders/actions";
 import { getExecutiveAccessRedirect } from "@/lib/executive/access";
@@ -61,6 +62,9 @@ export default async function ExecutiveApprovalsPage() {
 
   return (
     <div className="flex flex-col gap-6">
+      <RealtimeRefresh
+        tables={["quotations", "quotation_approvals", "purchase_orders", "po_approvals"]}
+      />
       <PageHeader
         title="Executive Approvals"
         description="Review high-value quotations from Sales that require owner or executive approval. Quotations of ₱3,000,000 or above appear here when assigned to your account."
