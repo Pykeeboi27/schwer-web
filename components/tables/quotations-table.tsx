@@ -18,6 +18,7 @@ import {
   statusLabel,
 } from "@/components/patterns";
 import { QuotationDetailsDialog } from "@/components/dialogs/quotation-details-dialog";
+import { getQuotationAging } from "@/lib/sales/quotation-aging";
 import type { SalesQuotation } from "@/lib/sales/quotations";
 import { FileText, Search } from "lucide-react";
 import { useMemo, useState, type KeyboardEvent } from "react";
@@ -60,6 +61,16 @@ function sortQuotations(
   });
   if (direction === "desc") sorted.reverse();
   return sorted;
+}
+
+function agingLabel(quotation: SalesQuotation): string {
+  const aging = getQuotationAging(quotation.costingApprovedAt, quotation.poConvertedAt);
+  if (!aging) {
+    return "—";
+  }
+
+  const dayLabel = aging.days === 1 ? "1 day" : `${aging.days} days`;
+  return aging.isOpen ? `${dayLabel} (open)` : dayLabel;
 }
 
 function onRowKeyDown(
@@ -178,7 +189,7 @@ export function QuotationsTable({
 
       <ResponsiveTable
         table={
-          <table className="w-full min-w-[760px] text-sm">
+          <table className="w-full min-w-[860px] text-sm">
             <thead className="bg-muted/40 text-left">
               <tr>
                 <th className="px-3 py-2 font-medium">ID</th>
@@ -188,12 +199,13 @@ export function QuotationsTable({
                 <th className="px-3 py-2 font-medium">Authored By</th>
                 <th className="px-3 py-2 font-medium">Status</th>
                 <th className="px-3 py-2 font-medium">Date</th>
+                <th className="px-3 py-2 font-medium">Days since costing</th>
               </tr>
             </thead>
             <tbody>
               {filteredAndSorted.length === 0 ? (
                 <tr>
-                  <td colSpan={7}>{emptyState}</td>
+                  <td colSpan={8}>{emptyState}</td>
                 </tr>
               ) : (
                 filteredAndSorted.map((quotation) => (
@@ -224,6 +236,9 @@ export function QuotationsTable({
                     </td>
                     <td className="px-3 py-2">
                       {new Date(quotation.createdAt).toLocaleDateString()}
+                    </td>
+                    <td className="px-3 py-2 text-muted-foreground">
+                      {agingLabel(quotation)}
                     </td>
                   </tr>
                 ))
@@ -262,6 +277,7 @@ export function QuotationsTable({
                   label="Date"
                   value={new Date(quotation.createdAt).toLocaleDateString()}
                 />
+                <DataField label="Days since costing" value={agingLabel(quotation)} />
               </DataCard>
             ))
           )
