@@ -1,5 +1,6 @@
 import { CostingHistoryTable } from "@/components/engineering/costing-history-table";
 import { CostingQuotationsTable } from "@/components/engineering/costing-quotations-table";
+import { RealtimeRefresh } from "@/components/realtime/realtime-refresh";
 import { PageHeader, Panel } from "@/components/patterns";
 import { getEngineeringAccessRedirect } from "@/lib/engineering/access";
 import {
@@ -37,6 +38,7 @@ export default async function EngineeringQuotationsPage() {
 
   return (
     <div className="flex flex-col gap-6">
+      <RealtimeRefresh tables={["quotations"]} />
       <PageHeader
         title="Costing Quotations"
         description="Requests for quotation raised by Sales. Set the unit cost for every item, attach a Google Drive link, then submit for executive approval."

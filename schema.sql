@@ -626,6 +626,81 @@ CREATE TRIGGER trg_sync_quotation_status_from_approvals
 AFTER INSERT OR UPDATE OR DELETE ON public.quotation_approvals
 FOR EACH ROW EXECUTE FUNCTION public.fn_sync_quotation_status_from_approvals();
 
+-- Mirrors fn_sync_quotation_status_from_approvals for purchase orders. Without
+-- this, when a role (e.g. "executive") has more than one active approver, the
+-- app fans out one po_approvals row per approver and nothing cancelled the
+-- sibling pending rows once one of them approved — the aggregate (which
+-- requires every row to be approved/cancelled) stayed "pending" forever.
+CREATE OR REPLACE FUNCTION public.fn_sync_po_status_from_approvals()
+RETURNS TRIGGER
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  pid UUID;
+BEGIN
+  pid := COALESCE(NEW.po_id, OLD.po_id);
+
+  IF pg_trigger_depth() > 1 THEN
+    RETURN COALESCE(NEW, OLD);
+  END IF;
+
+  IF TG_OP = 'UPDATE'
+     AND NEW.status = 'approved'
+     AND (OLD.status IS DISTINCT FROM NEW.status) THEN
+    UPDATE public.po_approvals
+    SET status = 'cancelled', updated_at = NOW()
+    WHERE po_id = pid
+      AND approver_role = NEW.approver_role
+      AND status = 'pending'
+      AND id <> NEW.id;
+  END IF;
+
+  UPDATE public.purchase_orders p
+  SET status = CASE
+    WHEN EXISTS (
+      SELECT 1 FROM public.po_approvals pa
+      WHERE pa.po_id = pid AND pa.status = 'rejected'
+    ) THEN 'rejected'::approval_status_enum
+    WHEN EXISTS (
+      SELECT 1 FROM public.po_approvals pa
+      WHERE pa.po_id = pid AND pa.status = 'pending'
+    ) THEN 'pending'::approval_status_enum
+    WHEN EXISTS (
+      SELECT 1 FROM public.po_approvals pa
+      WHERE pa.po_id = pid AND pa.status = 'approved'
+    )
+    AND NOT EXISTS (
+      SELECT 1 FROM public.po_approvals pa
+      WHERE pa.po_id = pid AND pa.status = 'pending'
+    ) THEN 'approved'::approval_status_enum
+    ELSE p.status
+  END,
+  approved_at = CASE
+    WHEN EXISTS (
+      SELECT 1 FROM public.po_approvals pa
+      WHERE pa.po_id = pid AND pa.status = 'approved'
+    )
+    AND NOT EXISTS (
+      SELECT 1 FROM public.po_approvals pa
+      WHERE pa.po_id = pid AND pa.status IN ('pending', 'rejected')
+    ) THEN COALESCE(p.approved_at, NOW())
+    ELSE NULL
+  END,
+  updated_at = NOW()
+  WHERE p.id = pid
+    AND p.status NOT IN ('draft', 'closed', 'cancelled');
+
+  RETURN COALESCE(NEW, OLD);
+END;
+$$;
+
+DROP TRIGGER IF EXISTS trg_sync_po_status_from_approvals ON public.po_approvals;
+CREATE TRIGGER trg_sync_po_status_from_approvals
+AFTER INSERT OR UPDATE OR DELETE ON public.po_approvals
+FOR EACH ROW EXECUTE FUNCTION public.fn_sync_po_status_from_approvals();
+
 
 -- ============================================================
 -- SECTION 9: AUTH TRIGGER

@@ -29,11 +29,15 @@ export default async function ExecutiveDashboardPage() {
     redirect(redirectPath);
   }
 
-  let dashboard;
+  // Independent loaders (different tables, no data dependency) run concurrently.
+  // allSettled preserves each one's own fail-soft behavior instead of letting
+  // one rejection abort both, as a plain Promise.all would.
+  const [dashboardResult, avgCostingResult] = await Promise.allSettled([
+    getExecutiveDashboardData("ytd", { viewer: profile }),
+    getAverageCostingToPoDays("ytd"),
+  ]);
 
-  try {
-    dashboard = await getExecutiveDashboardData("ytd", { viewer: profile });
-  } catch {
+  if (dashboardResult.status === "rejected") {
     return (
       <div className="flex flex-col gap-6">
         <PageHeader
@@ -50,13 +54,9 @@ export default async function ExecutiveDashboardPage() {
     );
   }
 
-  let avgCostingToPoDays: number | null = null;
-
-  try {
-    avgCostingToPoDays = await getAverageCostingToPoDays("ytd");
-  } catch {
-    avgCostingToPoDays = null;
-  }
+  const dashboard = dashboardResult.value;
+  const avgCostingToPoDays =
+    avgCostingResult.status === "fulfilled" ? avgCostingResult.value : null;
 
   const canEditTarget = isTargetEditor(profile);
   const currentYear = new Date().getFullYear();

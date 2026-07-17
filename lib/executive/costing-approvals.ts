@@ -1,3 +1,4 @@
+import { getCurrentProfile } from "@/lib/profile/get-current-profile";
 import { createClient } from "@/lib/supabase/server";
 
 export type CostingApprovalLineItem = {
@@ -79,29 +80,16 @@ export async function listPendingCostingApprovals(): Promise<CostingApprovalItem
   });
 }
 
+// Uses getCurrentProfile() (local JWT claims verification, no network
+// round-trip to the auth server) instead of a fresh auth.getUser() + profile
+// SELECT — see the comment on ensureCurrentProfile() for why getUser() is
+// avoided on hot paths.
 async function assertExecutiveActor(): Promise<void> {
-  const supabase = await createClient();
-  const {
-    data: { user },
-    error: userError,
-  } = await supabase.auth.getUser();
-
-  if (userError || !user) {
-    throw new Error("You must be signed in.");
-  }
-
-  const { data: profile, error: profileError } = await supabase
-    .from("profiles")
-    .select("department, role, is_active")
-    .eq("id", user.id)
-    .single();
-
-  if (profileError || !profile) {
-    throw new Error("Profile not found.");
-  }
+  const profile = await getCurrentProfile();
 
   if (
-    !profile.is_active ||
+    !profile ||
+    !profile.isActive ||
     profile.department !== "executive" ||
     profile.role !== "executive"
   ) {
@@ -113,21 +101,10 @@ export async function approveCostingQuotation(quotationId: string): Promise<void
   await assertExecutiveActor();
   const supabase = await createClient();
 
-  const { data: row, error: rowError } = await supabase
-    .from("quotations")
-    .select("id, phase, status")
-    .eq("id", quotationId)
-    .single();
-
-  if (rowError || !row) {
-    throw new Error("Quotation was not found.");
-  }
-
-  if (row.phase !== "costing" || row.status !== "pending") {
-    throw new Error("Only quotations pending costing approval can be approved here.");
-  }
-
-  const { error: updateError } = await supabase
+  // The guard (phase/status) is folded into the UPDATE's WHERE clause rather
+  // than a separate SELECT-then-UPDATE, saving a round-trip: a null result
+  // means either not found or not in the required state.
+  const { data, error: updateError } = await supabase
     .from("quotations")
     .update({
       phase: "sales",
@@ -135,10 +112,18 @@ export async function approveCostingQuotation(quotationId: string): Promise<void
       costing_rejection_reason: null,
       costing_approved_at: new Date().toISOString(),
     })
-    .eq("id", quotationId);
+    .eq("id", quotationId)
+    .eq("phase", "costing")
+    .eq("status", "pending")
+    .select("id")
+    .maybeSingle();
 
   if (updateError) {
     throw new Error(updateError.message || "Failed to approve costing quotation.");
+  }
+
+  if (!data) {
+    throw new Error("Only quotations pending costing approval can be approved here.");
   }
 }
 
@@ -153,30 +138,24 @@ export async function rejectCostingQuotation(input: {
   await assertExecutiveActor();
   const supabase = await createClient();
 
-  const { data: row, error: rowError } = await supabase
-    .from("quotations")
-    .select("id, phase, status")
-    .eq("id", input.quotationId)
-    .single();
-
-  if (rowError || !row) {
-    throw new Error("Quotation was not found.");
-  }
-
-  if (row.phase !== "costing" || row.status !== "pending") {
-    throw new Error("Only quotations pending costing approval can be rejected here.");
-  }
-
-  const { error: updateError } = await supabase
+  const { data, error: updateError } = await supabase
     .from("quotations")
     .update({
       status: "draft",
       costing_rejection_reason: input.reason.trim(),
     })
-    .eq("id", input.quotationId);
+    .eq("id", input.quotationId)
+    .eq("phase", "costing")
+    .eq("status", "pending")
+    .select("id")
+    .maybeSingle();
 
   if (updateError) {
     throw new Error(updateError.message || "Failed to reject costing quotation.");
+  }
+
+  if (!data) {
+    throw new Error("Only quotations pending costing approval can be rejected here.");
   }
 }
 
@@ -184,27 +163,21 @@ export async function deleteCostingQuotation(quotationId: string): Promise<void>
   await assertExecutiveActor();
   const supabase = await createClient();
 
-  const { data: row, error: rowError } = await supabase
-    .from("quotations")
-    .select("id, phase, status")
-    .eq("id", quotationId)
-    .single();
-
-  if (rowError || !row) {
-    throw new Error("Quotation was not found.");
-  }
-
-  if (row.phase !== "costing" || row.status !== "pending") {
-    throw new Error("Only quotations pending costing approval can be deleted here.");
-  }
-
-  const { error: deleteError } = await supabase
+  const { data, error: deleteError } = await supabase
     .from("quotations")
     .delete()
-    .eq("id", quotationId);
+    .eq("id", quotationId)
+    .eq("phase", "costing")
+    .eq("status", "pending")
+    .select("id")
+    .maybeSingle();
 
   if (deleteError) {
     throw new Error(deleteError.message || "Failed to delete costing quotation.");
+  }
+
+  if (!data) {
+    throw new Error("Only quotations pending costing approval can be deleted here.");
   }
 }
 
