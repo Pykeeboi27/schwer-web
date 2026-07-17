@@ -594,7 +594,9 @@ export async function submitQuotationForApproval(quotationId: string): Promise<v
   assertQuotationReadyForApproval(quotation);
 
   const roles = requiredApproverRolesForAmount(Number(quotation.amount));
-  const approversByRole = await Promise.all(roles.map((role) => findApproversForRole(role)));
+  const approversByRole = await Promise.all(
+    roles.map((role) => findApproversForRole(role)),
+  );
   const rows: Array<{
     quotation_id: string;
     approver_id: string;
@@ -794,7 +796,9 @@ export async function resubmitQuotationForApproval(quotationId: string): Promise
   await supabase.from("quotation_approvals").delete().eq("quotation_id", quotationId);
 
   const roles = requiredApproverRolesForAmount(Number(row.amount));
-  const approversByRole = await Promise.all(roles.map((role) => findApproversForRole(role)));
+  const approversByRole = await Promise.all(
+    roles.map((role) => findApproversForRole(role)),
+  );
   const rows: Array<{
     quotation_id: string;
     approver_id: string;

@@ -409,7 +409,9 @@ export async function convertQuotationToPurchaseOrder(
   }
 
   const roles = requiredApproverRolesForAmount(poAmount);
-  const approversByRole = await Promise.all(roles.map((role) => findApproversForRole(role)));
+  const approversByRole = await Promise.all(
+    roles.map((role) => findApproversForRole(role)),
+  );
   const rows: Array<{
     po_id: string;
     approver_id: string;
@@ -635,7 +637,9 @@ export async function resubmitPurchaseOrderForApproval(poId: string): Promise<vo
   await supabase.from("po_approvals").delete().eq("po_id", poId);
 
   const roles = requiredApproverRolesForAmount(Number(po.po_amount));
-  const approversByRole = await Promise.all(roles.map((role) => findApproversForRole(role)));
+  const approversByRole = await Promise.all(
+    roles.map((role) => findApproversForRole(role)),
+  );
   const rows: Array<{
     po_id: string;
     approver_id: string;

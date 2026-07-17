@@ -2,7 +2,10 @@ import { isTargetEditor } from "@/lib/executive/access";
 import { executiveDashboardQueries } from "@/lib/executive/dashboard";
 import { getPeriodDateRange } from "@/lib/executive/period";
 import type { PeriodFilter } from "@/lib/executive/types";
-import { getCurrentProfile, type CurrentProfile } from "@/lib/profile/get-current-profile";
+import {
+  getCurrentProfile,
+  type CurrentProfile,
+} from "@/lib/profile/get-current-profile";
 import { createClient } from "@/lib/supabase/server";
 
 export type SalesQuotaRosterEntry = {
@@ -57,9 +60,7 @@ type ApprovedPoWithQuotationOwnerRow = {
   created_by: string | null;
   quotation_id: string | null;
   quotations:
-    | { sales_person_id: string | null }
-    | { sales_person_id: string | null }[]
-    | null;
+    { sales_person_id: string | null } | { sales_person_id: string | null }[] | null;
 };
 
 /**
@@ -74,7 +75,9 @@ async function fetchApprovedPurchaseOrdersWithQuotationOwner(
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("purchase_orders")
-    .select("po_amount, created_by, quotation_id, quotations:quotation_id(sales_person_id)")
+    .select(
+      "po_amount, created_by, quotation_id, quotations:quotation_id(sales_person_id)",
+    )
     .eq("status", "approved")
     .gte("approved_at", startDate)
     .lte("approved_at", `${endDate}T23:59:59.999Z`);

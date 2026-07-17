@@ -288,7 +288,10 @@ describe("findPendingPoApprovalForRole", () => {
   it("returns the approval id when present, otherwise null", async () => {
     mockClient = createSupabaseMock({
       user,
-      tables: { profiles: profileRow, po_approvals: { data: { id: "pa1" }, error: null } },
+      tables: {
+        profiles: profileRow,
+        po_approvals: { data: { id: "pa1" }, error: null },
+      },
     });
     await expect(
       findPendingPoApprovalForRole({ poId: "p1", role: "owner" }),
