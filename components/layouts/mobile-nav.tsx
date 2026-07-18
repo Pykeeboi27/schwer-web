@@ -7,16 +7,18 @@ import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { getNavConfig } from "@/components/layouts/nav-config";
 import { SidebarNav } from "@/components/layouts/sidebar-nav";
+import type { NotificationSection } from "@/lib/notifications/types";
 
 type MobileNavProps = {
   currentUserRole?: string | null;
+  unseenSections?: NotificationSection[];
 };
 
 /**
  * Mobile-only navigation. Renders a hamburger in the top bar that opens a left
  * drawer with the same links as the desktop rail. Closes on route change.
  */
-export function MobileNav({ currentUserRole }: MobileNavProps) {
+export function MobileNav({ currentUserRole, unseenSections }: MobileNavProps) {
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
   const config = getNavConfig(pathname, currentUserRole);
@@ -47,6 +49,7 @@ export function MobileNav({ currentUserRole }: MobileNavProps) {
           config={config}
           pathname={pathname}
           onNavigate={() => setOpen(false)}
+          unseenSections={unseenSections}
         />
       </SheetContent>
     </Sheet>

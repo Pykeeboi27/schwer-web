@@ -60,9 +60,12 @@
       "PowerShell($p='C:\\\\Users\\\\SPM\\\\.claude\\\\projects\\\\C--Users-SPM-Desktop-schwer-web\\\\6daec822-ea1d-44aa-a652-0b703c403552\\\\tool-results\\\\mcp-supabase-get_advisors-1784269767355.txt'; $c=Get-Content -Raw $p; Write-Output \\(\"LEN=\"+$c.Length\\); $c.Substring\\(0,70000\\))",
       "PowerShell($p='C:\\\\Users\\\\SPM\\\\.claude\\\\projects\\\\C--Users-SPM-Desktop-schwer-web\\\\6daec822-ea1d-44aa-a652-0b703c403552\\\\tool-results\\\\mcp-supabase-get_advisors-1784269767355.txt'; $c=Get-Content -Raw $p; $c.Substring\\(70000,70154\\))",
       "PowerShell($p='C:\\\\Users\\\\SPM\\\\.claude\\\\projects\\\\C--Users-SPM-Desktop-schwer-web\\\\6daec822-ea1d-44aa-a652-0b703c403552\\\\tool-results\\\\mcp-supabase-get_advisors-1784269767355.txt'; $j=Get-Content -Raw $p | ConvertFrom-Json; $lints=$j.result.lints; Write-Output \\(\"TOTAL LINTS=\"+$lints.Count\\); $lints | Group-Object name | Sort-Object Count -Descending | ForEach-Object { Write-Output \\($_.Name+\" = \"+$_.Count\\) })",
-      "PowerShell($p='C:\\\\Users\\\\SPM\\\\.claude\\\\projects\\\\C--Users-SPM-Desktop-schwer-web\\\\6daec822-ea1d-44aa-a652-0b703c403552\\\\tool-results\\\\mcp-supabase-get_advisors-1784269767355.txt'; $j=Get-Content -Raw $p | ConvertFrom-Json; $lints=$j.result.lints; Write-Output \"=== auth_rls_initplan \\(metadata\\) ===\"; $lints | Where-Object name -eq 'auth_rls_initplan' | ForEach-Object { $_.metadata.name+\" || \"+$_.detail } | Sort-Object)"
+      "PowerShell($p='C:\\\\Users\\\\SPM\\\\.claude\\\\projects\\\\C--Users-SPM-Desktop-schwer-web\\\\6daec822-ea1d-44aa-a652-0b703c403552\\\\tool-results\\\\mcp-supabase-get_advisors-1784269767355.txt'; $j=Get-Content -Raw $p | ConvertFrom-Json; $lints=$j.result.lints; Write-Output \"=== auth_rls_initplan \\(metadata\\) ===\"; $lints | Where-Object name -eq 'auth_rls_initplan' | ForEach-Object { $_.metadata.name+\" || \"+$_.detail } | Sort-Object)",
+      "PowerShell(winget upgrade *)"
     ]
   },
   "enableAllProjectMcpServers": true,
-  "enabledMcpjsonServers": ["supabase"]
+  "enabledMcpjsonServers": [
+    "supabase"
+  ]
 }

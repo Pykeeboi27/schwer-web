@@ -30,4 +30,34 @@ function Badge({ className, variant, ...props }: BadgeProps) {
   return <div className={cn(badgeVariants({ variant }), className)} {...props} />;
 }
 
-export { Badge, badgeVariants };
+/** Small circular "unseen changes" indicator for nav tabs. No text/count. */
+function NotificationDot({ className }: { className?: string }) {
+  return (
+    <span
+      aria-hidden="true"
+      className={cn("inline-block h-2 w-2 shrink-0 rounded-full bg-primary", className)}
+    />
+  );
+}
+
+/** Circular unread-count bubble for the notification bell trigger. */
+function CountBadge({
+  count,
+  className,
+}: {
+  count: string;
+  className?: string;
+}) {
+  return (
+    <span
+      className={cn(
+        "grid h-[1.15rem] min-w-[1.15rem] shrink-0 place-items-center rounded-full bg-destructive px-1 text-[0.65rem] font-semibold leading-none text-destructive-foreground",
+        className,
+      )}
+    >
+      {count}
+    </span>
+  );
+}
+
+export { Badge, badgeVariants, NotificationDot, CountBadge };

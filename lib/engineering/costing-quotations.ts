@@ -247,12 +247,28 @@ export async function setQuotationItemCosts(input: {
     throw new Error("Only draft costing quotations can be edited.");
   }
 
+  // Fetched up front so the post-save notification can tell whether any cost
+  // value actually changed (editing notes/drive-link alone shouldn't notify).
+  const { data: existingItems, error: existingItemsError } = await supabase
+    .from("quotation_items")
+    .select("id, unit_cost")
+    .eq("quotation_id", input.quotationId);
+
+  if (existingItemsError) {
+    throw new Error("Failed to load existing item costs.");
+  }
+
+  const previousUnitCostById = new Map(
+    (existingItems ?? []).map((row) => [row.id, row.unit_cost]),
+  );
+
   // Sequential, not Promise.all: every quotation_items write fires
   // trg_sync_quotation_cost_from_items, which UPDATEs the shared parent
   // quotations row. Concurrent item writes for the same quotation all
   // contend for that same row's lock — Postgres serializes them regardless,
   // so running them concurrently buys nothing and risks a lock pile-up
   // (this caused a real `statement timeout` under load).
+  let anyCostChanged = false;
   for (const item of input.items) {
     const { error: itemError } = await supabase
       .from("quotation_items")
@@ -262,6 +278,24 @@ export async function setQuotationItemCosts(input: {
 
     if (itemError) {
       throw new Error(itemError.message || "Failed to update an item's unit cost.");
+    }
+
+    if ((previousUnitCostById.get(item.id) ?? null) !== item.unitCost) {
+      anyCostChanged = true;
+    }
+  }
+
+  // Notify the sales person who created the RFQ that costing changed. Best
+  // effort: the costing save itself already succeeded, so a notification
+  // hiccup shouldn't fail the whole action. See migration 0015 for why this
+  // is a single RPC call after the batch rather than a per-item trigger.
+  if (anyCostChanged) {
+    const { error: notifyError } = await supabase.rpc("fn_notify_costing_cost_updated", {
+      target_quotation_id: input.quotationId,
+    });
+
+    if (notifyError) {
+      console.error("Failed to notify sales person of costing update:", notifyError);
     }
   }
 }
