@@ -4,7 +4,6 @@ import { SectorPerformanceChart } from "@/components/sales/sector-performance-ch
 import { ClientDistributionChart } from "@/components/sales/client-distribution-chart";
 import { BeamTick, PageHeader, Panel, StatCard } from "@/components/patterns";
 import { QuotaRail } from "@/components/executive/quota-rail";
-import { getMonthLabel } from "@/lib/executive/period";
 import { getMyQuotaProgress } from "@/lib/executive/quotas";
 import { getCurrentProfile } from "@/lib/profile/get-current-profile";
 import { getSalesAccessRedirect } from "@/lib/sales/access";
@@ -29,16 +28,13 @@ export default async function SalesDashboardPage() {
   }
 
   const isQuotaHolder = Boolean(profile?.role && QUOTA_HOLDER_ROLES.has(profile.role));
-  const now = new Date();
-  const year = now.getFullYear();
-  const month = now.getMonth() + 1;
-  const monthLabel = getMonthLabel(month);
+  const year = new Date().getFullYear();
 
   const [summary, charts, myQuota] = await Promise.all([
     getSalesSummary(profile?.id ?? ""),
     getSalesDashboardCharts(),
     isQuotaHolder && profile
-      ? getMyQuotaProgress(profile.id, year, month)
+      ? getMyQuotaProgress(profile.id, year)
       : Promise.resolve(null),
   ]);
 
@@ -64,15 +60,13 @@ export default async function SalesDashboardPage() {
 
       {myQuota ? (
         <StatCard
-          label={`My quota — ${monthLabel}`}
+          label={`My quota — ${year}`}
           value={formatCurrency(myQuota.achieved)}
         >
           <QuotaRail
             quotaAmount={myQuota.quotaAmount}
             achieved={myQuota.achieved}
             year={year}
-            month={month}
-            monthLabel={monthLabel}
           />
         </StatCard>
       ) : null}

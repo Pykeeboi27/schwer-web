@@ -44,16 +44,24 @@ export function AuthShell({ children, showBackLink = true }: AuthShellProps) {
           </p>
         </div>
 
-        {showBackLink ? (
-          <Link
-            href="/"
-            className="inline-flex items-center text-sm font-medium text-secondary-foreground/70 transition-colors hover:text-secondary-foreground"
-          >
-            &larr; Back to home
-          </Link>
-        ) : (
-          <span aria-hidden="true" />
-        )}
+        <div className="space-y-6">
+          <p className="text-xs font-medium uppercase tracking-[0.22em] text-secondary-foreground/50">
+            Engineering&ensp;&middot;&ensp;Sales&ensp;&middot;&ensp;Executive
+          </p>
+
+          {showBackLink ? (
+            <div className="border-t border-secondary-foreground/15 pt-6">
+              <Link
+                href="/"
+                className="inline-flex items-center text-sm font-medium text-secondary-foreground/70 transition-colors hover:text-secondary-foreground"
+              >
+                &larr; Back to home
+              </Link>
+            </div>
+          ) : (
+            <span aria-hidden="true" />
+          )}
+        </div>
       </div>
 
       {/* Mobile brand strip */}

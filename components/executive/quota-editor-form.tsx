@@ -13,18 +13,20 @@ import { useActionState, useEffect } from "react";
 type QuotaEditorFormProps = {
   entry: SalesQuotaProgress;
   year: number;
-  month: number;
-  monthLabel: string;
   canEdit: boolean;
 };
 
-export function QuotaEditorForm({
-  entry,
-  year,
-  month,
-  monthLabel,
-  canEdit,
-}: QuotaEditorFormProps) {
+function getInitials(name: string): string {
+  return name
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((word) => word[0])
+    .join("")
+    .toUpperCase();
+}
+
+export function QuotaEditorForm({ entry, year, canEdit }: QuotaEditorFormProps) {
   const [state, formAction, isPending] = useActionState(
     updateSalesQuotaAction,
     INITIAL_UPDATE_QUOTA_STATE,
@@ -43,40 +45,51 @@ export function QuotaEditorForm({
   }, [state.error, state.message, state.success, toast]);
 
   return (
-    <div className="space-y-3 rounded-lg border p-4">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <p className="font-medium">{entry.name}</p>
+    <div className="rounded-lg border bg-card p-4 shadow-xs sm:p-5">
+      <div className="flex flex-wrap items-center justify-between gap-x-6 gap-y-3">
+        <div className="flex min-w-0 items-center gap-3">
+          <span
+            aria-hidden="true"
+            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-muted text-xs font-semibold text-muted-foreground"
+          >
+            {getInitials(entry.name)}
+          </span>
+          <div className="min-w-0">
+            <p className="truncate font-medium">{entry.name}</p>
+            <p className="text-xs text-muted-foreground">{year} annual quota</p>
+          </div>
+        </div>
+
         {canEdit ? (
           <form action={formAction} className="flex items-center gap-2">
             <input type="hidden" name="profileId" value={entry.profileId} />
             <input type="hidden" name="year" value={year} />
-            <input type="hidden" name="month" value={month} />
             <Label htmlFor={`quota-${entry.profileId}`} className="sr-only">
-              Monthly quota for {entry.name}
+              {year} quota for {entry.name}
             </Label>
             <NumberInput
               id={`quota-${entry.profileId}`}
               name="quotaAmount"
-              placeholder="e.g. 500,000"
+              placeholder="e.g. 6,000,000"
               defaultValue={entry.quotaAmount ?? ""}
               disabled={isPending}
-              className="w-40"
+              className="w-44"
             />
             <Button type="submit" size="sm" disabled={isPending}>
-              {isPending ? "Saving…" : "Save quota"}
+              {isPending ? "Saving…" : "Save"}
             </Button>
           </form>
         ) : null}
       </div>
 
-      <QuotaRail
-        quotaAmount={entry.quotaAmount}
-        achieved={entry.achieved}
-        year={year}
-        month={month}
-        monthLabel={monthLabel}
-        canEdit={canEdit}
-      />
+      <div className="mt-4">
+        <QuotaRail
+          quotaAmount={entry.quotaAmount}
+          achieved={entry.achieved}
+          year={year}
+          canEdit={canEdit}
+        />
+      </div>
     </div>
   );
 }

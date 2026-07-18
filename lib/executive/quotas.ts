@@ -43,7 +43,7 @@ function toNumber(value: number | string | null | undefined): number {
 
 export function validateQuotaAmountInput(value: number): number {
   if (!Number.isFinite(value) || value < 0) {
-    throw new Error("Monthly quota must be a non-negative number.");
+    throw new Error("Annual quota must be a non-negative number.");
   }
 
   return Number(value);
@@ -117,13 +117,12 @@ export function attributePurchaseOrdersToSalesPerson(
   return totals;
 }
 
-/** Approved-PO totals for the given month, keyed by attributed salesperson profile id. */
-export async function getMonthlyPoBySalesPerson(
+/** Approved-PO totals for the given year, keyed by attributed salesperson profile id. */
+export async function getAnnualPoBySalesPerson(
   year: number,
-  month: number,
 ): Promise<Map<string, number>> {
-  const startDate = `${year}-${String(month).padStart(2, "0")}-01`;
-  const endDate = new Date(year, month, 0).toISOString().slice(0, 10);
+  const startDate = `${year}-01-01`;
+  const endDate = `${year}-12-31`;
 
   const rawRows = await fetchApprovedPurchaseOrdersWithQuotationOwner(startDate, endDate);
 
@@ -143,17 +142,13 @@ export async function getMonthlyPoBySalesPerson(
   return attributePurchaseOrdersToSalesPerson(rows, quotationSalesPersonMap);
 }
 
-/** Quotas set for the given month, keyed by profile id. */
-export async function getSalesQuotas(
-  year: number,
-  month: number,
-): Promise<Map<string, number>> {
+/** Quotas set for the given year, keyed by profile id. */
+export async function getSalesQuotas(year: number): Promise<Map<string, number>> {
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("sales_quotas")
     .select("profile_id, quota_amount")
-    .eq("year", year)
-    .eq("month", month);
+    .eq("year", year);
 
   if (error) {
     throw new Error("Failed to load sales quotas.");
@@ -178,11 +173,10 @@ export function computeQuotaPercent(
   return (achieved / quotaAmount) * 100;
 }
 
-/** Sets/updates one salesperson's quota for a month. Callers must already have checked `isTargetEditor`. */
+/** Sets/updates one salesperson's quota for a year. Callers must already have checked `isTargetEditor`. */
 export async function upsertSalesQuota(
   profileId: string,
   year: number,
-  month: number,
   quotaAmountInput: number,
 ): Promise<void> {
   const quotaAmount = validateQuotaAmountInput(quotaAmountInput);
@@ -197,11 +191,10 @@ export async function upsertSalesQuota(
     {
       profile_id: profileId,
       year,
-      month,
       quota_amount: quotaAmount,
       set_by: profile.id,
     },
-    { onConflict: "profile_id,year,month" },
+    { onConflict: "profile_id,year" },
   );
 
   if (error) {
@@ -212,7 +205,6 @@ export async function upsertSalesQuota(
 /** Quota + achieved-vs-quota progress for every active salesperson, for the executive Quotas tab. */
 export async function getSalesQuotaProgress(
   year: number,
-  month: number,
   options: { viewer?: CurrentProfile | null } = {},
 ): Promise<SalesQuotaProgress[]> {
   if (options.viewer !== undefined && !isTargetEditor(options.viewer)) {
@@ -221,8 +213,8 @@ export async function getSalesQuotaProgress(
 
   const [roster, quotas, achievedMap] = await Promise.all([
     getSalesRoster(),
-    getSalesQuotas(year, month),
-    getMonthlyPoBySalesPerson(year, month),
+    getSalesQuotas(year),
+    getAnnualPoBySalesPerson(year),
   ]);
 
   return roster
@@ -245,7 +237,6 @@ export async function getSalesQuotaProgress(
 export async function getMyQuotaProgress(
   profileId: string,
   year: number,
-  month: number,
 ): Promise<SalesQuotaProgress> {
   const supabase = await createClient();
   const [{ data: quotaRow, error: quotaError }, achievedMap] = await Promise.all([
@@ -254,9 +245,8 @@ export async function getMyQuotaProgress(
       .select("quota_amount")
       .eq("profile_id", profileId)
       .eq("year", year)
-      .eq("month", month)
       .maybeSingle(),
-    getMonthlyPoBySalesPerson(year, month),
+    getAnnualPoBySalesPerson(year),
   ]);
 
   if (quotaError) {

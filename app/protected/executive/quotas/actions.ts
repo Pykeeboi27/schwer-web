@@ -12,21 +12,19 @@ export async function updateSalesQuotaAction(
 ): Promise<UpdateSalesQuotaState> {
   const profileId = String(formData.get("profileId") ?? "").trim();
   const yearRaw = String(formData.get("year") ?? "").trim();
-  const monthRaw = String(formData.get("month") ?? "").trim();
   const quotaRaw = String(formData.get("quotaAmount") ?? "").trim();
 
   const year = Number(yearRaw);
-  const month = Number(monthRaw);
   const quotaAmount = Number(quotaRaw);
 
   if (!profileId) {
     return { success: false, error: "A salesperson is required.", message: null };
   }
 
-  if (!Number.isInteger(year) || !Number.isInteger(month) || month < 1 || month > 12) {
+  if (!Number.isInteger(year)) {
     return {
       success: false,
-      error: "A valid year and month are required.",
+      error: "A valid year is required.",
       message: null,
     };
   }
@@ -50,7 +48,7 @@ export async function updateSalesQuotaAction(
   }
 
   try {
-    await upsertSalesQuota(profileId, year, month, quotaAmount);
+    await upsertSalesQuota(profileId, year, quotaAmount);
     revalidatePath("/protected/executive/quotas");
     revalidatePath("/protected/sales");
 

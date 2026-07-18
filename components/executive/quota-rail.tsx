@@ -4,13 +4,10 @@ import { cn } from "@/lib/utils";
 import { useEffect, useState } from "react";
 
 export type QuotaRailProps = {
-  /** Null when no quota has been set for this person/month yet. */
+  /** Null when no quota has been set for this person/year yet. */
   quotaAmount: number | null;
   achieved: number;
   year: number;
-  /** 1-12. */
-  month: number;
-  monthLabel: string;
   /** Defaults to now; pass a fixed date in tests/stories. */
   referenceDate?: Date;
   /** Softens the empty-state copy into an invitation to act, for target editors. */
@@ -25,36 +22,38 @@ function formatCurrency(amount: number): string {
   }).format(amount);
 }
 
-/** Fraction (0-1) of the month elapsed as of referenceDate — the pace marker's position. */
-function getPaceFraction(year: number, month: number, referenceDate: Date): number {
-  const daysInMonth = new Date(year, month, 0).getDate();
-  const monthStart = new Date(year, month - 1, 1);
-  const monthEnd = new Date(year, month, 0);
+const DAY_MS = 1000 * 60 * 60 * 24;
 
-  if (referenceDate < monthStart) {
+/** Fraction (0-1) of the year elapsed as of referenceDate — the pace marker's position. */
+function getPaceFraction(year: number, referenceDate: Date): number {
+  const yearStart = new Date(year, 0, 1);
+  const yearEnd = new Date(year + 1, 0, 1);
+
+  if (referenceDate < yearStart) {
     return 0;
   }
 
-  if (referenceDate > monthEnd) {
+  if (referenceDate >= yearEnd) {
     return 1;
   }
 
-  return Math.min(referenceDate.getDate(), daysInMonth) / daysInMonth;
+  return (
+    (referenceDate.getTime() - yearStart.getTime()) /
+    (yearEnd.getTime() - yearStart.getTime())
+  );
 }
 
 /**
  * The signature element for quota tracking: a progress rail that reads
  * against *pace*, not just amount. A plain bar can only say "60% there" — this
- * one also says whether 60% is good news (12 days into the month) or bad news
- * (25 days in). The moving pace marker carries that second fact; the fixed
- * tick at the right edge is the 100% reference the marker is judged against.
+ * one also says whether 60% is good news (May) or bad news (November). The
+ * moving pace marker carries that second fact; the fixed tick at the right
+ * edge is the 100% reference the marker is judged against.
  */
 export function QuotaRail({
   quotaAmount,
   achieved,
   year,
-  month,
-  monthLabel,
   referenceDate,
   canEdit = false,
 }: QuotaRailProps) {
@@ -69,16 +68,15 @@ export function QuotaRail({
     return (
       <p className="text-sm text-muted-foreground">
         {canEdit
-          ? `No quota set for ${monthLabel} yet — set one below.`
-          : `No quota set for ${monthLabel}.`}
+          ? `No quota set for ${year} yet — set one above.`
+          : `No quota set for ${year}.`}
       </p>
     );
   }
 
   const today = referenceDate ?? new Date();
-  const daysInMonth = new Date(year, month, 0).getDate();
-  const isCurrentMonth = today.getFullYear() === year && today.getMonth() + 1 === month;
-  const pacePercent = getPaceFraction(year, month, today) * 100;
+  const isCurrentYear = today.getFullYear() === year;
+  const pacePercent = getPaceFraction(year, today) * 100;
   const percent = (achieved / quotaAmount) * 100;
   const fillPercent = Math.min(100, percent);
 
@@ -91,7 +89,9 @@ export function QuotaRail({
     behind: "bg-red-500",
   }[status];
 
-  const daysLeft = isCurrentMonth ? Math.max(0, daysInMonth - today.getDate()) : null;
+  const daysLeft = isCurrentYear
+    ? Math.max(0, Math.ceil((new Date(year + 1, 0, 1).getTime() - today.getTime()) / DAY_MS))
+    : null;
 
   let statusLabel: string;
   if (percent >= 100) {
@@ -115,7 +115,7 @@ export function QuotaRail({
         aria-valuenow={Math.round(fillPercent)}
         aria-valuemin={0}
         aria-valuemax={100}
-        aria-label={`${monthLabel} quota progress`}
+        aria-label={`${year} quota progress`}
       >
         <div
           className={cn(
@@ -129,8 +129,8 @@ export function QuotaRail({
           className="absolute inset-y-0 right-0 w-px bg-foreground/70"
           aria-hidden="true"
         />
-        {/* Pace marker: where the month's elapsed time says achievement "should" be. */}
-        {isCurrentMonth ? (
+        {/* Pace marker: where the year's elapsed time says achievement "should" be. */}
+        {isCurrentYear ? (
           <div
             className="absolute inset-y-0 w-px bg-foreground/40"
             style={{ left: `${Math.min(99, pacePercent)}%` }}

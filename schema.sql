@@ -467,20 +467,19 @@ CREATE TABLE public.revenue_targets (
   UNIQUE (year, month, sector)
 );
 
--- Per-salesperson monthly quota, distinct from the company/sector-wide
--- revenue_targets above. profile_id/year/month are all NOT NULL, so (unlike
--- revenue_targets) a plain `ON CONFLICT (profile_id, year, month)` upsert
+-- Per-salesperson annual quota, distinct from the company/sector-wide
+-- revenue_targets above. profile_id/year are NOT NULL, so (unlike
+-- revenue_targets) a plain `ON CONFLICT (profile_id, year)` upsert
 -- works without the read-update-delete dance in lib/executive/targets.ts.
 CREATE TABLE public.sales_quotas (
   id            UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   profile_id    UUID NOT NULL REFERENCES public.profiles(id) ON DELETE CASCADE,
   year          INTEGER NOT NULL,
-  month         INTEGER NOT NULL CHECK (month BETWEEN 1 AND 12),
   quota_amount  NUMERIC(15, 2) NOT NULL,
   set_by        UUID REFERENCES public.profiles(id) ON DELETE SET NULL,
   created_at    TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at    TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  UNIQUE (profile_id, year, month)
+  UNIQUE (profile_id, year)
 );
 CREATE INDEX idx_sales_quotas_profile ON public.sales_quotas(profile_id);
 
