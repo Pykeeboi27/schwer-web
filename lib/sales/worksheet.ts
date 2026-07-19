@@ -27,6 +27,15 @@ export type PurchaseOrderWorksheetData = {
   quotationNumber: string | null;
   subject: string;
   poAmount: number;
+  /**
+   * Pricing percentages printed together in the worksheet REMARKS box.
+   * `marginPercent` prefers the sales-entered `margin_percentage`, falling
+   * back to the generated `margin_percent` (derived from po_amount vs. cost).
+   * Each is null when not set on the PO.
+   */
+  marginPercent: number | null;
+  bankPercent: number | null;
+  sopPercent: number | null;
   items: PurchaseOrderWorksheetItem[];
   paymentTerms: string | null;
   leadTimeDays: number | null;
@@ -47,6 +56,14 @@ function joinAddress(parts: Array<string | null | undefined>): string {
   return parts.filter((part) => part && part.trim() !== "").join(", ");
 }
 
+function toNullableNumber(value: number | string | null | undefined): number | null {
+  if (value === null || value === undefined) {
+    return null;
+  }
+  const parsed = Number(value);
+  return Number.isNaN(parsed) ? null : parsed;
+}
+
 export async function getPurchaseOrderWorksheetData(
   poId: string,
 ): Promise<PurchaseOrderWorksheetData | null> {
@@ -56,6 +73,7 @@ export async function getPurchaseOrderWorksheetData(
     .from("purchase_orders")
     .select(
       `id, po_number, client_po_number, quotation_reference, subject, po_amount,
+       cost, margin_percentage, margin_percent, bank_percentage, sop_percentage,
        payment_terms, payment_terms_custom, lead_time_days, po_date, expected_completion,
        notes, sector, created_at, created_by,
        clients:client_id ( company_name, address, city, province, tin, notes ),
@@ -102,6 +120,9 @@ export async function getPurchaseOrderWorksheetData(
       null,
     subject: po.subject,
     poAmount: Number(po.po_amount),
+    marginPercent: toNullableNumber(po.margin_percentage ?? po.margin_percent),
+    bankPercent: toNullableNumber(po.bank_percentage),
+    sopPercent: toNullableNumber(po.sop_percentage),
     items,
     paymentTerms: paymentTerms ?? null,
     leadTimeDays: po.lead_time_days ?? null,
