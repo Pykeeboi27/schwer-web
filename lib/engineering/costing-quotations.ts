@@ -213,9 +213,10 @@ export async function setQuotationItemCosts(input: {
   const updatePayload: Record<string, unknown> = {
     client_id: input.clientId,
     sector: clientRow.sector,
-    subject: input.subject,
+    // Quotation subject and comments are standardized to ALL CAPS.
+    subject: input.subject.toUpperCase(),
     google_drive_link: input.googleDriveLink,
-    notes: input.notes ?? null,
+    notes: input.notes ? input.notes.toUpperCase() : null,
     sales_person_id: input.salesPersonId ?? null,
     costing_rejection_reason: null,
   };

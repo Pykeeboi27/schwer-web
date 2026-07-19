@@ -106,7 +106,8 @@ export function CreateRequestForQuotationDialog({
 
     const parsedItems = items
       .map((row) => ({
-        description: row.description.trim(),
+        // Quotation line items are standardized to ALL CAPS.
+        description: row.description.trim().toUpperCase(),
         quantity: Number(row.quantity),
       }))
       .filter((row) => row.description !== "");
@@ -132,8 +133,9 @@ export function CreateRequestForQuotationDialog({
     const response = await createRequestForQuotationAction({
       quotationNumber: quotationNumberValue,
       clientId,
-      subject: subject.trim(),
-      notes: notes.trim() || null,
+      // Quotation subject and comments are standardized to ALL CAPS.
+      subject: subject.trim().toUpperCase(),
+      notes: notes.trim() ? notes.trim().toUpperCase() : null,
       items: parsedItems,
     });
 
