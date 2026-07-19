@@ -249,13 +249,15 @@ export async function createRequestForQuotation(input: {
       quotation_number: input.quotationNumber,
       client_id: input.clientId,
       sector: clientRow.sector,
-      subject: input.subject,
+      // Quotation subject and comments are standardized to ALL CAPS (see
+      // migration 0020 for the one-time backfill of existing rows).
+      subject: input.subject.toUpperCase(),
       // amount (selling amount) and cost are set later — amount in the sales
       // phase, cost is rolled up from quotation_items as Engineering costs them.
       amount: 0,
       // The requester is always the sales person on their own RFQ.
       sales_person_id: profile.id,
-      notes: input.notes ?? null,
+      notes: input.notes ? input.notes.toUpperCase() : null,
       prepared_by: profile.id,
       status: "draft",
       phase: "costing",
@@ -273,7 +275,9 @@ export async function createRequestForQuotation(input: {
   const { error: itemsError } = await supabase.from("quotation_items").insert(
     input.items.map((item, index) => ({
       quotation_id: data.id,
-      description: item.description,
+      // Quotation line items are standardized to ALL CAPS (see migration 0019
+      // for the one-time backfill of existing rows).
+      description: item.description.toUpperCase(),
       quantity: item.quantity,
       sort_order: index,
     })),
@@ -515,7 +519,8 @@ export async function updateSalesQuotationDetails(input: {
       payment_terms: input.paymentTerms,
       payment_terms_custom: input.paymentTermsCustom,
       lead_time_days: input.leadTimeDays,
-      notes: input.notes,
+      // Quotation comments are standardized to ALL CAPS.
+      notes: input.notes ? input.notes.toUpperCase() : null,
     })
     .eq("id", input.quotationId);
 

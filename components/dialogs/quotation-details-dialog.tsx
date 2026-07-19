@@ -284,7 +284,8 @@ export function QuotationDetailsDialog({
     formData.set("paymentTerms", paymentTermsSelect.trim());
     formData.set("paymentTermsCustom", paymentTermsCustom.trim());
     formData.set("leadTimeDays", trimmedLeadTime);
-    formData.set("notes", notes.trim());
+    // Quotation comments are standardized to ALL CAPS.
+    formData.set("notes", notes.trim().toUpperCase());
 
     const response = await updateSalesQuotationDetailsAction(formData);
     if (!response.success) {

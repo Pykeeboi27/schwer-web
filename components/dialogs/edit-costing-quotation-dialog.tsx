@@ -152,13 +152,14 @@ export function EditCostingQuotationDialog({
       quotationId: quotation.id,
       quotationNumber: quotationNumberValue,
       clientId,
-      subject: subject.trim(),
+      // Quotation subject and comments are standardized to ALL CAPS.
+      subject: subject.trim().toUpperCase(),
       items: quotation.items.map((item) => ({
         id: item.id,
         unitCost: itemCosts[item.id] ?? "",
       })),
       googleDriveLink: driveLink,
-      notes: notes.trim() || null,
+      notes: notes.trim() ? notes.trim().toUpperCase() : null,
       salesPersonId: salesPersonId || null,
     });
 
