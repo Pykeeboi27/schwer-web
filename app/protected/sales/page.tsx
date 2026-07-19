@@ -3,9 +3,13 @@ import { getSalesDashboardCharts } from "@/lib/sales/dashboard-charts";
 import { SectorPerformanceChart } from "@/components/sales/sector-performance-chart";
 import { ClientDistributionChart } from "@/components/sales/client-distribution-chart";
 import { BeamTick, PageHeader, Panel, StatCard } from "@/components/patterns";
+import { QuotaRail } from "@/components/executive/quota-rail";
+import { getMyQuotaProgress } from "@/lib/executive/quotas";
 import { getCurrentProfile } from "@/lib/profile/get-current-profile";
 import { getSalesAccessRedirect } from "@/lib/sales/access";
 import { redirect } from "next/navigation";
+
+const QUOTA_HOLDER_ROLES = new Set(["sales_staff", "sales_manager"]);
 
 function formatCurrency(amount: number): string {
   return new Intl.NumberFormat("en-PH", {
@@ -23,9 +27,15 @@ export default async function SalesDashboardPage() {
     redirect(redirectPath);
   }
 
-  const [summary, charts] = await Promise.all([
-    getSalesSummary(),
+  const isQuotaHolder = Boolean(profile?.role && QUOTA_HOLDER_ROLES.has(profile.role));
+  const year = new Date().getFullYear();
+
+  const [summary, charts, myQuota] = await Promise.all([
+    getSalesSummary(profile?.id ?? ""),
     getSalesDashboardCharts(),
+    isQuotaHolder && profile
+      ? getMyQuotaProgress(profile.id, year)
+      : Promise.resolve(null),
   ]);
 
   return (
@@ -35,12 +45,31 @@ export default async function SalesDashboardPage() {
         description="Snapshot of client volume, quotation pipeline, and closed vs recognized sales."
       />
 
-      <StatCard
-        label="Closed Sales"
-        value={formatCurrency(summary.closedSaleTotal)}
-        accent
-        size="hero"
-      />
+      <div className="grid gap-3 sm:grid-cols-2">
+        <StatCard
+          label="My Closed Sales"
+          value={formatCurrency(summary.myClosedSaleTotal)}
+          accent
+        />
+        <StatCard
+          label="Company Closed Sales"
+          value={formatCurrency(summary.companyClosedSaleTotal)}
+          accent
+        />
+      </div>
+
+      {myQuota ? (
+        <StatCard
+          label={`My quota — ${year}`}
+          value={formatCurrency(myQuota.achieved)}
+        >
+          <QuotaRail
+            quotaAmount={myQuota.quotaAmount}
+            achieved={myQuota.achieved}
+            year={year}
+          />
+        </StatCard>
+      ) : null}
 
       <div className="grid gap-3 sm:grid-cols-2">
         <StatCard label="Active Clients" value={summary.totalClients} />

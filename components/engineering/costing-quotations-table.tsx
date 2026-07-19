@@ -29,7 +29,6 @@ type SalesPersonOption = {
 
 type CostingQuotationsTableProps = {
   quotations: CostingQuotation[];
-  currentUserId: string;
   clients: ClientOption[];
   salesPeople: SalesPersonOption[];
 };
@@ -79,7 +78,6 @@ function matchesStatusFilter(q: CostingQuotation, filter: StatusFilter): boolean
 
 export function CostingQuotationsTable({
   quotations,
-  currentUserId,
   clients,
   salesPeople,
 }: CostingQuotationsTableProps) {
@@ -149,7 +147,7 @@ export function CostingQuotationsTable({
               <tr>
                 <th className="px-3 py-2 font-medium">Client</th>
                 <th className="px-3 py-2 font-medium">Subject</th>
-                <th className="px-3 py-2 font-medium">Direct Cost</th>
+                <th className="px-3 py-2 font-medium">Total Cost</th>
                 <th className="px-3 py-2 font-medium">Status</th>
               </tr>
             </thead>
@@ -198,7 +196,7 @@ export function CostingQuotationsTable({
                 }
               >
                 <DataField label="Subject" value={q.subject} />
-                <DataField label="Direct Cost" value={formatCurrency(q.cost)} />
+                <DataField label="Total Cost" value={formatCurrency(q.cost)} />
               </DataCard>
             ))
           )
@@ -208,7 +206,6 @@ export function CostingQuotationsTable({
       <CostingQuotationDetailsDialog
         open={viewing !== null}
         quotation={viewing}
-        currentUserId={currentUserId}
         clients={clients}
         salesPeople={salesPeople}
         onOpenChange={(open) => {

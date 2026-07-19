@@ -4,12 +4,21 @@ import {
   requiredApproverRolesForAmount,
   type RequiredApproverRole,
 } from "@/lib/sales/quotations";
+import { getCurrentProfile } from "@/lib/profile/get-current-profile";
 import { computeSalesPricing } from "@/lib/sales/pricing";
 import { createClient } from "@/lib/supabase/server";
 import { validatePoTotalAmount } from "@/lib/utils/form-validation";
 
 export type PurchaseOrderStatus =
   "draft" | "pending" | "approved" | "rejected" | "cancelled";
+
+export type SalesPurchaseOrderItem = {
+  id: string;
+  description: string;
+  quantity: number;
+  unitCost: number | null;
+  lineTotal: number;
+};
 
 export type SalesPurchaseOrder = {
   id: string;
@@ -22,6 +31,7 @@ export type SalesPurchaseOrder = {
   subject: string;
   poAmount: number;
   cost: number | null;
+  items: SalesPurchaseOrderItem[];
   marginPercentage: number | null;
   marginAmount: number | null;
   bankPercentage: number | null;
@@ -43,6 +53,7 @@ export type SalesPurchaseOrder = {
   createdAt: string;
   createdBy: string;
   createdByName: string;
+  itemCount: number;
 };
 
 export type SalesPoPayment = {
@@ -159,7 +170,7 @@ export async function listPurchaseOrders(): Promise<SalesPurchaseOrder[]> {
   const { data, error } = await supabase
     .from("purchase_orders")
     .select(
-      "id, quotation_id, po_number, client_po_number, quotation_reference, client_id, subject, po_amount, cost, margin_percentage, margin_amount, bank_percentage, bank_amount, sop_percentage, sop_amount, selling_amount, recognized_amount, payment_status, payment_terms, payment_terms_custom, lead_time_days, status, approved_at, created_at, created_by, clients:client_id(company_name), po_approvals(approver_role, status, rejection_reason, updated_at, approver:approver_id(full_name, email)), creator:created_by(full_name, email)",
+      "id, quotation_id, po_number, client_po_number, quotation_reference, client_id, subject, po_amount, cost, margin_percentage, margin_amount, bank_percentage, bank_amount, sop_percentage, sop_amount, selling_amount, recognized_amount, payment_status, payment_terms, payment_terms_custom, lead_time_days, status, approved_at, created_at, created_by, clients:client_id(company_name), po_approvals(approver_role, status, rejection_reason, updated_at, approver:approver_id(full_name, email)), creator:created_by(full_name, email), purchase_order_items(id, description, quantity, unit_cost, line_total, sort_order)",
     )
     .order("created_at", { ascending: false });
 
@@ -192,6 +203,19 @@ export async function listPurchaseOrders(): Promise<SalesPurchaseOrder[]> {
         : rejectedApproval.approver
       : null;
 
+    const items = (
+      Array.isArray(row.purchase_order_items) ? row.purchase_order_items : []
+    )
+      .slice()
+      .sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0))
+      .map((item) => ({
+        id: item.id,
+        description: item.description,
+        quantity: Number(item.quantity),
+        unitCost: item.unit_cost === null ? null : Number(item.unit_cost),
+        lineTotal: Number(item.line_total),
+      }));
+
     return {
       id: row.id,
       quotationId: row.quotation_id ?? null,
@@ -204,6 +228,7 @@ export async function listPurchaseOrders(): Promise<SalesPurchaseOrder[]> {
       subject: row.subject,
       poAmount: Number(row.po_amount),
       cost: numberOrNull(row.cost),
+      items,
       marginPercentage: numberOrNull(row.margin_percentage),
       marginAmount: numberOrNull(row.margin_amount),
       bankPercentage: numberOrNull(row.bank_percentage),
@@ -225,6 +250,7 @@ export async function listPurchaseOrders(): Promise<SalesPurchaseOrder[]> {
       createdAt: row.created_at,
       createdBy: row.created_by,
       createdByName: resolveDisplayName(creator) ?? "Unknown",
+      itemCount: items.length,
     };
   });
 }
@@ -237,44 +263,36 @@ export async function markClientPoReceived(input: {
   quotationId: string;
   clientPoNumber: string;
 }): Promise<void> {
-  const supabase = await createClient();
-  const {
-    data: { user },
-    error: userError,
-  } = await supabase.auth.getUser();
-
-  if (userError || !user) {
+  const profile = await getCurrentProfile();
+  if (!profile) {
     throw new Error("You must be signed in.");
   }
 
-  const { data: quotation, error: quotationError } = await supabase
-    .from("quotations")
-    .select("id, status, phase, converted_po_id")
-    .eq("id", input.quotationId)
-    .single();
+  const supabase = await createClient();
 
-  if (quotationError || !quotation) {
-    throw new Error("Quotation was not found.");
-  }
-
-  if (quotation.phase !== "sales" || quotation.status !== "approved") {
-    throw new Error("Only approved quotations can be re-opened for a client PO.");
-  }
-
-  if (quotation.converted_po_id) {
-    throw new Error("This quotation has already been converted to a purchase order.");
-  }
-
-  const { error: updateError } = await supabase
+  // The guard (phase='sales', status='approved', not yet converted) is folded
+  // into the UPDATE's WHERE clause rather than a separate SELECT-then-UPDATE.
+  const { data, error: updateError } = await supabase
     .from("quotations")
     .update({
       client_po_number: input.clientPoNumber,
       client_confirmed_at: new Date().toISOString(),
     })
-    .eq("id", input.quotationId);
+    .eq("id", input.quotationId)
+    .eq("phase", "sales")
+    .eq("status", "approved")
+    .is("converted_po_id", null)
+    .select("id")
+    .maybeSingle();
 
   if (updateError) {
     throw new Error(updateError.message || "Failed to record the client PO.");
+  }
+
+  if (!data) {
+    throw new Error(
+      "Only approved quotations that haven't been converted yet can be re-opened for a client PO.",
+    );
   }
 }
 
@@ -286,20 +304,17 @@ export async function markClientPoReceived(input: {
 export async function convertQuotationToPurchaseOrder(
   quotationId: string,
 ): Promise<{ purchaseOrderId: string }> {
-  const supabase = await createClient();
-  const {
-    data: { user },
-    error: userError,
-  } = await supabase.auth.getUser();
-
-  if (userError || !user) {
+  const profile = await getCurrentProfile();
+  if (!profile) {
     throw new Error("You must be signed in.");
   }
+
+  const supabase = await createClient();
 
   const { data: q, error: qError } = await supabase
     .from("quotations")
     .select(
-      "id, status, phase, client_id, sector, subject, amount, cost, margin_percentage, margin_amount, bank_percentage, bank_amount, sop_percentage, sop_amount, selling_amount, payment_terms, payment_terms_custom, lead_time_days, client_po_number, client_confirmed_at, converted_po_id",
+      "id, status, phase, client_id, sector, subject, amount, cost, margin_percentage, margin_amount, bank_percentage, bank_amount, sop_percentage, sop_amount, selling_amount, payment_terms, payment_terms_custom, lead_time_days, client_po_number, client_confirmed_at, converted_po_id, quotation_items(description, quantity, unit_cost, sort_order)",
     )
     .eq("id", quotationId)
     .single();
@@ -352,7 +367,7 @@ export async function convertQuotationToPurchaseOrder(
     client_po_number: q.client_po_number,
     status: "pending",
     submitted_at: new Date().toISOString(),
-    created_by: user.id,
+    created_by: profile.id,
   };
 
   let { data: po, error: poError } = await supabase
@@ -375,7 +390,28 @@ export async function convertQuotationToPurchaseOrder(
     throw new Error(poError?.message || "Failed to create the purchase order.");
   }
 
+  const sourceItems = Array.isArray(q.quotation_items) ? q.quotation_items : [];
+  if (sourceItems.length > 0) {
+    const { error: itemsError } = await supabase.from("purchase_order_items").insert(
+      sourceItems.map((item) => ({
+        purchase_order_id: po.id,
+        description: item.description,
+        quantity: item.quantity,
+        unit_cost: item.unit_cost,
+        sort_order: item.sort_order ?? 0,
+      })),
+    );
+    if (itemsError) {
+      throw new Error(
+        itemsError.message || "Failed to copy line items to the purchase order.",
+      );
+    }
+  }
+
   const roles = requiredApproverRolesForAmount(poAmount);
+  const approversByRole = await Promise.all(
+    roles.map((role) => findApproversForRole(role)),
+  );
   const rows: Array<{
     po_id: string;
     approver_id: string;
@@ -383,9 +419,8 @@ export async function convertQuotationToPurchaseOrder(
     status: "pending";
   }> = [];
 
-  for (const role of roles) {
-    const approvers = await findApproversForRole(role);
-    for (const approver of approvers) {
+  roles.forEach((role, index) => {
+    for (const approver of approversByRole[index]) {
       rows.push({
         po_id: po.id,
         approver_id: approver.id,
@@ -393,7 +428,7 @@ export async function convertQuotationToPurchaseOrder(
         status: "pending",
       });
     }
-  }
+  });
 
   const { error: approvalError } = await supabase.from("po_approvals").insert(rows);
   if (approvalError) {
@@ -447,21 +482,17 @@ export async function findPendingPoApprovalForRole(input: {
   poId: string;
   role: RequiredApproverRole;
 }): Promise<{ approvalId: string } | null> {
-  const supabase = await createClient();
-  const {
-    data: { user },
-    error: userError,
-  } = await supabase.auth.getUser();
-
-  if (userError || !user) {
+  const profile = await getCurrentProfile();
+  if (!profile) {
     throw new Error("You must be signed in.");
   }
 
+  const supabase = await createClient();
   const { data, error } = await supabase
     .from("po_approvals")
     .select("id")
     .eq("po_id", input.poId)
-    .eq("approver_id", user.id)
+    .eq("approver_id", profile.id)
     .eq("approver_role", input.role)
     .eq("status", "pending")
     .maybeSingle();
@@ -476,21 +507,18 @@ export async function findPendingPoApprovalForRole(input: {
 export async function listPendingPoApprovalsForCurrentUser(): Promise<
   PendingPoApprovalItem[]
 > {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (!user) {
+  const profile = await getCurrentProfile();
+  if (!profile) {
     return [];
   }
 
+  const supabase = await createClient();
   const { data, error } = await supabase
     .from("po_approvals")
     .select(
       "id, po_id, approver_role, status, purchase_orders:po_id(po_number, subject, po_amount, cost, margin_amount, sector, po_date, clients:client_id(company_name), creator:created_by(full_name, email))",
     )
-    .eq("approver_id", user.id)
+    .eq("approver_id", profile.id)
     .eq("status", "pending")
     .order("created_at", { ascending: false });
 
@@ -609,6 +637,9 @@ export async function resubmitPurchaseOrderForApproval(poId: string): Promise<vo
   await supabase.from("po_approvals").delete().eq("po_id", poId);
 
   const roles = requiredApproverRolesForAmount(Number(po.po_amount));
+  const approversByRole = await Promise.all(
+    roles.map((role) => findApproversForRole(role)),
+  );
   const rows: Array<{
     po_id: string;
     approver_id: string;
@@ -616,9 +647,8 @@ export async function resubmitPurchaseOrderForApproval(poId: string): Promise<vo
     status: "pending";
   }> = [];
 
-  for (const role of roles) {
-    const approvers = await findApproversForRole(role);
-    for (const approver of approvers) {
+  roles.forEach((role, index) => {
+    for (const approver of approversByRole[index]) {
       rows.push({
         po_id: poId,
         approver_id: approver.id,
@@ -626,7 +656,7 @@ export async function resubmitPurchaseOrderForApproval(poId: string): Promise<vo
         status: "pending",
       });
     }
-  }
+  });
 
   if (rows.length > 0) {
     const { error: approvalError } = await supabase.from("po_approvals").insert(rows);
@@ -820,19 +850,16 @@ export async function addPoPayment(input: {
   referenceNumber?: string | null;
   notes?: string | null;
 }): Promise<void> {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (!user) {
+  const profile = await getCurrentProfile();
+  if (!profile) {
     throw new Error("You must be signed in.");
   }
 
+  const supabase = await createClient();
   const po = await loadOwnedApprovedPurchaseOrder(
     supabase,
     input.purchaseOrderId,
-    user.id,
+    profile.id,
   );
 
   const poAmount = Number(po.po_amount);
@@ -848,7 +875,7 @@ export async function addPoPayment(input: {
     payment_method: input.paymentMethod ?? null,
     reference_number: input.referenceNumber ?? null,
     notes: input.notes ?? null,
-    recorded_by: user.id,
+    recorded_by: profile.id,
   });
 
   if (error) {
@@ -864,19 +891,16 @@ export async function updatePoPayment(input: {
   purchaseOrderId: string;
   amountCollected: number;
 }): Promise<void> {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (!user) {
+  const profile = await getCurrentProfile();
+  if (!profile) {
     throw new Error("You must be signed in.");
   }
 
+  const supabase = await createClient();
   const po = await loadOwnedApprovedPurchaseOrder(
     supabase,
     input.purchaseOrderId,
-    user.id,
+    profile.id,
   );
 
   const { data: payment, error: paymentError } = await supabase
@@ -913,38 +937,34 @@ export async function deletePoPayment(input: {
   paymentId: string;
   purchaseOrderId: string;
 }): Promise<void> {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (!user) {
+  const profile = await getCurrentProfile();
+  if (!profile) {
     throw new Error("You must be signed in.");
   }
 
+  const supabase = await createClient();
   const po = await loadOwnedApprovedPurchaseOrder(
     supabase,
     input.purchaseOrderId,
-    user.id,
+    profile.id,
   );
 
-  const { data: payment, error: paymentError } = await supabase
-    .from("po_payments")
-    .select("id, purchase_order_id")
-    .eq("id", input.paymentId)
-    .single();
-
-  if (paymentError || !payment || payment.purchase_order_id !== po.id) {
-    throw new Error("Collection record was not found.");
-  }
-
-  const { error: deleteError } = await supabase
+  // The existence/ownership guard is folded into the DELETE's WHERE clause
+  // rather than a separate SELECT-then-DELETE.
+  const { data, error: deleteError } = await supabase
     .from("po_payments")
     .delete()
-    .eq("id", input.paymentId);
+    .eq("id", input.paymentId)
+    .eq("purchase_order_id", po.id)
+    .select("id")
+    .maybeSingle();
 
   if (deleteError) {
     throw new Error(deleteError.message || "Failed to delete the collection.");
+  }
+
+  if (!data) {
+    throw new Error("Collection record was not found.");
   }
 
   await recomputeAndSyncPoTotals(supabase, po.id, Number(po.po_amount));

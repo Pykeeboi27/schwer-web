@@ -9,7 +9,8 @@ export type SalesSummary = {
     rejected: number;
     closed: number;
   };
-  closedSaleTotal: number;
+  myClosedSaleTotal: number;
+  companyClosedSaleTotal: number;
   recognizedSaleTotal: number;
 };
 
@@ -22,7 +23,8 @@ export const EMPTY_SALES_SUMMARY: SalesSummary = {
     rejected: 0,
     closed: 0,
   },
-  closedSaleTotal: 0,
+  myClosedSaleTotal: 0,
+  companyClosedSaleTotal: 0,
   recognizedSaleTotal: 0,
 };
 
@@ -42,7 +44,7 @@ async function getQuotationCountByStatus(
   return count ?? 0;
 }
 
-export async function getSalesSummary(): Promise<SalesSummary> {
+export async function getSalesSummary(currentUserId: string): Promise<SalesSummary> {
   const supabase = await createClient();
 
   const [
@@ -59,10 +61,14 @@ export async function getSalesSummary(): Promise<SalesSummary> {
       .from("clients")
       .select("id", { count: "exact", head: true })
       .eq("is_active", true),
+    // A quotation counts as a closed sale once it's won ("approved"); it may
+    // later move on to "closed" once converted to a purchase order, but it
+    // stays a closed sale either way — both statuses must be included, or
+    // every quotation that has completed the full cycle drops out of the total.
     supabase
       .from("quotations")
-      .select("amount")
-      .eq("status", "approved")
+      .select("amount, sales_person_id")
+      .in("status", ["approved", "closed"])
       .eq("phase", "sales"),
     // Recognized sales are actual collections. `purchase_orders.recognized_amount`
     // is kept current for every approved PO (converted from a quotation or
@@ -80,9 +86,17 @@ export async function getSalesSummary(): Promise<SalesSummary> {
     throw new Error("Failed to load sales dashboard summary.");
   }
 
-  const closedSaleTotal = (quotationRows ?? []).reduce(
-    (sum, row) => sum + Number(row.amount ?? 0),
-    0,
+  const { myClosedSaleTotal, companyClosedSaleTotal } = (quotationRows ?? []).reduce(
+    (totals, row) => {
+      const amount = Number(row.amount ?? 0);
+      if (row.sales_person_id === currentUserId) {
+        totals.myClosedSaleTotal += amount;
+      } else {
+        totals.companyClosedSaleTotal += amount;
+      }
+      return totals;
+    },
+    { myClosedSaleTotal: 0, companyClosedSaleTotal: 0 },
   );
   const recognizedSaleTotal = (poRows ?? []).reduce(
     (sum, row) => sum + Number(row.recognized_amount ?? 0),
@@ -98,7 +112,8 @@ export async function getSalesSummary(): Promise<SalesSummary> {
       rejected,
       closed,
     },
-    closedSaleTotal,
+    myClosedSaleTotal,
+    companyClosedSaleTotal,
     recognizedSaleTotal,
   };
 }

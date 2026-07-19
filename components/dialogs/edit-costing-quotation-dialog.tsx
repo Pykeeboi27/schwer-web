@@ -1,6 +1,6 @@
 "use client";
 
-import { updateCostingQuotationAction } from "@/app/protected/engineering/quotations/actions";
+import { setQuotationItemCostsAction } from "@/app/protected/engineering/quotations/actions";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -16,6 +16,7 @@ import {
 } from "@/components/ui/select";
 import type { CostingQuotation } from "@/lib/engineering/costing-quotations";
 import { suggestQuotationNumber } from "@/lib/engineering/suggest-quotation-number";
+import { formatCurrency } from "@/lib/utils/number-format";
 import { useToast } from "@/lib/utils/toast-notification";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
@@ -43,7 +44,6 @@ type FieldErrors = {
   quotationNumber?: string;
   clientId?: string;
   subject?: string;
-  cost?: string;
   googleDriveLink?: string;
 };
 
@@ -71,11 +71,27 @@ export function EditCostingQuotationDialog({
   const [quotationNumber, setQuotationNumber] = useState(
     quotation?.quotationNumber ?? "",
   );
+  const [clientId, setClientId] = useState(quotation?.clientId ?? "");
+  const [salesPersonId, setSalesPersonId] = useState(quotation?.salesPersonId ?? "");
+  const [subject, setSubject] = useState(quotation?.subject ?? "");
+  const [googleDriveLink, setGoogleDriveLink] = useState(
+    quotation?.googleDriveLink ?? "",
+  );
+  const [notes, setNotes] = useState(quotation?.notes ?? "");
+  const [itemCosts, setItemCosts] = useState<Record<string, string>>({});
 
   const activeClients = useMemo(
     () => clients.filter((c) => c.isActive || c.id === quotation?.clientId),
     [clients, quotation],
   );
+
+  const totalCost = useMemo(() => {
+    if (!quotation) return 0;
+    return quotation.items.reduce((sum, item) => {
+      const unitCost = Number(itemCosts[item.id]);
+      return sum + (Number.isFinite(unitCost) ? unitCost * item.quantity : 0);
+    }, 0);
+  }, [quotation, itemCosts]);
 
   useEffect(() => {
     if (!open) {
@@ -85,7 +101,20 @@ export function EditCostingQuotationDialog({
       return;
     }
     setQuotationNumber(quotation?.quotationNumber ?? "");
-  }, [open, quotation?.quotationNumber]);
+    setClientId(quotation?.clientId ?? "");
+    setSalesPersonId(quotation?.salesPersonId ?? "");
+    setSubject(quotation?.subject ?? "");
+    setGoogleDriveLink(quotation?.googleDriveLink ?? "");
+    setNotes(quotation?.notes ?? "");
+    setItemCosts(
+      Object.fromEntries(
+        (quotation?.items ?? []).map((item) => [
+          item.id,
+          item.unitCost === null ? "" : String(item.unitCost),
+        ]),
+      ),
+    );
+  }, [open, quotation]);
 
   if (!quotation) {
     return null;
@@ -96,27 +125,14 @@ export function EditCostingQuotationDialog({
     setFormError(null);
     setFieldErrors({});
 
-    const formData = new FormData(event.currentTarget);
-    formData.set("quotationId", quotation.id);
-
     const nextErrors: FieldErrors = {};
     const quotationNumberValue = quotationNumber.trim().toUpperCase();
     if (!quotationNumberValue) nextErrors.quotationNumber = "Quotation ID is required.";
-    else formData.set("quotationNumber", quotationNumberValue);
-
-    const clientId = String(formData.get("clientId") ?? "").trim();
-    const subject = String(formData.get("subject") ?? "").trim();
-    const costText = String(formData.get("cost") ?? "").trim();
-    const driveLink = String(formData.get("googleDriveLink") ?? "").trim();
 
     if (!clientId) nextErrors.clientId = "Client is required.";
-    if (!subject) nextErrors.subject = "Subject is required.";
+    if (!subject.trim()) nextErrors.subject = "Subject is required.";
 
-    const cost = Number(costText);
-    if (!costText || !Number.isFinite(cost) || cost < 0) {
-      nextErrors.cost = "Direct cost must be 0 or greater.";
-    }
-
+    const driveLink = googleDriveLink.trim();
     if (!driveLink) {
       nextErrors.googleDriveLink = "Google Drive link is required.";
     } else if (!isHttpUrl(driveLink)) {
@@ -132,7 +148,19 @@ export function EditCostingQuotationDialog({
     }
 
     setIsSubmitting(true);
-    const response = await updateCostingQuotationAction(formData);
+    const response = await setQuotationItemCostsAction({
+      quotationId: quotation.id,
+      quotationNumber: quotationNumberValue,
+      clientId,
+      subject: subject.trim(),
+      items: quotation.items.map((item) => ({
+        id: item.id,
+        unitCost: itemCosts[item.id] ?? "",
+      })),
+      googleDriveLink: driveLink,
+      notes: notes.trim() || null,
+      salesPersonId: salesPersonId || null,
+    });
 
     if (!response.success) {
       const message = response.error ?? "Failed to update costing quotation.";
@@ -157,7 +185,7 @@ export function EditCostingQuotationDialog({
     >
       <DialogContent className="max-h-[85vh] max-w-2xl overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Edit Costing Quotation</DialogTitle>
+          <DialogTitle>Set Item Costs</DialogTitle>
         </DialogHeader>
 
         {quotation.costingRejectionReason ? (
@@ -166,117 +194,121 @@ export function EditCostingQuotationDialog({
           </Callout>
         ) : null}
 
-        <form onSubmit={handleSubmit} className="grid gap-4 md:grid-cols-2">
-          <div className="md:col-span-2">
-            <Label htmlFor="edit-costing-quotation-number">Quotation ID</Label>
-            <div className="mt-1 flex gap-2">
-              <Input
-                id="edit-costing-quotation-number"
-                value={quotationNumber}
-                onChange={(e) => setQuotationNumber(e.target.value.toUpperCase())}
-                aria-invalid={Boolean(fieldErrors.quotationNumber)}
-                className="uppercase"
-                placeholder="QT-2026-001"
-              />
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => setQuotationNumber(suggestQuotationNumber())}
-              >
-                Suggest
-              </Button>
+        <form onSubmit={handleSubmit} className="grid gap-4">
+          <div className="grid gap-4 md:grid-cols-2">
+            <div className="md:col-span-2">
+              <Label htmlFor="edit-costing-quotation-number">Quotation ID</Label>
+              <div className="mt-1 flex gap-2">
+                <Input
+                  id="edit-costing-quotation-number"
+                  value={quotationNumber}
+                  onChange={(e) => setQuotationNumber(e.target.value.toUpperCase())}
+                  aria-invalid={Boolean(fieldErrors.quotationNumber)}
+                  className="uppercase"
+                  placeholder="QT-2026-001"
+                />
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setQuotationNumber(suggestQuotationNumber())}
+                >
+                  Suggest
+                </Button>
+              </div>
+              {fieldErrors.quotationNumber ? (
+                <p className="mt-1 text-xs text-destructive">
+                  {fieldErrors.quotationNumber}
+                </p>
+              ) : null}
             </div>
-            {fieldErrors.quotationNumber ? (
-              <p className="mt-1 text-xs text-destructive">
-                {fieldErrors.quotationNumber}
-              </p>
-            ) : null}
-          </div>
 
-          <div className="md:col-span-2">
-            <Label htmlFor="edit-costing-client">Client</Label>
-            <Select name="clientId" required defaultValue={quotation.clientId}>
-              <SelectTrigger
-                id="edit-costing-client"
+            <div className="md:col-span-2">
+              <Label htmlFor="edit-costing-client">Client</Label>
+              <Select value={clientId} onValueChange={setClientId}>
+                <SelectTrigger
+                  id="edit-costing-client"
+                  className="mt-1"
+                  aria-invalid={Boolean(fieldErrors.clientId)}
+                >
+                  <SelectValue placeholder="Select client" />
+                </SelectTrigger>
+                <SelectContent>
+                  {activeClients.map((client) => (
+                    <SelectItem key={client.id} value={client.id}>
+                      {client.companyName}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {fieldErrors.clientId ? (
+                <p className="mt-1 text-xs text-destructive">{fieldErrors.clientId}</p>
+              ) : null}
+            </div>
+
+            <div className="md:col-span-2">
+              <Label htmlFor="edit-costing-sales-person">Sales Person</Label>
+              <Select value={salesPersonId} onValueChange={setSalesPersonId}>
+                <SelectTrigger id="edit-costing-sales-person" className="mt-1">
+                  <SelectValue placeholder="Select sales person" />
+                </SelectTrigger>
+                <SelectContent>
+                  {salesPeople.map((person) => (
+                    <SelectItem key={person.id} value={person.id}>
+                      {person.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="md:col-span-2">
+              <Label htmlFor="edit-costing-subject">Subject</Label>
+              <Input
+                id="edit-costing-subject"
+                value={subject}
+                onChange={(e) => setSubject(e.target.value)}
+                aria-invalid={Boolean(fieldErrors.subject)}
                 className="mt-1"
-                aria-invalid={Boolean(fieldErrors.clientId)}
-              >
-                <SelectValue placeholder="Select client" />
-              </SelectTrigger>
-              <SelectContent>
-                {activeClients.map((client) => (
-                  <SelectItem key={client.id} value={client.id}>
-                    {client.companyName}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            {fieldErrors.clientId ? (
-              <p className="mt-1 text-xs text-destructive">{fieldErrors.clientId}</p>
-            ) : null}
+              />
+              {fieldErrors.subject ? (
+                <p className="mt-1 text-xs text-destructive">{fieldErrors.subject}</p>
+              ) : null}
+            </div>
           </div>
 
-          <div className="md:col-span-2">
-            <Label htmlFor="edit-costing-sales-person">Sales Person</Label>
-            <Select
-              name="salesPersonId"
-              defaultValue={quotation.salesPersonId ?? undefined}
-            >
-              <SelectTrigger id="edit-costing-sales-person" className="mt-1">
-                <SelectValue placeholder="Select sales person" />
-              </SelectTrigger>
-              <SelectContent>
-                {salesPeople.map((person) => (
-                  <SelectItem key={person.id} value={person.id}>
-                    {person.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <p className="mt-1 text-xs text-muted-foreground">
-              Can be left blank in a draft, but is required before submitting for
-              approval.
-            </p>
+          <div>
+            <Label>Line Item Costs</Label>
+            <div className="mt-2 space-y-2 rounded-md border p-3">
+              {quotation.items.map((item) => (
+                <div key={item.id} className="flex items-center gap-3">
+                  <div className="flex-1 text-sm">
+                    <p className="font-medium">{item.description}</p>
+                    <p className="text-xs text-muted-foreground">Qty {item.quantity}</p>
+                  </div>
+                  <NumberInput
+                    value={itemCosts[item.id] ?? ""}
+                    onValueChange={(raw) =>
+                      setItemCosts((prev) => ({ ...prev, [item.id]: raw }))
+                    }
+                    placeholder="Unit cost"
+                    className="w-36"
+                  />
+                </div>
+              ))}
+              <div className="flex items-center justify-between border-t pt-2 text-sm font-semibold">
+                <span>Total Cost</span>
+                <span>{formatCurrency(totalCost)}</span>
+              </div>
+            </div>
           </div>
 
-          <div className="md:col-span-2">
-            <Label htmlFor="edit-costing-subject">Subject</Label>
-            <Input
-              id="edit-costing-subject"
-              name="subject"
-              required
-              defaultValue={quotation.subject}
-              aria-invalid={Boolean(fieldErrors.subject)}
-              className="mt-1"
-            />
-            {fieldErrors.subject ? (
-              <p className="mt-1 text-xs text-destructive">{fieldErrors.subject}</p>
-            ) : null}
-          </div>
-
-          <div className="md:col-span-2">
-            <Label htmlFor="edit-costing-cost">Direct Cost</Label>
-            <NumberInput
-              id="edit-costing-cost"
-              name="cost"
-              required
-              defaultValue={quotation.cost ?? ""}
-              aria-invalid={Boolean(fieldErrors.cost)}
-              className="mt-1"
-            />
-            {fieldErrors.cost ? (
-              <p className="mt-1 text-xs text-destructive">{fieldErrors.cost}</p>
-            ) : null}
-          </div>
-
-          <div className="md:col-span-2">
+          <div>
             <Label htmlFor="edit-costing-drive">Google Drive Link</Label>
             <Input
               id="edit-costing-drive"
-              name="googleDriveLink"
+              value={googleDriveLink}
+              onChange={(e) => setGoogleDriveLink(e.target.value)}
               type="url"
-              required
-              defaultValue={quotation.googleDriveLink ?? ""}
               aria-invalid={Boolean(fieldErrors.googleDriveLink)}
               className="mt-1"
             />
@@ -287,25 +319,25 @@ export function EditCostingQuotationDialog({
             ) : null}
           </div>
 
-          <div className="md:col-span-2">
+          <div>
             <Label htmlFor="edit-costing-notes">Comments</Label>
             <textarea
               id="edit-costing-notes"
-              name="notes"
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
               rows={3}
-              defaultValue={quotation.notes ?? ""}
               className={textareaClassName}
               placeholder="Add any commercial notes or comments (optional)"
             />
           </div>
 
           {formError ? (
-            <p className="md:col-span-2 text-sm text-destructive" role="alert">
+            <p className="text-sm text-destructive" role="alert">
               {formError}
             </p>
           ) : null}
 
-          <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end md:col-span-2">
+          <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
               Cancel
             </Button>

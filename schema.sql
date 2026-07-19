@@ -65,6 +65,46 @@ CREATE TYPE quotation_phase_enum AS ENUM (
   'sales'
 );
 
+CREATE TYPE notification_type_enum AS ENUM (
+  'quotation_approval_requested',
+  'quotation_approved',
+  'quotation_rejected',
+  'po_approval_requested',
+  'po_approved',
+  'po_rejected',
+  'costing_approval_requested',
+  'costing_approved',
+  'costing_rejected',
+  -- Added by migration 0012 for the engineering module (no per-user
+  -- assignment column there -- lib/engineering/access.ts gates purely on
+  -- department='engineering', so these broadcast department-wide).
+  'costing_quotation_received',
+  'costing_quotation_returned',
+  -- Added by migration 0014/0015: an engineer updated item unit costs on a
+  -- costing quotation, notifying the RFQ's preparer. Created via an RPC
+  -- (fn_notify_costing_cost_updated), not a trigger -- see that function.
+  'costing_cost_updated',
+  -- Added by migration 0016/0017: symmetric with costing_quotation_returned --
+  -- engineering is notified when costing is approved too, not just rejected.
+  'costing_quotation_approved'
+);
+
+-- One section per nav tab that can show an "unseen changes" dot. Sales-phase
+-- quotation outcomes surface on the Quotations tab; costing outcomes surface
+-- on Request for Quotation, since that's where a preparer tracks their
+-- costing-phase items (lib/sales/quotations.ts's costing list is filtered to
+-- phase='costing' AND prepared_by = current user, shown on that tab, not the
+-- Quotations tab which is phase='sales' only).
+CREATE TYPE notification_section_enum AS ENUM (
+  'request_for_quotation',
+  'quotations',
+  'purchase_orders',
+  'approvals',
+  'costing_approvals',
+  -- Added by migration 0012, for the Engineering module's Quotations tab.
+  'engineering_quotations'
+);
+
 
 -- ============================================================
 -- SECTION 1: USER PROFILES & ROLES
@@ -427,6 +467,22 @@ CREATE TABLE public.revenue_targets (
   UNIQUE (year, month, sector)
 );
 
+-- Per-salesperson annual quota, distinct from the company/sector-wide
+-- revenue_targets above. profile_id/year are NOT NULL, so (unlike
+-- revenue_targets) a plain `ON CONFLICT (profile_id, year)` upsert
+-- works without the read-update-delete dance in lib/executive/targets.ts.
+CREATE TABLE public.sales_quotas (
+  id            UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  profile_id    UUID NOT NULL REFERENCES public.profiles(id) ON DELETE CASCADE,
+  year          INTEGER NOT NULL,
+  quota_amount  NUMERIC(15, 2) NOT NULL,
+  set_by        UUID REFERENCES public.profiles(id) ON DELETE SET NULL,
+  created_at    TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at    TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  UNIQUE (profile_id, year)
+);
+CREATE INDEX idx_sales_quotas_profile ON public.sales_quotas(profile_id);
+
 
 -- ============================================================
 -- SECTION 6: AUDIT TRIGGERS
@@ -456,6 +512,10 @@ CREATE TRIGGER trg_audit_revenue_targets
   AFTER INSERT OR UPDATE OR DELETE ON public.revenue_targets
   FOR EACH ROW EXECUTE FUNCTION public.fn_audit_trigger();
 
+CREATE TRIGGER trg_audit_sales_quotas
+  AFTER INSERT OR UPDATE OR DELETE ON public.sales_quotas
+  FOR EACH ROW EXECUTE FUNCTION public.fn_audit_trigger();
+
 
 -- ============================================================
 -- SECTION 7: UPDATED_AT TRIGGERS
@@ -469,6 +529,7 @@ CREATE TRIGGER trg_updated_at_quotations          BEFORE UPDATE ON public.quotat
 CREATE TRIGGER trg_updated_at_quotation_approvals BEFORE UPDATE ON public.quotation_approvals FOR EACH ROW EXECUTE FUNCTION public.fn_set_updated_at();
 CREATE TRIGGER trg_updated_at_po_payments         BEFORE UPDATE ON public.po_payments         FOR EACH ROW EXECUTE FUNCTION public.fn_set_updated_at();
 CREATE TRIGGER trg_updated_at_revenue_targets     BEFORE UPDATE ON public.revenue_targets     FOR EACH ROW EXECUTE FUNCTION public.fn_set_updated_at();
+CREATE TRIGGER trg_updated_at_sales_quotas        BEFORE UPDATE ON public.sales_quotas        FOR EACH ROW EXECUTE FUNCTION public.fn_set_updated_at();
 
 
 -- ============================================================
@@ -604,6 +665,81 @@ CREATE TRIGGER trg_sync_quotation_status_from_approvals
 AFTER INSERT OR UPDATE OR DELETE ON public.quotation_approvals
 FOR EACH ROW EXECUTE FUNCTION public.fn_sync_quotation_status_from_approvals();
 
+-- Mirrors fn_sync_quotation_status_from_approvals for purchase orders. Without
+-- this, when a role (e.g. "executive") has more than one active approver, the
+-- app fans out one po_approvals row per approver and nothing cancelled the
+-- sibling pending rows once one of them approved — the aggregate (which
+-- requires every row to be approved/cancelled) stayed "pending" forever.
+CREATE OR REPLACE FUNCTION public.fn_sync_po_status_from_approvals()
+RETURNS TRIGGER
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  pid UUID;
+BEGIN
+  pid := COALESCE(NEW.po_id, OLD.po_id);
+
+  IF pg_trigger_depth() > 1 THEN
+    RETURN COALESCE(NEW, OLD);
+  END IF;
+
+  IF TG_OP = 'UPDATE'
+     AND NEW.status = 'approved'
+     AND (OLD.status IS DISTINCT FROM NEW.status) THEN
+    UPDATE public.po_approvals
+    SET status = 'cancelled', updated_at = NOW()
+    WHERE po_id = pid
+      AND approver_role = NEW.approver_role
+      AND status = 'pending'
+      AND id <> NEW.id;
+  END IF;
+
+  UPDATE public.purchase_orders p
+  SET status = CASE
+    WHEN EXISTS (
+      SELECT 1 FROM public.po_approvals pa
+      WHERE pa.po_id = pid AND pa.status = 'rejected'
+    ) THEN 'rejected'::approval_status_enum
+    WHEN EXISTS (
+      SELECT 1 FROM public.po_approvals pa
+      WHERE pa.po_id = pid AND pa.status = 'pending'
+    ) THEN 'pending'::approval_status_enum
+    WHEN EXISTS (
+      SELECT 1 FROM public.po_approvals pa
+      WHERE pa.po_id = pid AND pa.status = 'approved'
+    )
+    AND NOT EXISTS (
+      SELECT 1 FROM public.po_approvals pa
+      WHERE pa.po_id = pid AND pa.status = 'pending'
+    ) THEN 'approved'::approval_status_enum
+    ELSE p.status
+  END,
+  approved_at = CASE
+    WHEN EXISTS (
+      SELECT 1 FROM public.po_approvals pa
+      WHERE pa.po_id = pid AND pa.status = 'approved'
+    )
+    AND NOT EXISTS (
+      SELECT 1 FROM public.po_approvals pa
+      WHERE pa.po_id = pid AND pa.status IN ('pending', 'rejected')
+    ) THEN COALESCE(p.approved_at, NOW())
+    ELSE NULL
+  END,
+  updated_at = NOW()
+  WHERE p.id = pid
+    AND p.status NOT IN ('draft', 'closed', 'cancelled');
+
+  RETURN COALESCE(NEW, OLD);
+END;
+$$;
+
+DROP TRIGGER IF EXISTS trg_sync_po_status_from_approvals ON public.po_approvals;
+CREATE TRIGGER trg_sync_po_status_from_approvals
+AFTER INSERT OR UPDATE OR DELETE ON public.po_approvals
+FOR EACH ROW EXECUTE FUNCTION public.fn_sync_po_status_from_approvals();
+
 
 -- ============================================================
 -- SECTION 9: AUTH TRIGGER
@@ -628,6 +764,7 @@ ALTER TABLE public.quotation_approvals ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.purchase_orders     ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.po_payments         ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.revenue_targets     ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.sales_quotas        ENABLE ROW LEVEL SECURITY;
 
 -- Profiles
 CREATE POLICY "profiles_self_read"
@@ -685,6 +822,44 @@ CREATE POLICY "revenue_targets_target_editor_insert"
 
 CREATE POLICY "revenue_targets_target_editor_update"
   ON public.revenue_targets FOR UPDATE
+  USING (
+    EXISTS (
+      SELECT 1 FROM public.profiles p
+      WHERE p.id = auth.uid() AND p.role IN ('owner', 'executive') AND p.is_active = TRUE
+    )
+  )
+  WITH CHECK (
+    EXISTS (
+      SELECT 1 FROM public.profiles p
+      WHERE p.id = auth.uid() AND p.role IN ('owner', 'executive') AND p.is_active = TRUE
+    )
+  );
+
+-- Sales quotas: the quota holder can read their own row; owner/executive can
+-- read every row and are the only ones who can write.
+CREATE POLICY "sales_quotas_self_or_exec_read"
+  ON public.sales_quotas FOR SELECT
+  USING (
+    profile_id = auth.uid()
+    OR EXISTS (
+      SELECT 1 FROM public.profiles p
+      WHERE p.id = auth.uid()
+        AND p.is_active = TRUE
+        AND (p.is_executive_viewer = TRUE OR p.role IN ('owner','executive'))
+    )
+  );
+
+CREATE POLICY "sales_quotas_target_editor_insert"
+  ON public.sales_quotas FOR INSERT
+  WITH CHECK (
+    EXISTS (
+      SELECT 1 FROM public.profiles p
+      WHERE p.id = auth.uid() AND p.role IN ('owner', 'executive') AND p.is_active = TRUE
+    )
+  );
+
+CREATE POLICY "sales_quotas_target_editor_update"
+  ON public.sales_quotas FOR UPDATE
   USING (
     EXISTS (
       SELECT 1 FROM public.profiles p
@@ -978,10 +1153,550 @@ CREATE POLICY "sales_po_payments_sales_all"
 
 
 -- ============================================================
+-- SECTION 10: NOTIFICATIONS
+-- ============================================================
+-- Persisted, per-user notification feed for the bell/dropdown, the full
+-- notifications history page, and the small "unseen changes" dots on nav
+-- tabs. See migrations/0011_notifications.sql for the introducing migration.
+--
+-- Notifications are created entirely by SECURITY DEFINER triggers (never by
+-- application code) so every status-changing path is covered automatically,
+-- mirroring fn_audit_trigger()/fn_set_updated_at() above.
+--
+-- Two independent "cleared" timestamps drive two different UI signals:
+--   read_at  -> bell unread count; cleared when the user clicks that notification.
+--   seen_at  -> nav-tab dot;       cleared when the user visits that section's tab
+--               (app-level, via markSectionSeen()), even if the notification
+--               itself was never opened.
+--
+-- Scope is strictly personal: an approver assigned via quotation_approvals/
+-- po_approvals.approver_id, or the owner of a quotation/PO
+-- (sales_person_id/prepared_by/created_by). Company-wide browse views never
+-- generate notifications because nothing there fires these triggers.
+--
+-- Costing-phase quotations have no per-approver assignment row (any active
+-- profile with role='executive' AND department='executive' can act, per
+-- lib/executive/costing-approvals.ts assertExecutiveActor()), so the costing
+-- "approval requested" notification fans out to every such profile instead of
+-- a single recipient.
+
+CREATE TABLE public.notifications (
+  id           UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  recipient_id UUID NOT NULL REFERENCES public.profiles(id) ON DELETE CASCADE,
+  actor_id     UUID REFERENCES public.profiles(id) ON DELETE SET NULL,
+  type         notification_type_enum NOT NULL,
+  section      notification_section_enum NOT NULL,
+  entity_type  TEXT NOT NULL CHECK (entity_type IN ('quotation', 'purchase_order')),
+  entity_id    UUID NOT NULL,
+  title        TEXT NOT NULL,
+  body         TEXT,
+  link         TEXT NOT NULL,
+  read_at      TIMESTAMPTZ,
+  seen_at      TIMESTAMPTZ,
+  created_at   TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at   TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+-- Bell dropdown / unread count.
+CREATE INDEX idx_notifications_recipient_unread
+  ON public.notifications(recipient_id, created_at DESC) WHERE read_at IS NULL;
+-- Nav-tab dot lookup.
+CREATE INDEX idx_notifications_recipient_section_unseen
+  ON public.notifications(recipient_id, section) WHERE seen_at IS NULL;
+-- Full paginated history page.
+CREATE INDEX idx_notifications_recipient_created
+  ON public.notifications(recipient_id, created_at DESC);
+
+CREATE TRIGGER trg_updated_at_notifications
+  BEFORE UPDATE ON public.notifications
+  FOR EACH ROW EXECUTE FUNCTION public.fn_set_updated_at();
+
+-- Deliberately NOT audited (unlike quotations/clients/etc.): notifications are
+-- high-volume, derived, self-healing rows, not a source of truth worth a
+-- second audit_logs copy.
+
+ALTER TABLE public.notifications ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "notifications_recipient_read"
+  ON public.notifications FOR SELECT
+  USING (recipient_id = auth.uid());
+
+-- Mark-read / mark-seen only; recipient may only ever touch their own rows,
+-- and WITH CHECK keeps recipient_id from being reassigned. No INSERT/DELETE
+-- policy exists, so clients can neither forge nor delete notifications --
+-- only the SECURITY DEFINER trigger functions below (which bypass RLS) insert
+-- rows.
+CREATE POLICY "notifications_recipient_update"
+  ON public.notifications FOR UPDATE
+  USING (recipient_id = auth.uid())
+  WITH CHECK (recipient_id = auth.uid());
+
+-- (a) A quotation approval was assigned to an approver -> notify them.
+CREATE OR REPLACE FUNCTION public.fn_notify_quotation_approver()
+RETURNS TRIGGER
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  v_quotation RECORD;
+  v_link TEXT;
+BEGIN
+  IF NEW.status <> 'pending' THEN
+    RETURN NEW;
+  END IF;
+
+  SELECT quotation_number, subject INTO v_quotation
+  FROM public.quotations WHERE id = NEW.quotation_id;
+
+  IF NOT FOUND THEN
+    RETURN NEW;
+  END IF;
+
+  v_link := CASE
+    WHEN NEW.approver_role IN ('owner', 'executive') THEN '/protected/executive/approvals'
+    ELSE '/protected/sales/approvals'
+  END;
+
+  IF NEW.approver_id IS DISTINCT FROM auth.uid() THEN
+    INSERT INTO public.notifications
+      (recipient_id, actor_id, type, section, entity_type, entity_id, title, body, link)
+    VALUES (
+      NEW.approver_id,
+      auth.uid(),
+      'quotation_approval_requested',
+      'approvals',
+      'quotation',
+      NEW.quotation_id,
+      'Quotation ' || v_quotation.quotation_number || ' needs your approval',
+      v_quotation.subject,
+      v_link
+    );
+  END IF;
+
+  RETURN NEW;
+END;
+$$;
+
+CREATE TRIGGER trg_notify_quotation_approver
+  AFTER INSERT ON public.quotation_approvals
+  FOR EACH ROW EXECUTE FUNCTION public.fn_notify_quotation_approver();
+
+-- (b) A PO approval was assigned to an approver -> notify them.
+CREATE OR REPLACE FUNCTION public.fn_notify_po_approver()
+RETURNS TRIGGER
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  v_po RECORD;
+  v_link TEXT;
+BEGIN
+  IF NEW.status <> 'pending' THEN
+    RETURN NEW;
+  END IF;
+
+  SELECT po_number, subject INTO v_po
+  FROM public.purchase_orders WHERE id = NEW.po_id;
+
+  IF NOT FOUND THEN
+    RETURN NEW;
+  END IF;
+
+  v_link := CASE
+    WHEN NEW.approver_role IN ('owner', 'executive') THEN '/protected/executive/approvals'
+    ELSE '/protected/sales/approvals'
+  END;
+
+  IF NEW.approver_id IS DISTINCT FROM auth.uid() THEN
+    INSERT INTO public.notifications
+      (recipient_id, actor_id, type, section, entity_type, entity_id, title, body, link)
+    VALUES (
+      NEW.approver_id,
+      auth.uid(),
+      'po_approval_requested',
+      'approvals',
+      'purchase_order',
+      NEW.po_id,
+      'PO ' || v_po.po_number || ' needs your approval',
+      v_po.subject,
+      v_link
+    );
+  END IF;
+
+  RETURN NEW;
+END;
+$$;
+
+CREATE TRIGGER trg_notify_po_approver
+  AFTER INSERT ON public.po_approvals
+  FOR EACH ROW EXECUTE FUNCTION public.fn_notify_po_approver();
+
+-- (c) A costing-phase quotation was submitted for costing approval (engineering
+-- moves it draft -> pending while phase='costing') -> broadcast to every
+-- active executive-department executive, since costing approval has no
+-- per-approver assignment row.
+CREATE OR REPLACE FUNCTION public.fn_notify_costing_approval_requested()
+RETURNS TRIGGER
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  v_recipient RECORD;
+BEGIN
+  IF NEW.phase = 'costing' AND NEW.status = 'pending' AND OLD.status = 'draft' THEN
+    FOR v_recipient IN
+      SELECT id FROM public.profiles
+      WHERE department = 'executive' AND role = 'executive' AND is_active = TRUE
+    LOOP
+      IF v_recipient.id IS DISTINCT FROM auth.uid() THEN
+        INSERT INTO public.notifications
+          (recipient_id, actor_id, type, section, entity_type, entity_id, title, body, link)
+        VALUES (
+          v_recipient.id,
+          auth.uid(),
+          'costing_approval_requested',
+          'costing_approvals',
+          'quotation',
+          NEW.id,
+          'Quotation ' || NEW.quotation_number || ' needs costing approval',
+          NEW.subject,
+          '/protected/executive/costing-approvals'
+        );
+      END IF;
+    END LOOP;
+  END IF;
+
+  RETURN NEW;
+END;
+$$;
+
+CREATE TRIGGER trg_notify_costing_approval_requested
+  AFTER UPDATE OF status ON public.quotations
+  FOR EACH ROW
+  WHEN (OLD.status IS DISTINCT FROM NEW.status)
+  EXECUTE FUNCTION public.fn_notify_costing_approval_requested();
+
+-- (d) A quotation reached a terminal outcome -> notify its owner. Covers both
+-- the sales-phase chain (status -> approved/rejected) and the costing-phase
+-- decision (costing_approved_at / costing_rejection_reason newly set; costing
+-- approval resets status back to 'draft' rather than 'approved', so it can't
+-- be detected via the status column alone).
+--
+-- quotations.status is itself driven by fn_sync_quotation_status_from_approvals
+-- (above), which aggregates quotation_approvals rows but never writes
+-- quotations.rejection_reason (that column is otherwise unused/always NULL in
+-- this schema) -- the actual reason lives on whichever quotation_approvals row
+-- was rejected, so it's pulled from there.
+CREATE OR REPLACE FUNCTION public.fn_notify_quotation_resolved()
+RETURNS TRIGGER
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  v_recipient UUID;
+  v_reason TEXT;
+  v_engineering_recipient RECORD;
+BEGIN
+  IF NEW.phase = 'sales' AND NEW.status IN ('approved', 'rejected')
+     AND OLD.status IS DISTINCT FROM NEW.status THEN
+    v_recipient := COALESCE(NEW.sales_person_id, NEW.prepared_by);
+
+    IF NEW.status = 'rejected' THEN
+      SELECT rejection_reason INTO v_reason
+      FROM public.quotation_approvals
+      WHERE quotation_id = NEW.id AND status = 'rejected'
+      ORDER BY updated_at DESC
+      LIMIT 1;
+    ELSE
+      v_reason := NULL;
+    END IF;
+
+    IF v_recipient IS NOT NULL AND v_recipient IS DISTINCT FROM auth.uid() THEN
+      INSERT INTO public.notifications
+        (recipient_id, actor_id, type, section, entity_type, entity_id, title, body, link)
+      VALUES (
+        v_recipient,
+        auth.uid(),
+        CASE WHEN NEW.status = 'approved' THEN 'quotation_approved' ELSE 'quotation_rejected' END,
+        'quotations',
+        'quotation',
+        NEW.id,
+        'Quotation ' || NEW.quotation_number ||
+          CASE WHEN NEW.status = 'approved' THEN ' was approved' ELSE ' was rejected' END,
+        v_reason,
+        '/protected/sales/quotations'
+      );
+    END IF;
+  END IF;
+
+  IF OLD.costing_approved_at IS NULL AND NEW.costing_approved_at IS NOT NULL THEN
+    v_recipient := NEW.prepared_by;
+    IF v_recipient IS NOT NULL AND v_recipient IS DISTINCT FROM auth.uid() THEN
+      INSERT INTO public.notifications
+        (recipient_id, actor_id, type, section, entity_type, entity_id, title, body, link)
+      VALUES (
+        v_recipient,
+        auth.uid(),
+        'costing_approved',
+        'request_for_quotation',
+        'quotation',
+        NEW.id,
+        'Costing for quotation ' || NEW.quotation_number || ' was approved',
+        NULL,
+        '/protected/sales/request-for-quotation'
+      );
+    END IF;
+
+    -- Symmetric with the engineering broadcast on rejection below: they
+    -- costed it, so they should know it was approved and handed to Sales too
+    -- (added by migration 0017).
+    FOR v_engineering_recipient IN
+      SELECT id FROM public.profiles
+      WHERE department = 'engineering' AND is_active = TRUE
+    LOOP
+      IF v_engineering_recipient.id IS DISTINCT FROM auth.uid() THEN
+        INSERT INTO public.notifications
+          (recipient_id, actor_id, type, section, entity_type, entity_id, title, body, link)
+        VALUES (
+          v_engineering_recipient.id,
+          auth.uid(),
+          'costing_quotation_approved',
+          'engineering_quotations',
+          'quotation',
+          NEW.id,
+          'Quotation ' || NEW.quotation_number || ' costing was approved',
+          NEW.subject,
+          '/protected/engineering/quotations'
+        );
+      END IF;
+    END LOOP;
+  END IF;
+
+  IF OLD.costing_rejection_reason IS NULL AND NEW.costing_rejection_reason IS NOT NULL THEN
+    v_recipient := NEW.prepared_by;
+    IF v_recipient IS NOT NULL AND v_recipient IS DISTINCT FROM auth.uid() THEN
+      INSERT INTO public.notifications
+        (recipient_id, actor_id, type, section, entity_type, entity_id, title, body, link)
+      VALUES (
+        v_recipient,
+        auth.uid(),
+        'costing_rejected',
+        'request_for_quotation',
+        'quotation',
+        NEW.id,
+        'Costing for quotation ' || NEW.quotation_number || ' was rejected',
+        NEW.costing_rejection_reason,
+        '/protected/sales/request-for-quotation'
+      );
+    END IF;
+
+    -- Broadcast to the engineering department too -- the ball is back in
+    -- their court for rework (added by migration 0013).
+    FOR v_engineering_recipient IN
+      SELECT id FROM public.profiles
+      WHERE department = 'engineering' AND is_active = TRUE
+    LOOP
+      IF v_engineering_recipient.id IS DISTINCT FROM auth.uid() THEN
+        INSERT INTO public.notifications
+          (recipient_id, actor_id, type, section, entity_type, entity_id, title, body, link)
+        VALUES (
+          v_engineering_recipient.id,
+          auth.uid(),
+          'costing_quotation_returned',
+          'engineering_quotations',
+          'quotation',
+          NEW.id,
+          'Quotation ' || NEW.quotation_number || ' was sent back for costing rework',
+          NEW.costing_rejection_reason,
+          '/protected/engineering/quotations'
+        );
+      END IF;
+    END LOOP;
+  END IF;
+
+  RETURN NEW;
+END;
+$$;
+
+CREATE TRIGGER trg_notify_quotation_resolved
+  AFTER UPDATE OF status, costing_approved_at, costing_rejection_reason ON public.quotations
+  FOR EACH ROW
+  WHEN (
+    OLD.status IS DISTINCT FROM NEW.status
+    OR OLD.costing_approved_at IS DISTINCT FROM NEW.costing_approved_at
+    OR OLD.costing_rejection_reason IS DISTINCT FROM NEW.costing_rejection_reason
+  )
+  EXECUTE FUNCTION public.fn_notify_quotation_resolved();
+
+-- (e) A PO reached a terminal outcome -> notify its creator. Mirrors (d): the
+-- rejection reason lives on the rejected po_approvals row, not on
+-- purchase_orders itself.
+CREATE OR REPLACE FUNCTION public.fn_notify_po_resolved()
+RETURNS TRIGGER
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  v_reason TEXT;
+BEGIN
+  IF NEW.status IN ('approved', 'rejected') AND OLD.status IS DISTINCT FROM NEW.status
+     AND NEW.created_by IS DISTINCT FROM auth.uid() THEN
+    IF NEW.status = 'rejected' THEN
+      SELECT rejection_reason INTO v_reason
+      FROM public.po_approvals
+      WHERE po_id = NEW.id AND status = 'rejected'
+      ORDER BY updated_at DESC
+      LIMIT 1;
+    ELSE
+      v_reason := NULL;
+    END IF;
+
+    INSERT INTO public.notifications
+      (recipient_id, actor_id, type, section, entity_type, entity_id, title, body, link)
+    VALUES (
+      NEW.created_by,
+      auth.uid(),
+      CASE WHEN NEW.status = 'approved' THEN 'po_approved' ELSE 'po_rejected' END,
+      'purchase_orders',
+      'purchase_order',
+      NEW.id,
+      'PO ' || NEW.po_number ||
+        CASE WHEN NEW.status = 'approved' THEN ' was approved' ELSE ' was rejected' END,
+      v_reason,
+      '/protected/sales/purchase-orders'
+    );
+  END IF;
+
+  RETURN NEW;
+END;
+$$;
+
+CREATE TRIGGER trg_notify_po_resolved
+  AFTER UPDATE OF status ON public.purchase_orders
+  FOR EACH ROW
+  WHEN (OLD.status IS DISTINCT FROM NEW.status)
+  EXECUTE FUNCTION public.fn_notify_po_resolved();
+
+-- (f) A new RFQ arrives for costing (quotations INSERT with phase='costing',
+-- inserted directly as status='draft' by lib/sales/quotations.ts
+-- createRequestForQuotation) -> broadcast to the engineering department, same
+-- department-wide reasoning as (c)/the engineering broadcast in (d): there is
+-- no per-user assignment column for engineering (lib/engineering/access.ts
+-- gates purely on department='engineering'). Added by migration 0013.
+CREATE OR REPLACE FUNCTION public.fn_notify_costing_quotation_received()
+RETURNS TRIGGER
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  v_recipient RECORD;
+BEGIN
+  IF NEW.phase = 'costing' THEN
+    FOR v_recipient IN
+      SELECT id FROM public.profiles
+      WHERE department = 'engineering' AND is_active = TRUE
+    LOOP
+      IF v_recipient.id IS DISTINCT FROM auth.uid() THEN
+        INSERT INTO public.notifications
+          (recipient_id, actor_id, type, section, entity_type, entity_id, title, body, link)
+        VALUES (
+          v_recipient.id,
+          auth.uid(),
+          'costing_quotation_received',
+          'engineering_quotations',
+          'quotation',
+          NEW.id,
+          'New request for quotation ' || NEW.quotation_number || ' needs costing',
+          NEW.subject,
+          '/protected/engineering/quotations'
+        );
+      END IF;
+    END LOOP;
+  END IF;
+
+  RETURN NEW;
+END;
+$$;
+
+CREATE TRIGGER trg_notify_costing_quotation_received
+  AFTER INSERT ON public.quotations
+  FOR EACH ROW
+  WHEN (NEW.phase = 'costing')
+  EXECUTE FUNCTION public.fn_notify_costing_quotation_received();
+
+-- (g) Not a trigger. Called once via RPC from
+-- lib/engineering/costing-quotations.ts setQuotationItemCosts() after a batch
+-- of quotation_items unit_cost updates succeeds (that function updates N
+-- items sequentially per Save click; a row-level trigger would fire N times
+-- for one click). Regular clients have no INSERT policy on notifications, so
+-- this validates its own caller (must be an active engineering profile)
+-- rather than relying on RLS, and derives all notification content
+-- server-side from target_quotation_id. Added by migration 0015.
+CREATE OR REPLACE FUNCTION public.fn_notify_costing_cost_updated(target_quotation_id UUID)
+RETURNS VOID
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  v_caller_is_engineering BOOLEAN;
+  v_quotation RECORD;
+BEGIN
+  SELECT EXISTS (
+    SELECT 1 FROM public.profiles
+    WHERE id = auth.uid() AND department = 'engineering' AND is_active = TRUE
+  ) INTO v_caller_is_engineering;
+
+  IF NOT v_caller_is_engineering THEN
+    RAISE EXCEPTION 'Only an active engineering profile may report a costing update.';
+  END IF;
+
+  SELECT quotation_number, subject, prepared_by, phase INTO v_quotation
+  FROM public.quotations
+  WHERE id = target_quotation_id;
+
+  IF NOT FOUND OR v_quotation.phase <> 'costing' THEN
+    RETURN;
+  END IF;
+
+  IF v_quotation.prepared_by IS NULL OR v_quotation.prepared_by = auth.uid() THEN
+    RETURN;
+  END IF;
+
+  INSERT INTO public.notifications
+    (recipient_id, actor_id, type, section, entity_type, entity_id, title, body, link)
+  VALUES (
+    v_quotation.prepared_by,
+    auth.uid(),
+    'costing_cost_updated',
+    'request_for_quotation',
+    'quotation',
+    target_quotation_id,
+    'Costing was updated for quotation ' || v_quotation.quotation_number,
+    v_quotation.subject,
+    '/protected/sales/request-for-quotation'
+  );
+END;
+$$;
+
+-- Realtime delivery: the bell subscribes to a per-user filtered channel
+-- (recipient_id=eq.<uid>), the first filtered postgres_changes subscription in
+-- this codebase (existing RealtimeRefresh channels are unfiltered/table-wide).
+ALTER PUBLICATION supabase_realtime ADD TABLE public.notifications;
+
+
+-- ============================================================
 -- END OF SCHEMA
 -- ============================================================
--- Tables: 8 (profiles, audit_logs, clients, client_contacts,
---            quotations, quotation_approvals, po_payments, revenue_targets)
+-- Tables: 9 (profiles, audit_logs, clients, client_contacts,
+--            quotations, quotation_approvals, po_payments, revenue_targets,
+--            notifications)
 -- Modules: Auth/Profiles, Sales, Executive Dashboard
 -- Approved quotations serve as the canonical purchase-order record.
 -- ============================================================

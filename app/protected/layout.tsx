@@ -8,6 +8,7 @@ import { hasEnvVars } from "@/lib/utils";
 import { SidebarSlot } from "@/components/layouts/sidebar-slot";
 import { NavModuleBadge } from "@/components/layouts/nav-module-badge";
 import { MobileNavSlot } from "@/components/layouts/mobile-nav-slot";
+import { NotificationCenter } from "@/components/notifications/notification-center";
 import Link from "next/link";
 import { Suspense } from "react";
 
@@ -38,6 +39,9 @@ export default function ProtectedLayout({ children }: { children: React.ReactNod
               </Suspense>
             </div>
             <div className="flex shrink-0 items-center gap-1.5">
+              <Suspense fallback={null}>
+                <NotificationCenter />
+              </Suspense>
               <ThemeSwitcher />
               {!hasEnvVars ? (
                 <EnvVarWarning />

@@ -1,4 +1,13 @@
+import { getCurrentProfile } from "@/lib/profile/get-current-profile";
 import { createClient } from "@/lib/supabase/server";
+
+export type CostingQuotationItem = {
+  id: string;
+  description: string;
+  quantity: number;
+  unitCost: number | null;
+  lineTotal: number;
+};
 
 export type CostingApprovedHistoryItem = {
   quotationId: string;
@@ -7,6 +16,7 @@ export type CostingApprovedHistoryItem = {
   subject: string;
   amount: number;
   cost: number | null;
+  items: CostingQuotationItem[];
   googleDriveLink: string | null;
   notes: string | null;
   salesPersonId: string | null;
@@ -23,6 +33,7 @@ export type CostingQuotation = {
   subject: string;
   amount: number;
   cost: number | null;
+  items: CostingQuotationItem[];
   googleDriveLink: string | null;
   notes: string | null;
   status: "draft" | "pending" | "approved" | "rejected" | "cancelled";
@@ -43,12 +54,17 @@ export function parseCostingAmount(raw: unknown): number {
   return value;
 }
 
-export function parseCostingCost(raw: unknown): number {
+export function parseUnitCost(raw: unknown): number {
   const value = Number(raw);
   if (!Number.isFinite(value) || value < 0) {
-    throw new Error("Cost must be 0 or greater.");
+    throw new Error("Unit cost must be 0 or greater.");
   }
   return value;
+}
+
+/** True once every line item on the quotation has a unit cost set. */
+export function allItemsCosted(items: Array<{ unitCost: number | null }>): boolean {
+  return items.length > 0 && items.every((item) => item.unitCost !== null);
 }
 
 export function isHttpUrl(value: string): boolean {
@@ -65,7 +81,7 @@ export async function listCostingQuotations(): Promise<CostingQuotation[]> {
   const { data, error } = await supabase
     .from("quotations")
     .select(
-      "id, quotation_number, client_id, subject, amount, cost, google_drive_link, costing_rejection_reason, notes, status, prepared_by, sales_person_id, created_at, clients:client_id(company_name), sales_person:sales_person_id(full_name, email)",
+      "id, quotation_number, client_id, subject, amount, cost, google_drive_link, costing_rejection_reason, notes, status, prepared_by, sales_person_id, created_at, clients:client_id(company_name), sales_person:sales_person_id(full_name, email), quotation_items(id, description, quantity, unit_cost, line_total, sort_order)",
     )
     .eq("phase", "costing")
     .order("created_at", { ascending: false });
@@ -79,6 +95,16 @@ export async function listCostingQuotations(): Promise<CostingQuotation[]> {
     const salesPerson = Array.isArray(row.sales_person)
       ? row.sales_person[0]
       : row.sales_person;
+    const items = (Array.isArray(row.quotation_items) ? row.quotation_items : [])
+      .slice()
+      .sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0))
+      .map((item) => ({
+        id: item.id,
+        description: item.description,
+        quantity: Number(item.quantity),
+        unitCost: item.unit_cost === null ? null : Number(item.unit_cost),
+        lineTotal: Number(item.line_total),
+      }));
     return {
       id: row.id,
       quotationNumber: row.quotation_number,
@@ -87,6 +113,7 @@ export async function listCostingQuotations(): Promise<CostingQuotation[]> {
       subject: row.subject,
       amount: Number(row.amount),
       cost: row.cost === null ? null : Number(row.cost),
+      items,
       googleDriveLink: row.google_drive_link,
       notes: row.notes,
       status: row.status,
@@ -106,7 +133,7 @@ export async function listCostingApprovedHistory(): Promise<
   const { data, error } = await supabase
     .from("quotations")
     .select(
-      "id, quotation_number, subject, amount, cost, google_drive_link, notes, sales_person_id, created_at, costing_approved_at, clients:client_id(company_name), sales_person:sales_person_id(full_name, email)",
+      "id, quotation_number, subject, amount, cost, google_drive_link, notes, sales_person_id, created_at, costing_approved_at, clients:client_id(company_name), sales_person:sales_person_id(full_name, email), quotation_items(id, description, quantity, unit_cost, line_total, sort_order)",
     )
     .not("costing_approved_at", "is", null)
     .order("costing_approved_at", { ascending: false });
@@ -120,6 +147,16 @@ export async function listCostingApprovedHistory(): Promise<
     const salesPerson = Array.isArray(row.sales_person)
       ? row.sales_person[0]
       : row.sales_person;
+    const items = (Array.isArray(row.quotation_items) ? row.quotation_items : [])
+      .slice()
+      .sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0))
+      .map((item) => ({
+        id: item.id,
+        description: item.description,
+        quantity: Number(item.quantity),
+        unitCost: item.unit_cost === null ? null : Number(item.unit_cost),
+        lineTotal: Number(item.line_total),
+      }));
     return {
       quotationId: row.id,
       quotationNumber: row.quotation_number,
@@ -127,6 +164,7 @@ export async function listCostingApprovedHistory(): Promise<
       subject: row.subject,
       amount: Number(row.amount),
       cost: row.cost === null ? null : Number(row.cost),
+      items,
       googleDriveLink: row.google_drive_link,
       notes: row.notes,
       salesPersonId: row.sales_person_id,
@@ -137,107 +175,30 @@ export async function listCostingApprovedHistory(): Promise<
   });
 }
 
-export async function createCostingQuotation(input: {
-  quotationNumber: string;
-  clientId: string;
-  subject: string;
-  cost: number;
-  googleDriveLink: string;
-  notes?: string | null;
-  salesPersonId?: string | null;
-}): Promise<{ quotationId: string }> {
-  const supabase = await createClient();
-  const {
-    data: { user },
-    error: userError,
-  } = await supabase.auth.getUser();
-
-  if (userError || !user) {
-    throw new Error("You must be signed in.");
-  }
-
-  const { data: clientRow, error: clientError } = await supabase
-    .from("clients")
-    .select("sector")
-    .eq("id", input.clientId)
-    .single();
-
-  if (clientError || !clientRow) {
-    throw new Error("Selected client was not found.");
-  }
-
-  const { data, error } = await supabase
-    .from("quotations")
-    .insert({
-      quotation_number: input.quotationNumber,
-      client_id: input.clientId,
-      sector: clientRow.sector,
-      subject: input.subject,
-      // amount (selling amount) is set later in the sales phase; costing only
-      // captures the direct cost.
-      amount: 0,
-      cost: input.cost,
-      google_drive_link: input.googleDriveLink,
-      notes: input.notes ?? null,
-      sales_person_id: input.salesPersonId ?? null,
-      prepared_by: user.id,
-      status: "draft",
-      phase: "costing",
-    })
-    .select("id")
-    .single();
-
-  if (error || !data) {
-    if (error?.code === "23505") {
-      throw new Error("Quotation ID already exists. Please choose a different one.");
-    }
-    throw new Error(error?.message || "Failed to create costing quotation.");
-  }
-
-  return { quotationId: data.id };
-}
-
-export async function updateCostingQuotation(input: {
+/**
+ * Engineering sets/updates the per-item unit cost on a Sales-originated
+ * request for quotation, plus the Google Drive link and optional metadata
+ * corrections. quotations.cost rolls up automatically via the
+ * trg_sync_quotation_cost_from_items trigger.
+ */
+export async function setQuotationItemCosts(input: {
   quotationId: string;
   quotationNumber?: string;
   clientId: string;
   subject: string;
-  cost: number;
+  items: Array<{ id: string; unitCost: number | null }>;
   googleDriveLink: string;
   notes?: string | null;
   salesPersonId?: string | null;
 }): Promise<void> {
-  const supabase = await createClient();
-  const {
-    data: { user },
-    error: userError,
-  } = await supabase.auth.getUser();
-
-  if (userError || !user) {
+  // getCurrentProfile() verifies the session via local JWT claims, avoiding
+  // the network round-trip that auth.getUser() makes to the auth server.
+  const profile = await getCurrentProfile();
+  if (!profile) {
     throw new Error("You must be signed in.");
   }
 
-  const { data: row, error: rowError } = await supabase
-    .from("quotations")
-    .select("id, status, phase, prepared_by")
-    .eq("id", input.quotationId)
-    .single();
-
-  if (rowError || !row) {
-    throw new Error("Quotation was not found.");
-  }
-
-  if (row.phase !== "costing") {
-    throw new Error("Only costing-phase quotations can be edited here.");
-  }
-
-  if (row.status !== "draft") {
-    throw new Error("Only draft costing quotations can be edited.");
-  }
-
-  if (row.prepared_by !== user.id) {
-    throw new Error("Only the costing engineer who created this quotation can edit it.");
-  }
+  const supabase = await createClient();
 
   const { data: clientRow, error: clientError } = await supabase
     .from("clients")
@@ -253,7 +214,6 @@ export async function updateCostingQuotation(input: {
     client_id: input.clientId,
     sector: clientRow.sector,
     subject: input.subject,
-    cost: input.cost,
     google_drive_link: input.googleDriveLink,
     notes: input.notes ?? null,
     sales_person_id: input.salesPersonId ?? null,
@@ -264,10 +224,17 @@ export async function updateCostingQuotation(input: {
     updatePayload.quotation_number = input.quotationNumber;
   }
 
-  const { error: updateError } = await supabase
+  // The guard (phase='costing', status='draft') is folded into the UPDATE's
+  // WHERE clause rather than a separate SELECT-then-UPDATE, saving a
+  // round-trip: a null result means either not found or not editable.
+  const { data: updatedRow, error: updateError } = await supabase
     .from("quotations")
     .update(updatePayload)
-    .eq("id", input.quotationId);
+    .eq("id", input.quotationId)
+    .eq("phase", "costing")
+    .eq("status", "draft")
+    .select("id")
+    .maybeSingle();
 
   if (updateError) {
     if (updateError.code === "23505") {
@@ -275,67 +242,103 @@ export async function updateCostingQuotation(input: {
     }
     throw new Error(updateError.message || "Failed to update costing quotation.");
   }
+
+  if (!updatedRow) {
+    throw new Error("Only draft costing quotations can be edited.");
+  }
+
+  // Fetched up front so the post-save notification can tell whether any cost
+  // value actually changed (editing notes/drive-link alone shouldn't notify).
+  const { data: existingItems, error: existingItemsError } = await supabase
+    .from("quotation_items")
+    .select("id, unit_cost")
+    .eq("quotation_id", input.quotationId);
+
+  if (existingItemsError) {
+    throw new Error("Failed to load existing item costs.");
+  }
+
+  const previousUnitCostById = new Map(
+    (existingItems ?? []).map((row) => [row.id, row.unit_cost]),
+  );
+
+  // Sequential, not Promise.all: every quotation_items write fires
+  // trg_sync_quotation_cost_from_items, which UPDATEs the shared parent
+  // quotations row. Concurrent item writes for the same quotation all
+  // contend for that same row's lock — Postgres serializes them regardless,
+  // so running them concurrently buys nothing and risks a lock pile-up
+  // (this caused a real `statement timeout` under load).
+  let anyCostChanged = false;
+  for (const item of input.items) {
+    const { error: itemError } = await supabase
+      .from("quotation_items")
+      .update({ unit_cost: item.unitCost })
+      .eq("id", item.id)
+      .eq("quotation_id", input.quotationId);
+
+    if (itemError) {
+      throw new Error(itemError.message || "Failed to update an item's unit cost.");
+    }
+
+    if ((previousUnitCostById.get(item.id) ?? null) !== item.unitCost) {
+      anyCostChanged = true;
+    }
+  }
+
+  // Notify the sales person who created the RFQ that costing changed. Best
+  // effort: the costing save itself already succeeded, so a notification
+  // hiccup shouldn't fail the whole action. See migration 0015 for why this
+  // is a single RPC call after the batch rather than a per-item trigger.
+  if (anyCostChanged) {
+    const { error: notifyError } = await supabase.rpc("fn_notify_costing_cost_updated", {
+      target_quotation_id: input.quotationId,
+    });
+
+    if (notifyError) {
+      console.error("Failed to notify sales person of costing update:", notifyError);
+    }
+  }
 }
 
 export async function deleteCostingQuotation(quotationId: string): Promise<void> {
-  const supabase = await createClient();
-  const {
-    data: { user },
-    error: userError,
-  } = await supabase.auth.getUser();
-
-  if (userError || !user) {
+  const profile = await getCurrentProfile();
+  if (!profile) {
     throw new Error("You must be signed in.");
   }
 
-  const { data: row, error: rowError } = await supabase
-    .from("quotations")
-    .select("id, status, phase, prepared_by")
-    .eq("id", quotationId)
-    .single();
+  const supabase = await createClient();
 
-  if (rowError || !row) {
-    throw new Error("Quotation was not found.");
-  }
-
-  if (row.phase !== "costing") {
-    throw new Error("Only costing-phase quotations can be deleted here.");
-  }
-
-  if (row.status !== "draft") {
-    throw new Error("Only draft costing quotations can be deleted.");
-  }
-
-  if (row.prepared_by !== user.id) {
-    throw new Error(
-      "Only the costing engineer who created this quotation can delete it.",
-    );
-  }
-
-  const { error: deleteError } = await supabase
+  const { data, error: deleteError } = await supabase
     .from("quotations")
     .delete()
-    .eq("id", quotationId);
+    .eq("id", quotationId)
+    .eq("phase", "costing")
+    .eq("status", "draft")
+    .select("id")
+    .maybeSingle();
 
   if (deleteError) {
     throw new Error(deleteError.message || "Failed to delete costing quotation.");
   }
+
+  if (!data) {
+    throw new Error("Only draft costing quotations can be deleted.");
+  }
 }
 
 export async function submitCostingForApproval(quotationId: string): Promise<void> {
-  const supabase = await createClient();
-  const {
-    data: { user },
-    error: userError,
-  } = await supabase.auth.getUser();
-
-  if (userError || !user) {
+  const profile = await getCurrentProfile();
+  if (!profile) {
     throw new Error("You must be signed in.");
   }
 
+  const supabase = await createClient();
+
   const { data: row, error: rowError } = await supabase
     .from("quotations")
-    .select("id, status, phase, prepared_by, google_drive_link, cost, sales_person_id")
+    .select(
+      "id, status, phase, google_drive_link, sales_person_id, quotation_items(unit_cost)",
+    )
     .eq("id", quotationId)
     .single();
 
@@ -353,14 +356,17 @@ export async function submitCostingForApproval(quotationId: string): Promise<voi
     throw new Error("Only draft costing quotations can be submitted.");
   }
 
-  if (row.prepared_by !== user.id) {
+  const items = Array.isArray(row.quotation_items) ? row.quotation_items : [];
+  if (
+    !allItemsCosted(
+      items.map((item) => ({
+        unitCost: item.unit_cost === null ? null : Number(item.unit_cost),
+      })),
+    )
+  ) {
     throw new Error(
-      "Only the costing engineer who created this quotation can submit it.",
+      "Every line item needs a unit cost before submitting for costing approval.",
     );
-  }
-
-  if (row.cost === null || row.cost === undefined) {
-    throw new Error("Cost must be set before submitting for costing approval.");
   }
 
   if (!row.google_drive_link) {
@@ -375,12 +381,20 @@ export async function submitCostingForApproval(quotationId: string): Promise<voi
     );
   }
 
-  const { error: updateError } = await supabase
+  const { data: updatedRow, error: updateError } = await supabase
     .from("quotations")
     .update({ status: "pending", costing_rejection_reason: null })
-    .eq("id", quotationId);
+    .eq("id", quotationId)
+    .eq("phase", "costing")
+    .eq("status", "draft")
+    .select("id")
+    .maybeSingle();
 
   if (updateError) {
     throw new Error(updateError.message || "Failed to submit costing quotation.");
+  }
+
+  if (!updatedRow) {
+    throw new Error("Only draft costing quotations can be submitted.");
   }
 }

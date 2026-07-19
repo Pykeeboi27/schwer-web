@@ -9,8 +9,17 @@ import {
 import { getExecutiveAccessRedirect, isTargetEditor } from "@/lib/executive/access";
 import { getExecutiveDashboardData } from "@/lib/executive/dashboard";
 import { formatCurrency, formatPercent } from "@/lib/executive/format";
+import { getAverageCostingToPoDays } from "@/lib/executive/quotas";
 import { getCurrentProfile } from "@/lib/profile/get-current-profile";
 import { redirect } from "next/navigation";
+
+function formatDays(value: number | null): string {
+  if (value === null) {
+    return "N/A";
+  }
+
+  return `${value.toLocaleString("en-PH", { maximumFractionDigits: 1 })} days`;
+}
 
 export default async function ExecutiveDashboardPage() {
   const profile = await getCurrentProfile();
@@ -20,11 +29,15 @@ export default async function ExecutiveDashboardPage() {
     redirect(redirectPath);
   }
 
-  let dashboard;
+  // Independent loaders (different tables, no data dependency) run concurrently.
+  // allSettled preserves each one's own fail-soft behavior instead of letting
+  // one rejection abort both, as a plain Promise.all would.
+  const [dashboardResult, avgCostingResult] = await Promise.allSettled([
+    getExecutiveDashboardData("ytd", { viewer: profile }),
+    getAverageCostingToPoDays("ytd"),
+  ]);
 
-  try {
-    dashboard = await getExecutiveDashboardData("ytd", { viewer: profile });
-  } catch {
+  if (dashboardResult.status === "rejected") {
     return (
       <div className="flex flex-col gap-6">
         <PageHeader
@@ -40,6 +53,10 @@ export default async function ExecutiveDashboardPage() {
       </div>
     );
   }
+
+  const dashboard = dashboardResult.value;
+  const avgCostingToPoDays =
+    avgCostingResult.status === "fulfilled" ? avgCostingResult.value : null;
 
   const canEditTarget = isTargetEditor(profile);
   const currentYear = new Date().getFullYear();
@@ -75,7 +92,7 @@ export default async function ExecutiveDashboardPage() {
       </StatCard>
 
       {/* Supporting KPIs */}
-      <div className="grid gap-3 sm:grid-cols-2">
+      <div className="grid gap-3 sm:grid-cols-3">
         <StatCard
           label="Annual Target"
           value={
@@ -94,6 +111,17 @@ export default async function ExecutiveDashboardPage() {
               <span className="text-xl font-normal text-muted-foreground">N/A</span>
             ) : (
               formatPercent(dashboard.kpis.marginYtdWeightedPercent)
+            )
+          }
+        />
+
+        <StatCard
+          label="Avg. Days Costing → PO (YTD)"
+          value={
+            avgCostingToPoDays === null ? (
+              <span className="text-xl font-normal text-muted-foreground">N/A</span>
+            ) : (
+              formatDays(avgCostingToPoDays)
             )
           }
         />

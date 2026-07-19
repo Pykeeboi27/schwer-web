@@ -1,12 +1,11 @@
 "use server";
 
 import {
-  createCostingQuotation,
   deleteCostingQuotation,
   isHttpUrl,
-  parseCostingCost,
+  parseUnitCost,
+  setQuotationItemCosts,
   submitCostingForApproval,
-  updateCostingQuotation,
 } from "@/lib/engineering/costing-quotations";
 import { revalidatePath } from "next/cache";
 
@@ -16,90 +15,54 @@ type ActionResponse<T> = {
   error?: string;
 };
 
-function asRequiredString(value: FormDataEntryValue | null, fieldName: string): string {
-  const normalized = String(value ?? "").trim();
+function ensureValidDriveLink(value: string): string {
+  const normalized = value.trim();
   if (!normalized) {
-    throw new Error(`${fieldName} is required.`);
+    throw new Error("Google Drive link is required.");
   }
-  return normalized;
-}
-
-function asOptionalString(value: FormDataEntryValue | null): string | null {
-  const normalized = String(value ?? "").trim();
-  return normalized ? normalized : null;
-}
-
-function ensureValidDriveLink(value: FormDataEntryValue | null): string {
-  const normalized = asRequiredString(value, "Google Drive link");
   if (!isHttpUrl(normalized)) {
     throw new Error("Google Drive link must be a valid http or https URL.");
   }
   return normalized;
 }
 
-export async function createCostingQuotationAction(
-  formData: FormData,
+export type SetQuotationItemCostsInput = {
+  quotationId: string;
+  quotationNumber?: string;
+  clientId: string;
+  subject: string;
+  items: Array<{ id: string; unitCost: string | number | null }>;
+  googleDriveLink: string;
+  notes?: string | null;
+  salesPersonId?: string | null;
+};
+
+export async function setQuotationItemCostsAction(
+  input: SetQuotationItemCostsInput,
 ): Promise<ActionResponse<{ quotationId: string }>> {
   try {
-    const quotationNumber = asRequiredString(
-      formData.get("quotationNumber"),
-      "Quotation ID",
-    ).toUpperCase();
-    const clientId = asRequiredString(formData.get("clientId"), "Client");
-    const subject = asRequiredString(formData.get("subject"), "Subject").toUpperCase();
-    const cost = parseCostingCost(formData.get("cost"));
-    const googleDriveLink = ensureValidDriveLink(formData.get("googleDriveLink"));
-    const notes = asOptionalString(formData.get("notes"))?.toUpperCase() ?? null;
-    const salesPersonId = asOptionalString(formData.get("salesPersonId"));
+    const googleDriveLink = ensureValidDriveLink(input.googleDriveLink);
+    const items = input.items.map((item) => ({
+      id: item.id,
+      unitCost:
+        item.unitCost === null || item.unitCost === ""
+          ? null
+          : parseUnitCost(item.unitCost),
+    }));
 
-    const result = await createCostingQuotation({
-      quotationNumber,
-      clientId,
-      subject,
-      cost,
+    await setQuotationItemCosts({
+      quotationId: input.quotationId,
+      quotationNumber: input.quotationNumber?.trim() || undefined,
+      clientId: input.clientId,
+      subject: input.subject,
+      items,
       googleDriveLink,
-      notes,
-      salesPersonId,
+      notes: input.notes ?? null,
+      salesPersonId: input.salesPersonId ?? null,
     });
 
     revalidatePath("/protected/engineering/quotations");
-    return { success: true, data: result };
-  } catch (error) {
-    return {
-      success: false,
-      error:
-        error instanceof Error ? error.message : "Failed to create costing quotation.",
-    };
-  }
-}
-
-export async function updateCostingQuotationAction(
-  formData: FormData,
-): Promise<ActionResponse<{ quotationId: string }>> {
-  try {
-    const quotationId = asRequiredString(formData.get("quotationId"), "Quotation");
-    const quotationNumber =
-      asOptionalString(formData.get("quotationNumber"))?.toUpperCase() ?? undefined;
-    const clientId = asRequiredString(formData.get("clientId"), "Client");
-    const subject = asRequiredString(formData.get("subject"), "Subject").toUpperCase();
-    const cost = parseCostingCost(formData.get("cost"));
-    const googleDriveLink = ensureValidDriveLink(formData.get("googleDriveLink"));
-    const notes = asOptionalString(formData.get("notes"))?.toUpperCase() ?? null;
-    const salesPersonId = asOptionalString(formData.get("salesPersonId"));
-
-    await updateCostingQuotation({
-      quotationId,
-      quotationNumber,
-      clientId,
-      subject,
-      cost,
-      googleDriveLink,
-      notes,
-      salesPersonId,
-    });
-
-    revalidatePath("/protected/engineering/quotations");
-    return { success: true, data: { quotationId } };
+    return { success: true, data: { quotationId: input.quotationId } };
   } catch (error) {
     return {
       success: false,

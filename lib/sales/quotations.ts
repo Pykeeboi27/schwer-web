@@ -1,7 +1,16 @@
+import { getCurrentProfile } from "@/lib/profile/get-current-profile";
 import { computeSalesPricing } from "@/lib/sales/pricing";
 import { createClient } from "@/lib/supabase/server";
 
 export type RequiredApproverRole = "sales_manager" | "owner" | "executive";
+
+export type SalesQuotationItem = {
+  id: string;
+  description: string;
+  quantity: number;
+  unitCost: number | null;
+  lineTotal: number;
+};
 
 export type SalesQuotation = {
   id: string;
@@ -11,6 +20,7 @@ export type SalesQuotation = {
   subject: string;
   amount: number;
   cost: number | null;
+  items: SalesQuotationItem[];
   googleDriveLink: string | null;
   notes: string | null;
   status: "draft" | "pending" | "approved" | "rejected" | "cancelled" | "closed";
@@ -180,12 +190,158 @@ export function aggregateQuotationStatus(
   return "pending";
 }
 
+export type RequestForQuotationItem = {
+  id: string;
+  description: string;
+  quantity: number;
+  unitCost: number | null;
+  lineTotal: number;
+};
+
+export type RequestForQuotation = {
+  id: string;
+  quotationNumber: string;
+  clientId: string;
+  clientName: string;
+  subject: string;
+  status: "draft" | "pending" | "approved" | "rejected" | "cancelled";
+  costingRejectionReason: string | null;
+  googleDriveLink: string | null;
+  items: RequestForQuotationItem[];
+  cost: number | null;
+  createdAt: string;
+  costingApprovedAt: string | null;
+};
+
+export async function createRequestForQuotation(input: {
+  quotationNumber: string;
+  clientId: string;
+  subject: string;
+  notes?: string | null;
+  items: Array<{ description: string; quantity: number }>;
+}): Promise<{ quotationId: string }> {
+  // getCurrentProfile() verifies the session via local JWT claims, avoiding
+  // the network round-trip that auth.getUser() makes to the auth server.
+  const profile = await getCurrentProfile();
+  if (!profile) {
+    throw new Error("You must be signed in.");
+  }
+
+  const supabase = await createClient();
+
+  if (input.items.length === 0) {
+    throw new Error("Add at least one line item.");
+  }
+
+  const { data: clientRow, error: clientError } = await supabase
+    .from("clients")
+    .select("sector")
+    .eq("id", input.clientId)
+    .single();
+
+  if (clientError || !clientRow) {
+    throw new Error("Selected client was not found.");
+  }
+
+  const { data, error } = await supabase
+    .from("quotations")
+    .insert({
+      quotation_number: input.quotationNumber,
+      client_id: input.clientId,
+      sector: clientRow.sector,
+      subject: input.subject,
+      // amount (selling amount) and cost are set later — amount in the sales
+      // phase, cost is rolled up from quotation_items as Engineering costs them.
+      amount: 0,
+      // The requester is always the sales person on their own RFQ.
+      sales_person_id: profile.id,
+      notes: input.notes ?? null,
+      prepared_by: profile.id,
+      status: "draft",
+      phase: "costing",
+    })
+    .select("id")
+    .single();
+
+  if (error || !data) {
+    if (error?.code === "23505") {
+      throw new Error("Quotation ID already exists. Please choose a different one.");
+    }
+    throw new Error(error?.message || "Failed to create the request for quotation.");
+  }
+
+  const { error: itemsError } = await supabase.from("quotation_items").insert(
+    input.items.map((item, index) => ({
+      quotation_id: data.id,
+      description: item.description,
+      quantity: item.quantity,
+      sort_order: index,
+    })),
+  );
+
+  if (itemsError) {
+    throw new Error(itemsError.message || "Failed to save line items.");
+  }
+
+  return { quotationId: data.id };
+}
+
+export async function listRequestsForQuotation(): Promise<RequestForQuotation[]> {
+  const profile = await getCurrentProfile();
+  if (!profile) {
+    throw new Error("You must be signed in.");
+  }
+
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("quotations")
+    .select(
+      "id, quotation_number, client_id, subject, status, costing_rejection_reason, google_drive_link, cost, created_at, costing_approved_at, clients:client_id(company_name), quotation_items(id, description, quantity, unit_cost, line_total, sort_order)",
+    )
+    .eq("phase", "costing")
+    .eq("prepared_by", profile.id)
+    .order("created_at", { ascending: false });
+
+  if (error) {
+    throw new Error("Failed to load requests for quotation.");
+  }
+
+  return (data ?? []).map((row) => {
+    const client = Array.isArray(row.clients) ? row.clients[0] : row.clients;
+    const items = (Array.isArray(row.quotation_items) ? row.quotation_items : [])
+      .slice()
+      .sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0))
+      .map((item) => ({
+        id: item.id,
+        description: item.description,
+        quantity: Number(item.quantity),
+        unitCost: item.unit_cost === null ? null : Number(item.unit_cost),
+        lineTotal: Number(item.line_total),
+      }));
+
+    return {
+      id: row.id,
+      quotationNumber: row.quotation_number,
+      clientId: row.client_id,
+      clientName: client?.company_name ?? "Unknown client",
+      subject: row.subject,
+      status: row.status,
+      costingRejectionReason: row.costing_rejection_reason,
+      googleDriveLink: row.google_drive_link,
+      items,
+      cost: row.cost === null ? null : Number(row.cost),
+      createdAt: row.created_at,
+      costingApprovedAt: row.costing_approved_at ?? null,
+    };
+  });
+}
+
 export async function listSalesQuotations(): Promise<SalesQuotation[]> {
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("quotations")
     .select(
-      "id, quotation_number, client_id, subject, amount, cost, google_drive_link, notes, status, prepared_by, sales_person_id, created_at, costing_approved_at, sales_margin_percent, margin_percentage, margin_amount, bank_percentage, bank_amount, sop_percentage, sop_amount, selling_amount, payment_terms, payment_terms_custom, lead_time_days, client_po_number, client_confirmed_at, converted_po_id, po_converted_at, clients:client_id(company_name), converted_po:converted_po_id(status), quotation_approvals(approver_role, status, rejection_reason, updated_at, approver:approver_id(full_name, email)), preparer:prepared_by(full_name, email), sales_person:sales_person_id(full_name, email)",
+      "id, quotation_number, client_id, subject, amount, cost, google_drive_link, notes, status, prepared_by, sales_person_id, created_at, costing_approved_at, sales_margin_percent, margin_percentage, margin_amount, bank_percentage, bank_amount, sop_percentage, sop_amount, selling_amount, payment_terms, payment_terms_custom, lead_time_days, client_po_number, client_confirmed_at, converted_po_id, po_converted_at, clients:client_id(company_name), converted_po:converted_po_id(status), quotation_approvals(approver_role, status, rejection_reason, updated_at, approver:approver_id(full_name, email)), preparer:prepared_by(full_name, email), sales_person:sales_person_id(full_name, email), quotation_items(id, description, quantity, unit_cost, line_total, sort_order)",
     )
     .eq("phase", "sales")
     .order("created_at", { ascending: false });
@@ -223,6 +379,17 @@ export async function listSalesQuotations(): Promise<SalesQuotation[]> {
         : rejectedApproval.approver
       : null;
 
+    const items = (Array.isArray(row.quotation_items) ? row.quotation_items : [])
+      .slice()
+      .sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0))
+      .map((item) => ({
+        id: item.id,
+        description: item.description,
+        quantity: Number(item.quantity),
+        unitCost: item.unit_cost === null ? null : Number(item.unit_cost),
+        lineTotal: Number(item.line_total),
+      }));
+
     return {
       id: row.id,
       quotationNumber: row.quotation_number,
@@ -231,6 +398,7 @@ export async function listSalesQuotations(): Promise<SalesQuotation[]> {
       subject: row.subject,
       amount: Number(row.amount),
       cost: row.cost === null ? null : Number(row.cost),
+      items,
       googleDriveLink: row.google_drive_link,
       notes: row.notes,
       status: row.status,
@@ -285,15 +453,12 @@ export async function updateSalesQuotationDetails(input: {
   leadTimeDays: number | null;
   notes: string | null;
 }): Promise<void> {
-  const supabase = await createClient();
-  const {
-    data: { user },
-    error: userError,
-  } = await supabase.auth.getUser();
-
-  if (userError || !user) {
+  const profile = await getCurrentProfile();
+  if (!profile) {
     throw new Error("You must be signed in.");
   }
+
+  const supabase = await createClient();
 
   const { data: quotationRow, error: quotationError } = await supabase
     .from("quotations")
@@ -399,15 +564,12 @@ function assertQuotationReadyForApproval(row: {
 }
 
 export async function submitQuotationForApproval(quotationId: string): Promise<void> {
-  const supabase = await createClient();
-  const {
-    data: { user },
-    error: userError,
-  } = await supabase.auth.getUser();
-
-  if (userError || !user) {
+  const profile = await getCurrentProfile();
+  if (!profile) {
     throw new Error("You must be signed in.");
   }
+
+  const supabase = await createClient();
 
   const { data: quotation, error: quotationError } = await supabase
     .from("quotations")
@@ -432,17 +594,18 @@ export async function submitQuotationForApproval(quotationId: string): Promise<v
   assertQuotationReadyForApproval(quotation);
 
   const roles = requiredApproverRolesForAmount(Number(quotation.amount));
-  const rows = [] as Array<{
+  const approversByRole = await Promise.all(
+    roles.map((role) => findApproversForRole(role)),
+  );
+  const rows: Array<{
     quotation_id: string;
     approver_id: string;
     approver_role: RequiredApproverRole;
     status: "pending";
-  }>;
+  }> = [];
 
-  for (const role of roles) {
-    const approvers = await findApproversForRole(role);
-
-    for (const approver of approvers) {
+  roles.forEach((role, index) => {
+    for (const approver of approversByRole[index]) {
       rows.push({
         quotation_id: quotationId,
         approver_id: approver.id,
@@ -450,7 +613,7 @@ export async function submitQuotationForApproval(quotationId: string): Promise<v
         status: "pending",
       });
     }
-  }
+  });
 
   const { error: insertError } = await supabase.from("quotation_approvals").insert(rows);
   if (insertError) {
@@ -471,21 +634,17 @@ export async function findPendingApprovalForRole(input: {
   quotationId: string;
   role: RequiredApproverRole;
 }): Promise<{ approvalId: string } | null> {
-  const supabase = await createClient();
-  const {
-    data: { user },
-    error: userError,
-  } = await supabase.auth.getUser();
-
-  if (userError || !user) {
+  const profile = await getCurrentProfile();
+  if (!profile) {
     throw new Error("You must be signed in.");
   }
 
+  const supabase = await createClient();
   const { data, error } = await supabase
     .from("quotation_approvals")
     .select("id")
     .eq("quotation_id", input.quotationId)
-    .eq("approver_id", user.id)
+    .eq("approver_id", profile.id)
     .eq("approver_role", input.role)
     .eq("status", "pending")
     .maybeSingle();
@@ -504,22 +663,18 @@ export async function findPendingApprovalForRole(input: {
 export async function listPendingApprovalsForCurrentUser(): Promise<
   PendingApprovalItem[]
 > {
-  const supabase = await createClient();
-  const {
-    data: { user },
-    error: userError,
-  } = await supabase.auth.getUser();
-
-  if (userError || !user) {
+  const profile = await getCurrentProfile();
+  if (!profile) {
     return [];
   }
 
+  const supabase = await createClient();
   const { data, error } = await supabase
     .from("quotation_approvals")
     .select(
       "id, quotation_id, approver_role, status, quotations:quotation_id(quotation_number, subject, amount, cost, margin_amount, sector, google_drive_link, notes, created_at, clients:client_id(company_name), preparer:prepared_by(full_name, email))",
     )
-    .eq("approver_id", user.id)
+    .eq("approver_id", profile.id)
     .eq("status", "pending")
     .order("created_at", { ascending: false });
 
@@ -641,6 +796,9 @@ export async function resubmitQuotationForApproval(quotationId: string): Promise
   await supabase.from("quotation_approvals").delete().eq("quotation_id", quotationId);
 
   const roles = requiredApproverRolesForAmount(Number(row.amount));
+  const approversByRole = await Promise.all(
+    roles.map((role) => findApproversForRole(role)),
+  );
   const rows: Array<{
     quotation_id: string;
     approver_id: string;
@@ -648,9 +806,8 @@ export async function resubmitQuotationForApproval(quotationId: string): Promise
     status: "pending";
   }> = [];
 
-  for (const role of roles) {
-    const approvers = await findApproversForRole(role);
-    for (const approver of approvers) {
+  roles.forEach((role, index) => {
+    for (const approver of approversByRole[index]) {
       rows.push({
         quotation_id: quotationId,
         approver_id: approver.id,
@@ -658,7 +815,7 @@ export async function resubmitQuotationForApproval(quotationId: string): Promise
         status: "pending",
       });
     }
-  }
+  });
 
   if (rows.length > 0) {
     const { error: insertError } = await supabase

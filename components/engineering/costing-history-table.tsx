@@ -113,7 +113,7 @@ export function CostingHistoryTable({ items }: CostingHistoryTableProps) {
           if (!next) setViewing(null);
         }}
       >
-        <DialogContent className="max-w-md">
+        <DialogContent className="max-h-[85vh] max-w-lg overflow-y-auto">
           {viewing ? (
             <>
               <DialogHeader>
@@ -127,9 +127,6 @@ export function CostingHistoryTable({ items }: CostingHistoryTableProps) {
 
                 <dt className="text-muted-foreground">Subject</dt>
                 <dd className="font-medium">{viewing.subject || "-"}</dd>
-
-                <dt className="text-muted-foreground">Direct Cost</dt>
-                <dd className="font-medium">{formatCurrency(viewing.cost)}</dd>
 
                 <dt className="text-muted-foreground">Sales Person</dt>
                 <dd className="font-medium">
@@ -152,6 +149,44 @@ export function CostingHistoryTable({ items }: CostingHistoryTableProps) {
                 <dt className="text-muted-foreground">Approved At</dt>
                 <dd className="font-medium">{formatDate(viewing.approvedAt)}</dd>
               </dl>
+
+              <div>
+                <p className="mb-2 text-sm font-medium text-muted-foreground">
+                  Line Items
+                </p>
+                <table className="w-full text-xs">
+                  <thead className="text-left text-muted-foreground">
+                    <tr>
+                      <th className="py-1 pr-3 font-medium">Item</th>
+                      <th className="py-1 pr-3 font-medium">Qty</th>
+                      <th className="py-1 pr-3 font-medium">Unit Cost</th>
+                      <th className="py-1 font-medium">Line Total</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {viewing.items.map((item) => (
+                      <tr key={item.id} className="border-t">
+                        <td className="py-1 pr-3">{item.description}</td>
+                        <td className="py-1 pr-3">{item.quantity}</td>
+                        <td className="py-1 pr-3">
+                          {item.unitCost === null ? (
+                            <span className="text-muted-foreground">-</span>
+                          ) : (
+                            formatCurrency(item.unitCost)
+                          )}
+                        </td>
+                        <td className="py-1">{formatCurrency(item.lineTotal)}</td>
+                      </tr>
+                    ))}
+                    <tr className="border-t font-semibold">
+                      <td className="py-1 pr-3" colSpan={3}>
+                        Total Cost
+                      </td>
+                      <td className="py-1">{formatCurrency(viewing.cost)}</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
             </>
           ) : null}
         </DialogContent>

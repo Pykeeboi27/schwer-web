@@ -22,6 +22,20 @@ import {
 const ok = { data: null, error: null };
 const fail = { data: null, error: { message: "boom" } };
 const user = { id: "u1" };
+// These functions resolve the actor via getCurrentProfile(), which does its
+// own `.from("profiles")` lookup (separate from any other table's queue)
+// after auth.getClaims().
+const profileRow = {
+  data: {
+    id: "u1",
+    email: "u1@example.com",
+    department: "sales",
+    is_active: true,
+    role: "sales_manager",
+    is_executive_viewer: false,
+  },
+  error: null,
+};
 
 describe("markClientPoReceived", () => {
   const input = { quotationId: "q1", clientPoNumber: "CPO-1" };
@@ -31,53 +45,33 @@ describe("markClientPoReceived", () => {
     await expect(markClientPoReceived(input)).rejects.toThrow(/must be signed in/);
   });
 
-  it("throws when the quotation is missing", async () => {
-    mockClient = createSupabaseMock({ user, tables: { quotations: fail } });
-    await expect(markClientPoReceived(input)).rejects.toThrow(/was not found/);
-  });
-
-  it("only re-opens approved sales quotations", async () => {
+  it("throws when the update query errors", async () => {
     mockClient = createSupabaseMock({
       user,
-      tables: {
-        quotations: {
-          data: { id: "q1", phase: "sales", status: "draft", converted_po_id: null },
-          error: null,
-        },
-      },
+      tables: { profiles: profileRow, quotations: fail },
     });
-    await expect(markClientPoReceived(input)).rejects.toThrow(/Only approved quotations/);
+    await expect(markClientPoReceived(input)).rejects.toThrow("boom");
   });
 
-  it("blocks quotations already converted to a PO", async () => {
+  it("blocks quotations that aren't approved, wrong phase, or already converted", async () => {
+    // The guard (phase='sales', status='approved', not yet converted) is
+    // enforced by the UPDATE's own WHERE clause; a non-matching row simply
+    // returns no data, same as "not found".
     mockClient = createSupabaseMock({
       user,
-      tables: {
-        quotations: {
-          data: { id: "q1", phase: "sales", status: "approved", converted_po_id: "p9" },
-          error: null,
-        },
-      },
+      tables: { profiles: profileRow, quotations: { data: null, error: null } },
     });
-    await expect(markClientPoReceived(input)).rejects.toThrow(/already been converted/);
+    await expect(markClientPoReceived(input)).rejects.toThrow(
+      /haven't been converted yet can be re-opened/,
+    );
   });
 
   it("records the client PO on a valid quotation", async () => {
     mockClient = createSupabaseMock({
       user,
       tables: {
-        quotations: [
-          {
-            data: {
-              id: "q1",
-              phase: "sales",
-              status: "approved",
-              converted_po_id: null,
-            },
-            error: null,
-          },
-          ok,
-        ],
+        profiles: profileRow,
+        quotations: { data: { id: "q1" }, error: null },
       },
     });
     await expect(markClientPoReceived(input)).resolves.toBeUndefined();
@@ -117,7 +111,10 @@ describe("convertQuotationToPurchaseOrder", () => {
   });
 
   it("throws when the quotation is missing", async () => {
-    mockClient = createSupabaseMock({ user, tables: { quotations: fail } });
+    mockClient = createSupabaseMock({
+      user,
+      tables: { profiles: profileRow, quotations: fail },
+    });
     await expect(convertQuotationToPurchaseOrder("q1")).rejects.toThrow(/was not found/);
   });
 
@@ -125,6 +122,7 @@ describe("convertQuotationToPurchaseOrder", () => {
     mockClient = createSupabaseMock({
       user,
       tables: {
+        profiles: profileRow,
         quotations: { data: { ...baseQuotation, status: "draft" }, error: null },
       },
     });
@@ -137,6 +135,7 @@ describe("convertQuotationToPurchaseOrder", () => {
     mockClient = createSupabaseMock({
       user,
       tables: {
+        profiles: profileRow,
         quotations: {
           data: { ...baseQuotation, client_confirmed_at: null },
           error: null,
@@ -152,6 +151,7 @@ describe("convertQuotationToPurchaseOrder", () => {
     mockClient = createSupabaseMock({
       user,
       tables: {
+        profiles: profileRow,
         quotations: {
           data: { ...baseQuotation, converted_po_id: "existing-po" },
           error: null,
@@ -225,6 +225,7 @@ describe("convertQuotationToPurchaseOrder", () => {
     mockClient = createSupabaseMock({
       user,
       tables: {
+        profiles: profileRow,
         quotations: { data: baseQuotation, error: null },
         purchase_orders: [
           { data: null, error: null, count: 3 },
@@ -287,7 +288,10 @@ describe("findPendingPoApprovalForRole", () => {
   it("returns the approval id when present, otherwise null", async () => {
     mockClient = createSupabaseMock({
       user,
-      tables: { po_approvals: { data: { id: "pa1" }, error: null } },
+      tables: {
+        profiles: profileRow,
+        po_approvals: { data: { id: "pa1" }, error: null },
+      },
     });
     await expect(
       findPendingPoApprovalForRole({ poId: "p1", role: "owner" }),
@@ -295,7 +299,7 @@ describe("findPendingPoApprovalForRole", () => {
 
     mockClient = createSupabaseMock({
       user,
-      tables: { po_approvals: { data: null, error: null } },
+      tables: { profiles: profileRow, po_approvals: { data: null, error: null } },
     });
     await expect(
       findPendingPoApprovalForRole({ poId: "p1", role: "owner" }),
@@ -303,7 +307,10 @@ describe("findPendingPoApprovalForRole", () => {
   });
 
   it("throws when the lookup errors", async () => {
-    mockClient = createSupabaseMock({ user, tables: { po_approvals: fail } });
+    mockClient = createSupabaseMock({
+      user,
+      tables: { profiles: profileRow, po_approvals: fail },
+    });
     await expect(
       findPendingPoApprovalForRole({ poId: "p1", role: "owner" }),
     ).rejects.toThrow(/verify PO approval assignment/);
@@ -470,7 +477,10 @@ describe("addPoPayment", () => {
   const input = { purchaseOrderId: "p1", amountCollected: 200000 };
 
   it("throws when the purchase order is missing", async () => {
-    mockClient = createSupabaseMock({ user, tables: { purchase_orders: fail } });
+    mockClient = createSupabaseMock({
+      user,
+      tables: { profiles: profileRow, purchase_orders: fail },
+    });
     await expect(addPoPayment(input)).rejects.toThrow(/was not found/);
   });
 
@@ -478,6 +488,7 @@ describe("addPoPayment", () => {
     mockClient = createSupabaseMock({
       user,
       tables: {
+        profiles: profileRow,
         purchase_orders: {
           data: {
             id: "p1",
@@ -498,6 +509,7 @@ describe("addPoPayment", () => {
     mockClient = createSupabaseMock({
       user,
       tables: {
+        profiles: profileRow,
         purchase_orders: {
           data: {
             id: "p1",
@@ -519,6 +531,7 @@ describe("addPoPayment", () => {
     mockClient = createSupabaseMock({
       user,
       tables: {
+        profiles: profileRow,
         // 1) select PO, 2) update PO totals
         purchase_orders: [
           {

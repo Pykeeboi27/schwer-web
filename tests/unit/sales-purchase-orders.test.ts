@@ -186,6 +186,19 @@ describe("listPendingPoApprovalsForCurrentUser", () => {
     mockClient = createSupabaseMock({
       user: { id: "u1" },
       tables: {
+        // listPendingPoApprovalsForCurrentUser resolves the actor via
+        // getCurrentProfile(), which does its own `.from("profiles")` lookup.
+        profiles: {
+          data: {
+            id: "u1",
+            email: "u1@example.com",
+            department: "executive",
+            is_active: true,
+            role: "executive",
+            is_executive_viewer: false,
+          },
+          error: null,
+        },
         po_approvals: {
           data: [
             {

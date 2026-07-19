@@ -3,12 +3,16 @@
 import Link from "next/link";
 import { cn } from "@/lib/utils";
 import { isNavItemActive, type NavConfig } from "@/components/layouts/nav-config";
+import { NotificationDot } from "@/components/ui/badge";
+import type { NotificationSection } from "@/lib/notifications/types";
 
 type SidebarNavProps = {
   config: NavConfig;
   pathname: string;
   /** Fired after a link is chosen — used to close the mobile drawer. */
   onNavigate?: () => void;
+  /** Sections with unseen notification changes — renders a small dot on that tab. */
+  unseenSections?: NotificationSection[];
 };
 
 /**
@@ -16,7 +20,12 @@ type SidebarNavProps = {
  * drawer (`MobileNav`). Keeps a single markup + active-state source so the two
  * never drift apart.
  */
-export function SidebarNav({ config, pathname, onNavigate }: SidebarNavProps) {
+export function SidebarNav({
+  config,
+  pathname,
+  onNavigate,
+  unseenSections,
+}: SidebarNavProps) {
   return (
     <div className="flex h-full flex-col">
       <div className="px-3 pb-3 pt-1">
@@ -63,6 +72,9 @@ export function SidebarNav({ config, pathname, onNavigate }: SidebarNavProps) {
                 )}
               />
               <span className="truncate">{item.label}</span>
+              {item.section && unseenSections?.includes(item.section) ? (
+                <NotificationDot className="ml-auto" />
+              ) : null}
             </Link>
           );
         })}

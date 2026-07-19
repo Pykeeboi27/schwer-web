@@ -1,3 +1,4 @@
+import { getCurrentProfile } from "@/lib/profile/get-current-profile";
 import { createClient } from "@/lib/supabase/server";
 
 export type AnnualTargetRecord = {
@@ -163,21 +164,18 @@ export async function upsertAnnualTarget(
     );
   }
 
-  const supabase = await createClient();
-  const {
-    data: { user },
-    error: authError,
-  } = await supabase.auth.getUser();
-
-  if (authError || !user) {
+  const profile = await getCurrentProfile();
+  if (!profile) {
     throw new Error("You must be signed in to update yearly targets.");
   }
+
+  const supabase = await createClient();
 
   return upsertRevenueTargetRow(supabase, {
     year,
     month: null,
     targetAmount,
-    userId: user.id,
+    userId: profile.id,
     errorMessage: "Failed to update yearly target.",
   });
 }
@@ -218,21 +216,18 @@ export async function upsertQuarterlyTarget(
     );
   }
 
-  const supabase = await createClient();
-  const {
-    data: { user },
-    error: authError,
-  } = await supabase.auth.getUser();
-
-  if (authError || !user) {
+  const profile = await getCurrentProfile();
+  if (!profile) {
     throw new Error("You must be signed in to update quarterly targets.");
   }
+
+  const supabase = await createClient();
 
   await upsertRevenueTargetRow(supabase, {
     year,
     month,
     targetAmount,
-    userId: user.id,
+    userId: profile.id,
     errorMessage: "Failed to update quarterly target.",
   });
 }

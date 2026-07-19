@@ -3,6 +3,11 @@
 import { DEPARTMENTS, isDepartment, type Department } from "@/lib/profile/departments";
 import { createClient } from "@/lib/supabase/server";
 
+const siteUrl = (
+  process.env.NEXT_PUBLIC_SITE_URL ??
+  (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : "http://localhost:3000")
+).replace(/\/+$/, "");
+
 export type SignUpActionState = {
   error: string | null;
   success: boolean;
@@ -61,6 +66,7 @@ export async function signUpAction(
       data: {
         department: departmentRaw as Department,
       },
+      emailRedirectTo: `${siteUrl}/auth/confirm`,
     },
   });
 

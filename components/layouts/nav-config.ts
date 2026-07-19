@@ -2,12 +2,15 @@ import {
   BadgeCheck,
   Building2,
   ClipboardCheck,
+  FilePlus,
   FileText,
   LayoutDashboard,
   LineChart,
   Receipt,
+  Target,
   type LucideIcon,
 } from "lucide-react";
+import type { NotificationSection } from "@/lib/notifications/types";
 
 export type NavItem = {
   href: string;
@@ -15,6 +18,8 @@ export type NavItem = {
   icon: LucideIcon;
   /** Match the pathname exactly (used for module dashboard roots). */
   end?: boolean;
+  /** Notification section this tab surfaces -- drives the "unseen changes" dot. */
+  section?: NotificationSection;
 };
 
 export type NavConfig = {
@@ -43,11 +48,18 @@ export function getNavConfig(pathname: string, role?: string | null): NavConfig 
           end: true,
         },
         { href: "/protected/executive/sales", label: "Sales", icon: LineChart },
-        { href: "/protected/executive/approvals", label: "Approvals", icon: BadgeCheck },
+        { href: "/protected/executive/quotas", label: "Quotas", icon: Target },
+        {
+          href: "/protected/executive/approvals",
+          label: "Approvals",
+          icon: BadgeCheck,
+          section: "approvals",
+        },
         {
           href: "/protected/executive/costing-approvals",
           label: "Costing Approval",
           icon: ClipboardCheck,
+          section: "costing_approvals",
         },
       ],
     };
@@ -67,6 +79,7 @@ export function getNavConfig(pathname: string, role?: string | null): NavConfig 
           href: "/protected/engineering/quotations",
           label: "Quotations",
           icon: FileText,
+          section: "engineering_quotations",
         },
       ],
     };
@@ -83,11 +96,23 @@ export function getNavConfig(pathname: string, role?: string | null): NavConfig 
           end: true,
         },
         { href: "/protected/sales/clients", label: "Clients", icon: Building2 },
-        { href: "/protected/sales/quotations", label: "Quotations", icon: FileText },
+        {
+          href: "/protected/sales/request-for-quotation",
+          label: "Request for Quotation",
+          icon: FilePlus,
+          section: "request_for_quotation",
+        },
+        {
+          href: "/protected/sales/quotations",
+          label: "Quotations",
+          icon: FileText,
+          section: "quotations",
+        },
         {
           href: "/protected/sales/purchase-orders",
           label: "Purchase Orders",
           icon: Receipt,
+          section: "purchase_orders",
         },
         ...(role === "sales_manager"
           ? [
@@ -95,6 +120,7 @@ export function getNavConfig(pathname: string, role?: string | null): NavConfig 
                 href: "/protected/sales/approvals",
                 label: "Approvals",
                 icon: BadgeCheck,
+                section: "approvals" as const,
               },
             ]
           : []),

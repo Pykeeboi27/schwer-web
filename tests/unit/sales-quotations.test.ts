@@ -247,6 +247,19 @@ describe("listPendingApprovalsForCurrentUser", () => {
     mockClient = createSupabaseMock({
       user: { id: "u1" },
       tables: {
+        // listPendingApprovalsForCurrentUser resolves the actor via
+        // getCurrentProfile(), which does its own `.from("profiles")` lookup.
+        profiles: {
+          data: {
+            id: "u1",
+            email: "u1@example.com",
+            department: "sales",
+            is_active: true,
+            role: "sales_manager",
+            is_executive_viewer: false,
+          },
+          error: null,
+        },
         quotation_approvals: {
           data: [
             {

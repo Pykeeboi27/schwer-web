@@ -13,6 +13,13 @@ import { createClient } from "@/lib/supabase/server";
  * client dialog can manage, but the worksheet always uses the client's
  * primary contact info directly.
  */
+export type PurchaseOrderWorksheetItem = {
+  description: string;
+  quantity: number;
+  unitCost: number | null;
+  lineTotal: number;
+};
+
 export type PurchaseOrderWorksheetData = {
   id: string;
   poNumber: string;
@@ -20,6 +27,7 @@ export type PurchaseOrderWorksheetData = {
   quotationNumber: string | null;
   subject: string;
   poAmount: number;
+  items: PurchaseOrderWorksheetItem[];
   paymentTerms: string | null;
   leadTimeDays: number | null;
   poDate: string | null;
@@ -52,7 +60,8 @@ export async function getPurchaseOrderWorksheetData(
        notes, sector, created_at, created_by,
        clients:client_id ( company_name, address, city, province, tin, notes ),
        quotations:quotation_id ( quotation_number ),
-       creator:created_by ( full_name )`,
+       creator:created_by ( full_name ),
+       purchase_order_items ( description, quantity, unit_cost, line_total, sort_order )`,
     )
     .eq("id", poId)
     .maybeSingle();
@@ -73,6 +82,16 @@ export async function getPurchaseOrderWorksheetData(
   const paymentTerms =
     po.payment_terms === "Other" ? po.payment_terms_custom : po.payment_terms;
 
+  const items = (Array.isArray(po.purchase_order_items) ? po.purchase_order_items : [])
+    .slice()
+    .sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0))
+    .map((item) => ({
+      description: item.description,
+      quantity: Number(item.quantity),
+      unitCost: item.unit_cost === null ? null : Number(item.unit_cost),
+      lineTotal: Number(item.line_total),
+    }));
+
   return {
     id: po.id,
     poNumber: po.po_number,
@@ -83,6 +102,7 @@ export async function getPurchaseOrderWorksheetData(
       null,
     subject: po.subject,
     poAmount: Number(po.po_amount),
+    items,
     paymentTerms: paymentTerms ?? null,
     leadTimeDays: po.lead_time_days ?? null,
     poDate: po.po_date ?? null,

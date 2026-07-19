@@ -29,7 +29,6 @@ type SalesPersonOption = {
 type CostingQuotationDetailsDialogProps = {
   open: boolean;
   quotation: CostingQuotation | null;
-  currentUserId: string;
   clients: ClientOption[];
   salesPeople: SalesPersonOption[];
   onOpenChange: (open: boolean) => void;
@@ -54,7 +53,6 @@ function formatDate(value: string): string {
 export function CostingQuotationDetailsDialog({
   open,
   quotation,
-  currentUserId,
   clients,
   salesPeople,
   onOpenChange,
@@ -68,8 +66,11 @@ export function CostingQuotationDetailsDialog({
     return null;
   }
 
-  const isMine = quotation.preparedBy === currentUserId;
-  const isEditable = isMine && quotation.status === "draft";
+  // Any active engineering user can cost/submit a draft RFQ, regardless of
+  // who raised it (Sales is the preparer, not Engineering) — matches the
+  // eng_quotations_eng_all RLS policy, which grants the whole department
+  // access rather than just the row's creator.
+  const isEditable = quotation.status === "draft";
   const isPending = quotation.status === "pending";
 
   const handleSubmit = async () => {
@@ -129,9 +130,6 @@ export function CostingQuotationDetailsDialog({
             <dt className="text-muted-foreground">Subject</dt>
             <dd className="font-medium">{quotation.subject}</dd>
 
-            <dt className="text-muted-foreground">Direct Cost</dt>
-            <dd className="font-medium">{formatCurrency(quotation.cost)}</dd>
-
             <dt className="text-muted-foreground">Sales Person</dt>
             <dd className="font-medium">
               {quotation.salesPersonName ?? (
@@ -163,6 +161,42 @@ export function CostingQuotationDetailsDialog({
             <dt className="text-muted-foreground">Created</dt>
             <dd className="font-medium">{formatDate(quotation.createdAt)}</dd>
           </dl>
+
+          <div>
+            <p className="mb-2 text-sm font-medium text-muted-foreground">Line Items</p>
+            <table className="w-full text-xs">
+              <thead className="text-left text-muted-foreground">
+                <tr>
+                  <th className="py-1 pr-3 font-medium">Item</th>
+                  <th className="py-1 pr-3 font-medium">Qty</th>
+                  <th className="py-1 pr-3 font-medium">Unit Cost</th>
+                  <th className="py-1 font-medium">Line Total</th>
+                </tr>
+              </thead>
+              <tbody>
+                {quotation.items.map((item) => (
+                  <tr key={item.id} className="border-t">
+                    <td className="py-1 pr-3">{item.description}</td>
+                    <td className="py-1 pr-3">{item.quantity}</td>
+                    <td className="py-1 pr-3">
+                      {item.unitCost === null ? (
+                        <span className="text-muted-foreground">Not costed yet</span>
+                      ) : (
+                        formatCurrency(item.unitCost)
+                      )}
+                    </td>
+                    <td className="py-1">{formatCurrency(item.lineTotal)}</td>
+                  </tr>
+                ))}
+                <tr className="border-t font-semibold">
+                  <td className="py-1 pr-3" colSpan={3}>
+                    Total Cost
+                  </td>
+                  <td className="py-1">{formatCurrency(quotation.cost)}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
 
           <div className="flex flex-col-reverse gap-2 pt-2 sm:flex-row sm:justify-end">
             {isPending ? (
