@@ -450,6 +450,40 @@ ALTER TABLE public.quotations
   ADD COLUMN IF NOT EXISTS converted_po_id     UUID REFERENCES public.purchase_orders(id) ON DELETE SET NULL,
   ADD COLUMN IF NOT EXISTS po_converted_at     TIMESTAMPTZ;
 
+-- Per-item Sales Margin/Bank/SOP pricing (migration 0020). Sales can price
+-- each quotation_items/purchase_order_items row individually instead of one
+-- shared percentage for the whole record; has_unequal_margins records
+-- whether the record is using per-item percentages or one shared value
+-- broadcast to every item. The *_amount/percentage columns on the item
+-- tables are plain (not GENERATED — they'd need to reference the already-
+-- GENERATED line_total column, which Postgres disallows) and are written
+-- app-side by lib/sales/pricing.ts, same as the record-level columns below.
+-- quotation_items and purchase_order_items themselves are created by
+-- migration 0008 (multi-item quotations), not inline in this file.
+ALTER TABLE public.quotations
+  ADD COLUMN IF NOT EXISTS has_unequal_margins BOOLEAN NOT NULL DEFAULT FALSE;
+
+ALTER TABLE public.purchase_orders
+  ADD COLUMN IF NOT EXISTS has_unequal_margins BOOLEAN NOT NULL DEFAULT FALSE;
+
+ALTER TABLE public.quotation_items
+  ADD COLUMN IF NOT EXISTS margin_percentage NUMERIC(6, 2),
+  ADD COLUMN IF NOT EXISTS margin_amount     NUMERIC(15, 2),
+  ADD COLUMN IF NOT EXISTS bank_percentage   NUMERIC(6, 2),
+  ADD COLUMN IF NOT EXISTS bank_amount       NUMERIC(15, 2),
+  ADD COLUMN IF NOT EXISTS sop_percentage    NUMERIC(6, 2),
+  ADD COLUMN IF NOT EXISTS sop_amount        NUMERIC(15, 2),
+  ADD COLUMN IF NOT EXISTS selling_amount    NUMERIC(15, 2);
+
+ALTER TABLE public.purchase_order_items
+  ADD COLUMN IF NOT EXISTS margin_percentage NUMERIC(6, 2),
+  ADD COLUMN IF NOT EXISTS margin_amount     NUMERIC(15, 2),
+  ADD COLUMN IF NOT EXISTS bank_percentage   NUMERIC(6, 2),
+  ADD COLUMN IF NOT EXISTS bank_amount       NUMERIC(15, 2),
+  ADD COLUMN IF NOT EXISTS sop_percentage    NUMERIC(6, 2),
+  ADD COLUMN IF NOT EXISTS sop_amount        NUMERIC(15, 2),
+  ADD COLUMN IF NOT EXISTS selling_amount    NUMERIC(15, 2);
+
 
 -- ============================================================
 -- SECTION 5: EXECUTIVE DASHBOARD — TARGETS
@@ -1020,6 +1054,23 @@ CREATE POLICY "sales_quotations_executive_high_value_select"
   USING (
     amount >= 3000000
     AND EXISTS (
+      SELECT 1 FROM public.profiles p
+      WHERE p.id = auth.uid()
+        AND p.department = 'executive'
+        AND p.role IN ('owner', 'executive')
+        AND p.is_active = TRUE
+    )
+  );
+
+-- Executive tracking (migration 0021): unrestricted quotation visibility for the
+-- Executive > Quotations tab, mirroring the already-unrestricted po_executive_select
+-- on purchase_orders. Additive alongside the high-value policy above (RLS policies
+-- for a command are OR'd). quotation_items needs no matching policy -- migration 0009
+-- already delegates item visibility to "can you see the parent quotations row".
+CREATE POLICY "quotations_executive_select_all"
+  ON public.quotations FOR SELECT
+  USING (
+    EXISTS (
       SELECT 1 FROM public.profiles p
       WHERE p.id = auth.uid()
         AND p.department = 'executive'

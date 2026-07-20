@@ -18,6 +18,24 @@ export type PurchaseOrderWorksheetItem = {
   quantity: number;
   unitCost: number | null;
   lineTotal: number;
+  /**
+   * Per-item pre-VAT selling price and its margin/bank/sop components, so the
+   * printed item rows can show each line's VAT-inclusive selling price
+   * instead of its bare direct cost. Null for items priced before the
+   * per-item pricing feature shipped -- the worksheet falls back to lineTotal.
+   */
+  sellingAmount: number | null;
+  marginAmount: number | null;
+  bankAmount: number | null;
+  sopAmount: number | null;
+  /**
+   * Each item's own margin/bank/sop percentage, so the REMARKS box can list
+   * the actual percentages used and which items got each one, instead of
+   * printing one blended/averaged percentage for the whole PO.
+   */
+  marginPercentage: number | null;
+  bankPercentage: number | null;
+  sopPercentage: number | null;
 };
 
 export type PurchaseOrderWorksheetData = {
@@ -28,14 +46,15 @@ export type PurchaseOrderWorksheetData = {
   subject: string;
   poAmount: number;
   /**
-   * Pricing percentages printed together in the worksheet REMARKS box.
-   * `marginPercent` prefers the sales-entered `margin_percentage`, falling
-   * back to the generated `margin_percent` (derived from po_amount vs. cost).
-   * Each is null when not set on the PO.
+   * Blended (record-level) pre-VAT margin/bank/SOP amounts, used only to
+   * print each component's aggregate 12% VAT (computeVatBreakdown) in the
+   * REMARKS box. The percentages themselves are NOT blended/averaged for
+   * display -- see each item's own marginPercentage/bankPercentage/
+   * sopPercentage in PurchaseOrderWorksheetItem.
    */
-  marginPercent: number | null;
-  bankPercent: number | null;
-  sopPercent: number | null;
+  marginAmount: number | null;
+  bankAmount: number | null;
+  sopAmount: number | null;
   items: PurchaseOrderWorksheetItem[];
   paymentTerms: string | null;
   leadTimeDays: number | null;
@@ -73,13 +92,15 @@ export async function getPurchaseOrderWorksheetData(
     .from("purchase_orders")
     .select(
       `id, po_number, client_po_number, quotation_reference, subject, po_amount,
-       cost, margin_percentage, margin_percent, bank_percentage, sop_percentage,
+       cost, margin_amount, bank_amount, sop_amount,
        payment_terms, payment_terms_custom, lead_time_days, po_date, expected_completion,
        notes, sector, created_at, created_by,
        clients:client_id ( company_name, address, city, province, tin, notes ),
        quotations:quotation_id ( quotation_number ),
        creator:created_by ( full_name ),
-       purchase_order_items ( description, quantity, unit_cost, line_total, sort_order )`,
+       purchase_order_items ( description, quantity, unit_cost, line_total, sort_order,
+         selling_amount, margin_amount, bank_amount, sop_amount,
+         margin_percentage, bank_percentage, sop_percentage )`,
     )
     .eq("id", poId)
     .maybeSingle();
@@ -108,6 +129,13 @@ export async function getPurchaseOrderWorksheetData(
       quantity: Number(item.quantity),
       unitCost: item.unit_cost === null ? null : Number(item.unit_cost),
       lineTotal: Number(item.line_total),
+      sellingAmount: toNullableNumber(item.selling_amount),
+      marginAmount: toNullableNumber(item.margin_amount),
+      bankAmount: toNullableNumber(item.bank_amount),
+      sopAmount: toNullableNumber(item.sop_amount),
+      marginPercentage: toNullableNumber(item.margin_percentage),
+      bankPercentage: toNullableNumber(item.bank_percentage),
+      sopPercentage: toNullableNumber(item.sop_percentage),
     }));
 
   return {
@@ -120,9 +148,9 @@ export async function getPurchaseOrderWorksheetData(
       null,
     subject: po.subject,
     poAmount: Number(po.po_amount),
-    marginPercent: toNullableNumber(po.margin_percentage ?? po.margin_percent),
-    bankPercent: toNullableNumber(po.bank_percentage),
-    sopPercent: toNullableNumber(po.sop_percentage),
+    marginAmount: toNullableNumber(po.margin_amount),
+    bankAmount: toNullableNumber(po.bank_amount),
+    sopAmount: toNullableNumber(po.sop_amount),
     items,
     paymentTerms: paymentTerms ?? null,
     leadTimeDays: po.lead_time_days ?? null,

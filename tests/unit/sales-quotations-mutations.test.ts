@@ -38,15 +38,16 @@ const profileRow = {
 
 const detailsInput = {
   quotationId: "q1",
-  marginPercentage: 10,
-  bankPercentage: 5,
-  sopPercentage: 2,
+  hasUnequalMargins: false,
+  items: [{ id: "i1", marginPercentage: 10, bankPercentage: 5, sopPercentage: 2 }],
   googleDriveLink: null,
   paymentTerms: "net30",
   paymentTermsCustom: null,
   leadTimeDays: 14,
   notes: null,
 };
+
+const oneQuotationItem = [{ id: "i1", line_total: "1000000" }];
 
 describe("updateSalesQuotationDetails", () => {
   it("requires an authenticated user", async () => {
@@ -89,9 +90,9 @@ describe("updateSalesQuotationDetails", () => {
             id: "q1",
             phase: "sales",
             status: "approved",
-            cost: "1000000",
             client_confirmed_at: null,
             converted_po_id: null,
+            quotation_items: oneQuotationItem,
           },
           error: null,
         },
@@ -99,6 +100,29 @@ describe("updateSalesQuotationDetails", () => {
     });
     await expect(updateSalesQuotationDetails(detailsInput)).rejects.toThrow(
       /can only be edited/,
+    );
+  });
+
+  it("rejects when the priced items don't match the quotation's items", async () => {
+    mockClient = createSupabaseMock({
+      user,
+      tables: {
+        profiles: profileRow,
+        quotations: {
+          data: {
+            id: "q1",
+            phase: "sales",
+            status: "draft",
+            client_confirmed_at: null,
+            converted_po_id: null,
+            quotation_items: [],
+          },
+          error: null,
+        },
+      },
+    });
+    await expect(updateSalesQuotationDetails(detailsInput)).rejects.toThrow(
+      /Every line item on this quotation needs pricing/,
     );
   });
 
@@ -113,14 +137,15 @@ describe("updateSalesQuotationDetails", () => {
               id: "q1",
               phase: "sales",
               status: "draft",
-              cost: "1000000",
               client_confirmed_at: null,
               converted_po_id: null,
+              quotation_items: oneQuotationItem,
             },
             error: null,
           },
           ok,
         ],
+        quotation_items: ok,
       },
     });
     await expect(updateSalesQuotationDetails(detailsInput)).resolves.toBeUndefined();
@@ -137,14 +162,15 @@ describe("updateSalesQuotationDetails", () => {
               id: "q1",
               phase: "sales",
               status: "approved",
-              cost: "1000000",
               client_confirmed_at: "2026-01-01",
               converted_po_id: null,
+              quotation_items: oneQuotationItem,
             },
             error: null,
           },
           ok,
         ],
+        quotation_items: ok,
       },
     });
     await expect(updateSalesQuotationDetails(detailsInput)).resolves.toBeUndefined();
@@ -161,14 +187,15 @@ describe("updateSalesQuotationDetails", () => {
               id: "q1",
               phase: "sales",
               status: "rejected",
-              cost: "1000000",
               client_confirmed_at: null,
               converted_po_id: null,
+              quotation_items: oneQuotationItem,
             },
             error: null,
           },
           ok,
         ],
+        quotation_items: ok,
       },
     });
     await expect(updateSalesQuotationDetails(detailsInput)).resolves.toBeUndefined();

@@ -147,7 +147,7 @@ export function CostingQuotationsTable({
               <tr>
                 <th className="px-3 py-2 font-medium">Client</th>
                 <th className="px-3 py-2 font-medium">Subject</th>
-                <th className="px-3 py-2 font-medium">Total Cost</th>
+                <th className="px-3 py-2 font-medium">Total Direct Cost</th>
                 <th className="px-3 py-2 font-medium">Status</th>
               </tr>
             </thead>
@@ -196,7 +196,7 @@ export function CostingQuotationsTable({
                 }
               >
                 <DataField label="Subject" value={q.subject} />
-                <DataField label="Total Cost" value={formatCurrency(q.cost)} />
+                <DataField label="Total Direct Cost" value={formatCurrency(q.cost)} />
               </DataCard>
             ))
           )

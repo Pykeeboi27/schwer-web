@@ -81,7 +81,9 @@
       "Bash(node -e \"try{require.resolve\\('fast-xml-parser'\\);console.log\\('fxp OK'\\)}catch\\(e\\){console.log\\('NO fxp'\\)}\")",
       "Bash(rm -rf C:/Users/jiroh/AppData/Local/Temp/claude/C--Users-jiroh-Desktop-schwer-web/9c1139a0-63e3-42f8-be16-dbcf46efcc64/scratchpad/orig)",
       "Bash(mkdir -p C:/Users/jiroh/AppData/Local/Temp/claude/C--Users-jiroh-Desktop-schwer-web/9c1139a0-63e3-42f8-be16-dbcf46efcc64/scratchpad/orig)",
-      "Bash(unzip -o -q 'SPMC-SALES-WORKSHEET-DATEM-BDO-TOWER \\(1\\).xlsx' -d C:/Users/jiroh/AppData/Local/Temp/claude/C--Users-jiroh-Desktop-schwer-web/9c1139a0-63e3-42f8-be16-dbcf46efcc64/scratchpad/orig)"
+      "Bash(unzip -o -q 'SPMC-SALES-WORKSHEET-DATEM-BDO-TOWER \\(1\\).xlsx' -d C:/Users/jiroh/AppData/Local/Temp/claude/C--Users-jiroh-Desktop-schwer-web/9c1139a0-63e3-42f8-be16-dbcf46efcc64/scratchpad/orig)",
+      "PowerShell(npx tsc --noEmit 2>&1)",
+      "PowerShell(npx vitest run tests/unit --maxWorkers=2)"
     ]
   },
   "enableAllProjectMcpServers": true,

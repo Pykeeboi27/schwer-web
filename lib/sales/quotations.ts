@@ -1,5 +1,9 @@
 import { getCurrentProfile } from "@/lib/profile/get-current-profile";
-import { computeSalesPricing } from "@/lib/sales/pricing";
+import {
+  computeAggregatePricing,
+  computeSalesPricing,
+  computeVatBreakdown,
+} from "@/lib/sales/pricing";
 import { createClient } from "@/lib/supabase/server";
 
 export type RequiredApproverRole = "sales_manager" | "owner" | "executive";
@@ -10,6 +14,13 @@ export type SalesQuotationItem = {
   quantity: number;
   unitCost: number | null;
   lineTotal: number;
+  marginPercentage: number | null;
+  marginAmount: number | null;
+  bankPercentage: number | null;
+  bankAmount: number | null;
+  sopPercentage: number | null;
+  sopAmount: number | null;
+  sellingAmount: number | null;
 };
 
 export type SalesQuotation = {
@@ -41,6 +52,7 @@ export type SalesQuotation = {
   sopPercentage: number | null;
   sopAmount: number | null;
   sellingAmount: number | null;
+  hasUnequalMargins: boolean;
   paymentTerms: string | null;
   paymentTermsCustom: string | null;
   leadTimeDays: number | null;
@@ -345,7 +357,7 @@ export async function listSalesQuotations(): Promise<SalesQuotation[]> {
   const { data, error } = await supabase
     .from("quotations")
     .select(
-      "id, quotation_number, client_id, subject, amount, cost, google_drive_link, notes, status, prepared_by, sales_person_id, created_at, costing_approved_at, sales_margin_percent, margin_percentage, margin_amount, bank_percentage, bank_amount, sop_percentage, sop_amount, selling_amount, payment_terms, payment_terms_custom, lead_time_days, client_po_number, client_confirmed_at, converted_po_id, po_converted_at, clients:client_id(company_name), converted_po:converted_po_id(status), quotation_approvals(approver_role, status, rejection_reason, updated_at, approver:approver_id(full_name, email)), preparer:prepared_by(full_name, email), sales_person:sales_person_id(full_name, email), quotation_items(id, description, quantity, unit_cost, line_total, sort_order)",
+      "id, quotation_number, client_id, subject, amount, cost, google_drive_link, notes, status, prepared_by, sales_person_id, created_at, costing_approved_at, sales_margin_percent, margin_percentage, margin_amount, bank_percentage, bank_amount, sop_percentage, sop_amount, selling_amount, has_unequal_margins, payment_terms, payment_terms_custom, lead_time_days, client_po_number, client_confirmed_at, converted_po_id, po_converted_at, clients:client_id(company_name), converted_po:converted_po_id(status), quotation_approvals(approver_role, status, rejection_reason, updated_at, approver:approver_id(full_name, email)), preparer:prepared_by(full_name, email), sales_person:sales_person_id(full_name, email), quotation_items(id, description, quantity, unit_cost, line_total, margin_percentage, margin_amount, bank_percentage, bank_amount, sop_percentage, sop_amount, selling_amount, sort_order)",
     )
     .eq("phase", "sales")
     .order("created_at", { ascending: false });
@@ -392,6 +404,13 @@ export async function listSalesQuotations(): Promise<SalesQuotation[]> {
         quantity: Number(item.quantity),
         unitCost: item.unit_cost === null ? null : Number(item.unit_cost),
         lineTotal: Number(item.line_total),
+        marginPercentage: numberOrNull(item.margin_percentage),
+        marginAmount: numberOrNull(item.margin_amount),
+        bankPercentage: numberOrNull(item.bank_percentage),
+        bankAmount: numberOrNull(item.bank_amount),
+        sopPercentage: numberOrNull(item.sop_percentage),
+        sopAmount: numberOrNull(item.sop_amount),
+        sellingAmount: numberOrNull(item.selling_amount),
       }));
 
     return {
@@ -426,6 +445,7 @@ export async function listSalesQuotations(): Promise<SalesQuotation[]> {
       sopPercentage: numberOrNull(row.sop_percentage),
       sopAmount: numberOrNull(row.sop_amount),
       sellingAmount: numberOrNull(row.selling_amount),
+      hasUnequalMargins: Boolean(row.has_unequal_margins),
       paymentTerms: row.payment_terms ?? null,
       paymentTermsCustom: row.payment_terms_custom ?? null,
       leadTimeDays:
@@ -446,11 +466,17 @@ export async function listSalesQuotations(): Promise<SalesQuotation[]> {
   });
 }
 
-export async function updateSalesQuotationDetails(input: {
-  quotationId: string;
+export type SalesQuotationItemPricingInput = {
+  id: string;
   marginPercentage: number | null;
   bankPercentage: number | null;
   sopPercentage: number | null;
+};
+
+export async function updateSalesQuotationDetails(input: {
+  quotationId: string;
+  hasUnequalMargins: boolean;
+  items: SalesQuotationItemPricingInput[];
   googleDriveLink: string | null;
   paymentTerms: string | null;
   paymentTermsCustom: string | null;
@@ -466,7 +492,9 @@ export async function updateSalesQuotationDetails(input: {
 
   const { data: quotationRow, error: quotationError } = await supabase
     .from("quotations")
-    .select("id, status, phase, cost, client_confirmed_at, converted_po_id")
+    .select(
+      "id, status, phase, client_confirmed_at, converted_po_id, quotation_items(id, line_total)",
+    )
     .eq("id", input.quotationId)
     .single();
 
@@ -493,28 +521,88 @@ export async function updateSalesQuotationDetails(input: {
     );
   }
 
-  const directCost = Number(quotationRow.cost ?? 0);
-  const pricing = computeSalesPricing({
-    directCost,
-    marginPercentage: input.marginPercentage ?? 0,
-    bankPercentage: input.bankPercentage ?? 0,
-    sopPercentage: input.sopPercentage ?? 0,
+  const itemRows = Array.isArray(quotationRow.quotation_items)
+    ? quotationRow.quotation_items
+    : [];
+  // Direct cost per item is read fresh from the DB rather than trusted from
+  // the client, same as the aggregate `cost` was read before this change.
+  const lineTotalById = new Map(itemRows.map((item) => [item.id, Number(item.line_total)]));
+
+  if (input.items.length === 0 || input.items.length !== itemRows.length) {
+    throw new Error("Every line item on this quotation needs pricing.");
+  }
+
+  const pricedItems = input.items.map((item) => {
+    const directCost = lineTotalById.get(item.id);
+    if (directCost === undefined) {
+      throw new Error("One of the priced items does not belong to this quotation.");
+    }
+
+    const pricing = computeSalesPricing({
+      directCost,
+      marginPercentage: item.marginPercentage ?? 0,
+      bankPercentage: item.bankPercentage ?? 0,
+      sopPercentage: item.sopPercentage ?? 0,
+    });
+
+    return {
+      id: item.id,
+      directCost,
+      marginPercentage: item.marginPercentage,
+      bankPercentage: item.bankPercentage,
+      sopPercentage: item.sopPercentage,
+      ...pricing,
+    };
   });
+
+  // Sequential, not Promise.all: every quotation_items write fires
+  // trg_sync_quotation_cost_from_items, which UPDATEs the shared parent
+  // quotations row (see the identical rationale in
+  // lib/engineering/costing-quotations.ts setQuotationItemCosts).
+  for (const item of pricedItems) {
+    const { error: itemError } = await supabase
+      .from("quotation_items")
+      .update({
+        margin_percentage: item.marginPercentage,
+        margin_amount: item.marginAmount,
+        bank_percentage: item.bankPercentage,
+        bank_amount: item.bankAmount,
+        sop_percentage: item.sopPercentage,
+        sop_amount: item.sopAmount,
+        selling_amount: item.sellingAmount,
+      })
+      .eq("id", item.id)
+      .eq("quotation_id", input.quotationId);
+
+    if (itemError) {
+      throw new Error(itemError.message || "Failed to update an item's pricing.");
+    }
+  }
+
+  // Blended weighted-average percentages + summed amounts, written back to
+  // the record-level columns so every existing reader (executive dashboard,
+  // worksheet exports, the >=3M approval threshold via `amount`) keeps
+  // working unchanged. VAT is applied once here, on the rolled-up aggregate --
+  // not per item -- so `selling_amount` stays the pre-VAT figure and `amount`
+  // becomes the VAT-inclusive grand total.
+  const aggregate = computeAggregatePricing(pricedItems);
+  const vat = computeVatBreakdown(aggregate);
 
   const { error: updateError } = await supabase
     .from("quotations")
     .update({
       // Keep the legacy sales_margin_percent in sync so existing approval
       // checks and displays continue to work.
-      sales_margin_percent: input.marginPercentage,
-      margin_percentage: input.marginPercentage,
-      margin_amount: pricing.marginAmount,
-      bank_percentage: input.bankPercentage,
-      bank_amount: pricing.bankAmount,
-      sop_percentage: input.sopPercentage,
-      sop_amount: pricing.sopAmount,
-      selling_amount: pricing.sellingAmount,
-      amount: pricing.sellingAmount,
+      sales_margin_percent: aggregate.marginPercentage,
+      margin_percentage: aggregate.marginPercentage,
+      margin_amount: aggregate.marginAmount,
+      bank_percentage: aggregate.bankPercentage,
+      bank_amount: aggregate.bankAmount,
+      sop_percentage: aggregate.sopPercentage,
+      sop_amount: aggregate.sopAmount,
+      selling_amount: aggregate.sellingAmount,
+      amount: vat.grandTotal,
+      has_unequal_margins: input.hasUnequalMargins,
       google_drive_link: input.googleDriveLink,
       payment_terms: input.paymentTerms,
       payment_terms_custom: input.paymentTermsCustom,

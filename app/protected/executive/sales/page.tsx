@@ -1,5 +1,6 @@
 import { ClientDistributionChart } from "@/components/sales/client-distribution-chart";
 import { SectorPerformanceChart } from "@/components/sales/sector-performance-chart";
+import { BookedVsCollectedChart } from "@/components/executive/booked-vs-collected-chart";
 import { RevenueMonthSelect } from "@/components/executive/revenue-month-select";
 import { RevenueTrendChart } from "@/components/executive/revenue-trend-chart";
 import { EmptyState } from "@/components/patterns";
@@ -12,7 +13,7 @@ import {
 } from "@/components/ui/card";
 import { getExecutiveAccessRedirect } from "@/lib/executive/access";
 import { getExecutiveDashboardData } from "@/lib/executive/dashboard";
-import { formatCurrency } from "@/lib/executive/format";
+import { formatCurrency, formatPercent } from "@/lib/executive/format";
 import { getMonthLabel } from "@/lib/executive/period";
 import { PERIOD_FILTERS, type PeriodFilter } from "@/lib/executive/types";
 import { cn } from "@/lib/utils";
@@ -240,6 +241,22 @@ export default async function ExecutiveSalesDashboardPage({
         </Card>
       </div>
 
+      {/* Purchase order collections */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Purchase Orders: Booked vs Collected</CardTitle>
+          <CardDescription>
+            How much of the period&apos;s booked PO value has actually been collected.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <BookedVsCollectedChart
+            totalBooked={dashboard.poSummary.totalPoValue}
+            totalCollected={dashboard.poSummary.totalCollectedAmount}
+          />
+        </CardContent>
+      </Card>
+
       {/* Sector + Client charts */}
       <div className="grid gap-4 lg:grid-cols-2">
         <Card>
@@ -272,35 +289,48 @@ export default async function ExecutiveSalesDashboardPage({
         <CardContent>
           {hasSalesPerformanceData ? (
             <div className="overflow-x-auto">
-              {/* Header row */}
-              <div className="grid grid-cols-[2rem,1fr,auto,auto] items-center gap-3 px-3 py-1.5 text-xs font-medium uppercase tracking-widest text-muted-foreground border-b mb-1">
-                <span>#</span>
-                <span>Owner</span>
-                <span className="text-right">Booked Revenue</span>
-                <span className="text-right">Margin</span>
-              </div>
-              <div className="space-y-1">
-                {dashboard.salesPerformance.map((row, index) => (
-                  <div
-                    key={row.ownerId}
-                    className={cn(
-                      "grid grid-cols-[2rem,1fr,auto,auto] items-center gap-3 rounded-md px-3 py-2.5 text-sm transition-colors hover:bg-muted/50",
-                      index % 2 === 0 ? "bg-muted/20" : "",
-                    )}
-                  >
-                    <span className="font-semibold text-muted-foreground tabular-nums">
-                      {index + 1}
-                    </span>
-                    <span className="font-medium truncate">{row.ownerName}</span>
-                    <span className="text-right tabular-nums">
-                      {formatCurrency(row.bookedRevenue)}
-                    </span>
-                    <span className="text-right tabular-nums text-muted-foreground">
-                      {formatCurrency(row.marginAmount)}
-                    </span>
-                  </div>
-                ))}
-              </div>
+              <table className="w-full border-collapse text-sm">
+                <thead>
+                  <tr className="border-b text-xs font-medium uppercase tracking-widest text-muted-foreground">
+                    <th className="w-8 px-3 py-1.5 text-left font-medium">#</th>
+                    <th className="px-3 py-1.5 text-left font-medium">Owner</th>
+                    <th className="px-3 py-1.5 text-right font-medium">
+                      Booked Revenue
+                    </th>
+                    <th className="px-3 py-1.5 text-right font-medium">Margin</th>
+                    <th className="px-3 py-1.5 text-right font-medium">Margin %</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {dashboard.salesPerformance.map((row, index) => (
+                    <tr
+                      key={row.ownerId}
+                      className={cn(
+                        "rounded-md transition-colors hover:bg-muted/50",
+                        index % 2 === 0 ? "bg-muted/20" : "",
+                      )}
+                    >
+                      <td className="px-3 py-2.5 font-semibold text-muted-foreground tabular-nums">
+                        {index + 1}
+                      </td>
+                      <td className="max-w-0 truncate px-3 py-2.5 font-medium">
+                        {row.ownerName}
+                      </td>
+                      <td className="px-3 py-2.5 text-right tabular-nums">
+                        {formatCurrency(row.bookedRevenue)}
+                      </td>
+                      <td className="px-3 py-2.5 text-right tabular-nums text-muted-foreground">
+                        {formatCurrency(row.marginAmount)}
+                      </td>
+                      <td className="px-3 py-2.5 text-right tabular-nums text-muted-foreground">
+                        {row.marginPercentAverage === null
+                          ? "N/A"
+                          : formatPercent(row.marginPercentAverage)}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
           ) : (
             <EmptyState
