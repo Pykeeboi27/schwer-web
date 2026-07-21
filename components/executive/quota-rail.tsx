@@ -90,7 +90,10 @@ export function QuotaRail({
   }[status];
 
   const daysLeft = isCurrentYear
-    ? Math.max(0, Math.ceil((new Date(year + 1, 0, 1).getTime() - today.getTime()) / DAY_MS))
+    ? Math.max(
+        0,
+        Math.ceil((new Date(year + 1, 0, 1).getTime() - today.getTime()) / DAY_MS),
+      )
     : null;
 
   let statusLabel: string;

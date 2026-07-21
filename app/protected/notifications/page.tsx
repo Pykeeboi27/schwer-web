@@ -13,7 +13,9 @@ type NotificationsPageProps = {
   searchParams?: Promise<{ page?: string }>;
 };
 
-export default async function NotificationsPage({ searchParams }: NotificationsPageProps) {
+export default async function NotificationsPage({
+  searchParams,
+}: NotificationsPageProps) {
   const profile = await getCurrentProfile();
 
   if (!profile) {
@@ -23,7 +25,10 @@ export default async function NotificationsPage({ searchParams }: NotificationsP
   const resolvedSearchParams = searchParams ? await searchParams : undefined;
   const page = Math.max(1, Number(resolvedSearchParams?.page ?? "1") || 1);
 
-  const { items, total, hasMore } = await listNotifications({ page, pageSize: PAGE_SIZE });
+  const { items, total, hasMore } = await listNotifications({
+    page,
+    pageSize: PAGE_SIZE,
+  });
 
   return (
     <div className="flex flex-col gap-6">

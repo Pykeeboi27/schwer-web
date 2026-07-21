@@ -5,7 +5,11 @@ import {
   type RequiredApproverRole,
 } from "@/lib/sales/quotations";
 import { getCurrentProfile } from "@/lib/profile/get-current-profile";
-import { computeSalesPricing } from "@/lib/sales/pricing";
+import {
+  computeAggregatePricing,
+  computeSalesPricing,
+  computeVatBreakdown,
+} from "@/lib/sales/pricing";
 import { createClient } from "@/lib/supabase/server";
 import { validatePoTotalAmount } from "@/lib/utils/form-validation";
 
@@ -18,6 +22,13 @@ export type SalesPurchaseOrderItem = {
   quantity: number;
   unitCost: number | null;
   lineTotal: number;
+  marginPercentage: number | null;
+  marginAmount: number | null;
+  bankPercentage: number | null;
+  bankAmount: number | null;
+  sopPercentage: number | null;
+  sopAmount: number | null;
+  sellingAmount: number | null;
 };
 
 export type SalesPurchaseOrder = {
@@ -39,6 +50,7 @@ export type SalesPurchaseOrder = {
   sopPercentage: number | null;
   sopAmount: number | null;
   sellingAmount: number | null;
+  hasUnequalMargins: boolean;
   recognizedAmount: number;
   paymentStatus: "unpaid" | "partial" | "paid" | "overdue";
   paymentTerms: string | null;
@@ -170,7 +182,7 @@ export async function listPurchaseOrders(): Promise<SalesPurchaseOrder[]> {
   const { data, error } = await supabase
     .from("purchase_orders")
     .select(
-      "id, quotation_id, po_number, client_po_number, quotation_reference, client_id, subject, po_amount, cost, margin_percentage, margin_amount, bank_percentage, bank_amount, sop_percentage, sop_amount, selling_amount, recognized_amount, payment_status, payment_terms, payment_terms_custom, lead_time_days, status, approved_at, created_at, created_by, clients:client_id(company_name), po_approvals(approver_role, status, rejection_reason, updated_at, approver:approver_id(full_name, email)), creator:created_by(full_name, email), purchase_order_items(id, description, quantity, unit_cost, line_total, sort_order)",
+      "id, quotation_id, po_number, client_po_number, quotation_reference, client_id, subject, po_amount, cost, margin_percentage, margin_amount, bank_percentage, bank_amount, sop_percentage, sop_amount, selling_amount, has_unequal_margins, recognized_amount, payment_status, payment_terms, payment_terms_custom, lead_time_days, status, approved_at, created_at, created_by, clients:client_id(company_name), po_approvals(approver_role, status, rejection_reason, updated_at, approver:approver_id(full_name, email)), creator:created_by(full_name, email), purchase_order_items(id, description, quantity, unit_cost, line_total, margin_percentage, margin_amount, bank_percentage, bank_amount, sop_percentage, sop_amount, selling_amount, sort_order)",
     )
     .order("created_at", { ascending: false });
 
@@ -214,6 +226,13 @@ export async function listPurchaseOrders(): Promise<SalesPurchaseOrder[]> {
         quantity: Number(item.quantity),
         unitCost: item.unit_cost === null ? null : Number(item.unit_cost),
         lineTotal: Number(item.line_total),
+        marginPercentage: numberOrNull(item.margin_percentage),
+        marginAmount: numberOrNull(item.margin_amount),
+        bankPercentage: numberOrNull(item.bank_percentage),
+        bankAmount: numberOrNull(item.bank_amount),
+        sopPercentage: numberOrNull(item.sop_percentage),
+        sopAmount: numberOrNull(item.sop_amount),
+        sellingAmount: numberOrNull(item.selling_amount),
       }));
 
     return {
@@ -236,6 +255,7 @@ export async function listPurchaseOrders(): Promise<SalesPurchaseOrder[]> {
       sopPercentage: numberOrNull(row.sop_percentage),
       sopAmount: numberOrNull(row.sop_amount),
       sellingAmount: numberOrNull(row.selling_amount),
+      hasUnequalMargins: Boolean(row.has_unequal_margins),
       recognizedAmount: Number(row.recognized_amount ?? 0),
       paymentStatus: row.payment_status ?? "unpaid",
       paymentTerms: row.payment_terms ?? null,
@@ -314,7 +334,7 @@ export async function convertQuotationToPurchaseOrder(
   const { data: q, error: qError } = await supabase
     .from("quotations")
     .select(
-      "id, status, phase, client_id, sector, subject, amount, cost, margin_percentage, margin_amount, bank_percentage, bank_amount, sop_percentage, sop_amount, selling_amount, payment_terms, payment_terms_custom, lead_time_days, client_po_number, client_confirmed_at, converted_po_id, quotation_items(description, quantity, unit_cost, sort_order)",
+      "id, status, phase, client_id, sector, subject, amount, cost, margin_percentage, margin_amount, bank_percentage, bank_amount, sop_percentage, sop_amount, selling_amount, has_unequal_margins, payment_terms, payment_terms_custom, lead_time_days, client_po_number, client_confirmed_at, converted_po_id, quotation_items(description, quantity, unit_cost, sort_order, margin_percentage, margin_amount, bank_percentage, bank_amount, sop_percentage, sop_amount, selling_amount)",
     )
     .eq("id", quotationId)
     .single();
@@ -361,6 +381,7 @@ export async function convertQuotationToPurchaseOrder(
     sop_percentage: q.sop_percentage,
     sop_amount: q.sop_amount,
     selling_amount: q.selling_amount,
+    has_unequal_margins: q.has_unequal_margins,
     payment_terms: q.payment_terms,
     payment_terms_custom: q.payment_terms_custom,
     lead_time_days: q.lead_time_days,
@@ -399,6 +420,13 @@ export async function convertQuotationToPurchaseOrder(
         quantity: item.quantity,
         unit_cost: item.unit_cost,
         sort_order: item.sort_order ?? 0,
+        margin_percentage: item.margin_percentage,
+        margin_amount: item.margin_amount,
+        bank_percentage: item.bank_percentage,
+        bank_amount: item.bank_amount,
+        sop_percentage: item.sop_percentage,
+        sop_amount: item.sop_amount,
+        selling_amount: item.selling_amount,
       })),
     );
     if (itemsError) {
@@ -668,16 +696,22 @@ export async function resubmitPurchaseOrderForApproval(poId: string): Promise<vo
   }
 }
 
-/**
- * Editing step for a rejected PO: re-price it (margin/bank/sop %, lead time,
- * payment terms) and update its references, ahead of resubmitting for approval.
- * Only permitted while the PO is in the `rejected` state.
- */
-export async function updatePurchaseOrderDetails(input: {
-  purchaseOrderId: string;
+export type PurchaseOrderItemPricingInput = {
+  id: string;
   marginPercentage: number | null;
   bankPercentage: number | null;
   sopPercentage: number | null;
+};
+
+/**
+ * Editing step for a rejected PO: re-price it per item (margin/bank/sop %,
+ * lead time, payment terms) and update its references, ahead of resubmitting
+ * for approval. Only permitted while the PO is in the `rejected` state.
+ */
+export async function updatePurchaseOrderDetails(input: {
+  purchaseOrderId: string;
+  hasUnequalMargins: boolean;
+  items: PurchaseOrderItemPricingInput[];
   paymentTerms: string | null;
   paymentTermsCustom: string | null;
   leadTimeDays: number | null;
@@ -688,7 +722,7 @@ export async function updatePurchaseOrderDetails(input: {
 
   const { data: po, error: poError } = await supabase
     .from("purchase_orders")
-    .select("id, status, cost")
+    .select("id, status, purchase_order_items(id, line_total)")
     .eq("id", input.purchaseOrderId)
     .single();
 
@@ -700,25 +734,82 @@ export async function updatePurchaseOrderDetails(input: {
     throw new Error("Only rejected purchase orders can be edited.");
   }
 
-  const directCost = Number(po.cost ?? 0);
-  const pricing = computeSalesPricing({
-    directCost,
-    marginPercentage: input.marginPercentage ?? 0,
-    bankPercentage: input.bankPercentage ?? 0,
-    sopPercentage: input.sopPercentage ?? 0,
+  const itemRows = Array.isArray(po.purchase_order_items) ? po.purchase_order_items : [];
+  // Direct cost per item is read fresh from the DB rather than trusted from
+  // the client.
+  const lineTotalById = new Map(
+    itemRows.map((item) => [item.id, Number(item.line_total)]),
+  );
+
+  if (input.items.length === 0 || input.items.length !== itemRows.length) {
+    throw new Error("Every line item on this purchase order needs pricing.");
+  }
+
+  const pricedItems = input.items.map((item) => {
+    const directCost = lineTotalById.get(item.id);
+    if (directCost === undefined) {
+      throw new Error("One of the priced items does not belong to this purchase order.");
+    }
+
+    const pricing = computeSalesPricing({
+      directCost,
+      marginPercentage: item.marginPercentage ?? 0,
+      bankPercentage: item.bankPercentage ?? 0,
+      sopPercentage: item.sopPercentage ?? 0,
+    });
+
+    return {
+      id: item.id,
+      directCost,
+      marginPercentage: item.marginPercentage,
+      bankPercentage: item.bankPercentage,
+      sopPercentage: item.sopPercentage,
+      ...pricing,
+    };
   });
+
+  // Sequential, matching the same rationale as
+  // lib/sales/quotations.ts updateSalesQuotationDetails.
+  for (const item of pricedItems) {
+    const { error: itemError } = await supabase
+      .from("purchase_order_items")
+      .update({
+        margin_percentage: item.marginPercentage,
+        margin_amount: item.marginAmount,
+        bank_percentage: item.bankPercentage,
+        bank_amount: item.bankAmount,
+        sop_percentage: item.sopPercentage,
+        sop_amount: item.sopAmount,
+        selling_amount: item.sellingAmount,
+      })
+      .eq("id", item.id)
+      .eq("purchase_order_id", input.purchaseOrderId);
+
+    if (itemError) {
+      throw new Error(itemError.message || "Failed to update an item's pricing.");
+    }
+  }
+
+  // Blended weighted-average percentages + summed amounts, written back to
+  // the record-level columns (same rollup as the quotation-side update). VAT
+  // is applied once here, on the rolled-up aggregate -- not per item -- so
+  // `selling_amount` stays the pre-VAT figure and `po_amount` becomes the
+  // VAT-inclusive grand total.
+  const aggregate = computeAggregatePricing(pricedItems);
+  const vat = computeVatBreakdown(aggregate);
 
   const { error: updateError } = await supabase
     .from("purchase_orders")
     .update({
-      margin_percentage: input.marginPercentage,
-      margin_amount: pricing.marginAmount,
-      bank_percentage: input.bankPercentage,
-      bank_amount: pricing.bankAmount,
-      sop_percentage: input.sopPercentage,
-      sop_amount: pricing.sopAmount,
-      selling_amount: pricing.sellingAmount,
-      po_amount: pricing.sellingAmount,
+      margin_percentage: aggregate.marginPercentage,
+      margin_amount: aggregate.marginAmount,
+      bank_percentage: aggregate.bankPercentage,
+      bank_amount: aggregate.bankAmount,
+      sop_percentage: aggregate.sopPercentage,
+      sop_amount: aggregate.sopAmount,
+      selling_amount: aggregate.sellingAmount,
+      po_amount: vat.grandTotal,
+      has_unequal_margins: input.hasUnequalMargins,
       payment_terms: input.paymentTerms,
       payment_terms_custom: input.paymentTermsCustom,
       lead_time_days: input.leadTimeDays,

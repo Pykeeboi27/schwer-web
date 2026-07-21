@@ -51,7 +51,9 @@ export async function markAllReadAction(): Promise<ActionResponse<null>> {
     return {
       success: false,
       error:
-        error instanceof Error ? error.message : "Failed to mark all notifications as read.",
+        error instanceof Error
+          ? error.message
+          : "Failed to mark all notifications as read.",
     };
   }
 }
@@ -66,7 +68,8 @@ export async function markSectionSeenAction(
   } catch (error) {
     return {
       success: false,
-      error: error instanceof Error ? error.message : "Failed to update notification state.",
+      error:
+        error instanceof Error ? error.message : "Failed to update notification state.",
     };
   }
 }

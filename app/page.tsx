@@ -94,8 +94,8 @@ export default function Home() {
               )}
               style={{ animationDelay: "180ms" }}
             >
-              The operations portal for Schwer PH — engineering prepares the
-              cost, sales prices and closes it, executives approve and track it.
+              The operations portal for Schwer PH — engineering prepares the cost, sales
+              prices and closes it, executives approve and track it.
             </p>
 
             <div
@@ -133,16 +133,9 @@ export default function Home() {
               Departments
             </p>
             {DEPARTMENTS.map((dept) => (
-              <div
-                key={dept.name}
-                className="mt-5 border-t pt-4 first-of-type:mt-4"
-              >
-                <dt className="text-sm font-semibold tracking-tight">
-                  {dept.name}
-                </dt>
-                <dd className="mt-1 text-sm text-muted-foreground">
-                  {dept.role}
-                </dd>
+              <div key={dept.name} className="mt-5 border-t pt-4 first-of-type:mt-4">
+                <dt className="text-sm font-semibold tracking-tight">{dept.name}</dt>
+                <dd className="mt-1 text-sm text-muted-foreground">{dept.role}</dd>
               </div>
             ))}
           </dl>

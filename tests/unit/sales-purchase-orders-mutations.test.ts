@@ -182,6 +182,74 @@ describe("convertQuotationToPurchaseOrder", () => {
     });
   });
 
+  it("snapshots per-item pricing into purchase_order_items on conversion", async () => {
+    let insertedItems: Array<Record<string, unknown>> | undefined;
+    mockClient = createSupabaseMock({
+      user,
+      tables: {
+        quotations: [
+          {
+            data: {
+              ...baseQuotation,
+              quotation_items: [
+                {
+                  description: "Pump",
+                  quantity: 2,
+                  unit_cost: "350000",
+                  sort_order: 0,
+                  margin_percentage: "10",
+                  margin_amount: "70000",
+                  bank_percentage: null,
+                  bank_amount: null,
+                  sop_percentage: null,
+                  sop_amount: null,
+                  selling_amount: "770000",
+                },
+              ],
+            },
+            error: null,
+          },
+          ok, // link update
+        ],
+        purchase_orders: [
+          { data: null, error: null, count: 3 },
+          { data: { id: "po1" }, error: null },
+        ],
+        purchase_order_items: ok,
+        profiles: { data: [{ id: "mgr1" }], error: null },
+        po_approvals: ok,
+      },
+    });
+
+    const originalFrom = mockClient.from;
+    mockClient.from = vi.fn((table: string) => {
+      const builder = originalFrom(table);
+      if (table === "purchase_order_items") {
+        const originalInsert = builder.insert;
+        builder.insert = vi.fn((rows: Array<Record<string, unknown>>) => {
+          insertedItems = rows;
+          return originalInsert(rows);
+        });
+      }
+      return builder;
+    });
+
+    await expect(convertQuotationToPurchaseOrder("q1")).resolves.toEqual({
+      purchaseOrderId: "po1",
+    });
+
+    expect(insertedItems).toEqual([
+      expect.objectContaining({
+        description: "Pump",
+        margin_percentage: "10",
+        margin_amount: "70000",
+        bank_percentage: null,
+        sop_percentage: null,
+        selling_amount: "770000",
+      }),
+    ]);
+  });
+
   it("routes high-value quotations through sales_manager, owner, and executive", async () => {
     mockClient = createSupabaseMock({
       user,
@@ -398,15 +466,17 @@ describe("resubmitPurchaseOrderForApproval", () => {
 describe("updatePurchaseOrderDetails", () => {
   const input = {
     purchaseOrderId: "p1",
-    marginPercentage: 10,
-    bankPercentage: null,
-    sopPercentage: null,
+    hasUnequalMargins: false,
+    items: [
+      { id: "i1", marginPercentage: 10, bankPercentage: null, sopPercentage: null },
+    ],
     paymentTerms: "30 Days",
     paymentTermsCustom: null,
     leadTimeDays: 14,
     clientPoNumber: "cpo-1",
     quotationReference: "q-1",
   };
+  const onePoItem = [{ id: "i1", line_total: "700000" }];
 
   it("throws when the purchase order is missing", async () => {
     mockClient = createSupabaseMock({ tables: { purchase_orders: fail } });
@@ -417,7 +487,7 @@ describe("updatePurchaseOrderDetails", () => {
     mockClient = createSupabaseMock({
       tables: {
         purchase_orders: {
-          data: { id: "p1", status: "pending", cost: "700000" },
+          data: { id: "p1", status: "pending", purchase_order_items: onePoItem },
           error: null,
         },
       },
@@ -427,14 +497,32 @@ describe("updatePurchaseOrderDetails", () => {
     );
   });
 
-  it("recomputes pricing from the direct cost and saves it, uppercasing references", async () => {
+  it("rejects when the priced items don't match the PO's items", async () => {
+    mockClient = createSupabaseMock({
+      tables: {
+        purchase_orders: {
+          data: { id: "p1", status: "rejected", purchase_order_items: [] },
+          error: null,
+        },
+      },
+    });
+    await expect(updatePurchaseOrderDetails(input)).rejects.toThrow(
+      /Every line item on this purchase order needs pricing/,
+    );
+  });
+
+  it("recomputes pricing from each item's direct cost and saves it, uppercasing references", async () => {
     let updatePayload: Record<string, unknown> | undefined;
     mockClient = createSupabaseMock({
       tables: {
         purchase_orders: [
-          { data: { id: "p1", status: "rejected", cost: "700000" }, error: null },
+          {
+            data: { id: "p1", status: "rejected", purchase_order_items: onePoItem },
+            error: null,
+          },
           ok,
         ],
+        purchase_order_items: ok,
       },
     });
     const originalUpdate = mockClient.from;
@@ -442,7 +530,9 @@ describe("updatePurchaseOrderDetails", () => {
       const builder = originalUpdate(table);
       const originalUpdateFn = builder.update;
       builder.update = vi.fn((payload: Record<string, unknown>) => {
-        updatePayload = payload;
+        if (table === "purchase_orders") {
+          updatePayload = payload;
+        }
         return originalUpdateFn(payload);
       });
       return builder;
@@ -453,8 +543,10 @@ describe("updatePurchaseOrderDetails", () => {
     expect(updatePayload).toMatchObject({
       margin_percentage: 10,
       margin_amount: 70000,
+      // 700000 direct cost + 70000 margin, no bank/sop -- selling_amount stays pre-VAT.
       selling_amount: 770000,
-      po_amount: 770000,
+      // po_amount is the grand total: selling_amount + 8400 VAT (12% of margin).
+      po_amount: 778400,
       client_po_number: "CPO-1",
       quotation_reference: "Q-1",
     });
@@ -464,9 +556,13 @@ describe("updatePurchaseOrderDetails", () => {
     mockClient = createSupabaseMock({
       tables: {
         purchase_orders: [
-          { data: { id: "p1", status: "rejected", cost: "700000" }, error: null },
+          {
+            data: { id: "p1", status: "rejected", purchase_order_items: onePoItem },
+            error: null,
+          },
           fail,
         ],
+        purchase_order_items: ok,
       },
     });
     await expect(updatePurchaseOrderDetails(input)).rejects.toThrow("boom");

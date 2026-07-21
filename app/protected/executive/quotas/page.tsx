@@ -1,5 +1,11 @@
 import { QuotaEditorForm } from "@/components/executive/quota-editor-form";
-import { EmptyState, PageHeader, Panel, StatCard, StatProgress } from "@/components/patterns";
+import {
+  EmptyState,
+  PageHeader,
+  Panel,
+  StatCard,
+  StatProgress,
+} from "@/components/patterns";
 import { getExecutiveAccessRedirect, isTargetEditor } from "@/lib/executive/access";
 import { getSalesQuotaProgress } from "@/lib/executive/quotas";
 import { getCurrentProfile } from "@/lib/profile/get-current-profile";
@@ -57,7 +63,11 @@ export default async function ExecutiveQuotasPage() {
       />
 
       <div className="grid gap-3 sm:grid-cols-3">
-        <StatCard label={`Team quota — ${year}`} value={formatCurrency(teamQuota)} accent />
+        <StatCard
+          label={`Team quota — ${year}`}
+          value={formatCurrency(teamQuota)}
+          accent
+        />
         <StatCard label="Booked this year" value={formatCurrency(teamAchieved)} />
         <StatCard
           label="Team attainment"

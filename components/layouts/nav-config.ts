@@ -48,6 +48,16 @@ export function getNavConfig(pathname: string, role?: string | null): NavConfig 
           end: true,
         },
         { href: "/protected/executive/sales", label: "Sales", icon: LineChart },
+        {
+          href: "/protected/executive/quotations",
+          label: "Quotations",
+          icon: FileText,
+        },
+        {
+          href: "/protected/executive/purchase-orders",
+          label: "Purchase Orders",
+          icon: Receipt,
+        },
         { href: "/protected/executive/quotas", label: "Quotas", icon: Target },
         {
           href: "/protected/executive/approvals",

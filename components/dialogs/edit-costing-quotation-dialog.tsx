@@ -186,7 +186,7 @@ export function EditCostingQuotationDialog({
     >
       <DialogContent className="max-h-[85vh] max-w-2xl overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Set Item Costs</DialogTitle>
+          <DialogTitle>Set Direct Costs</DialogTitle>
         </DialogHeader>
 
         {quotation.costingRejectionReason ? (
@@ -278,7 +278,7 @@ export function EditCostingQuotationDialog({
           </div>
 
           <div>
-            <Label>Line Item Costs</Label>
+            <Label>Line Item Direct Costs</Label>
             <div className="mt-2 space-y-2 rounded-md border p-3">
               {quotation.items.map((item) => (
                 <div key={item.id} className="flex items-center gap-3">
@@ -291,13 +291,13 @@ export function EditCostingQuotationDialog({
                     onValueChange={(raw) =>
                       setItemCosts((prev) => ({ ...prev, [item.id]: raw }))
                     }
-                    placeholder="Unit cost"
+                    placeholder="Unit Direct Cost"
                     className="w-36"
                   />
                 </div>
               ))}
               <div className="flex items-center justify-between border-t pt-2 text-sm font-semibold">
-                <span>Total Cost</span>
+                <span>Total Direct Cost</span>
                 <span>{formatCurrency(totalCost)}</span>
               </div>
             </div>

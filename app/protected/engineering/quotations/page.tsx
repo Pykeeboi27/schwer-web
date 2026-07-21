@@ -43,7 +43,7 @@ export default async function EngineeringQuotationsPage() {
       <MarkSectionSeen section="engineering_quotations" />
       <PageHeader
         title="Costing Quotations"
-        description="Requests for quotation raised by Sales. Set the unit cost for every item, attach a Google Drive link, then submit for executive approval."
+        description="Requests for quotation raised by Sales. Set the unit direct cost for every item, attach a Google Drive link, then submit for executive approval."
       />
 
       <Panel>
