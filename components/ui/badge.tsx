@@ -41,13 +41,7 @@ function NotificationDot({ className }: { className?: string }) {
 }
 
 /** Circular unread-count bubble for the notification bell trigger. */
-function CountBadge({
-  count,
-  className,
-}: {
-  count: string;
-  className?: string;
-}) {
+function CountBadge({ count, className }: { count: string; className?: string }) {
   return (
     <span
       className={cn(

@@ -526,7 +526,9 @@ export async function updateSalesQuotationDetails(input: {
     : [];
   // Direct cost per item is read fresh from the DB rather than trusted from
   // the client, same as the aggregate `cost` was read before this change.
-  const lineTotalById = new Map(itemRows.map((item) => [item.id, Number(item.line_total)]));
+  const lineTotalById = new Map(
+    itemRows.map((item) => [item.id, Number(item.line_total)]),
+  );
 
   if (input.items.length === 0 || input.items.length !== itemRows.length) {
     throw new Error("Every line item on this quotation needs pricing.");

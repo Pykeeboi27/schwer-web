@@ -93,9 +93,9 @@ describe("executive sales performance helpers", () => {
 
     // Simple mean (15 + 5) / 2 = 10 -- deliberately ignores PO size, unlike the
     // amount-weighted KPI formula used elsewhere on the dashboard.
-    expect(result.find((entry) => entry.ownerId === "owner-a")?.marginPercentAverage).toBe(
-      10,
-    );
+    expect(
+      result.find((entry) => entry.ownerId === "owner-a")?.marginPercentAverage,
+    ).toBe(10);
   });
 
   it("excludes POs with no margin_percentage from the average instead of treating them as zero", () => {
@@ -118,8 +118,8 @@ describe("executive sales performance helpers", () => {
 
     const result = buildSalesPerformanceFromRows(rows, new Map([["owner-a", "Aimee"]]));
 
-    expect(result.find((entry) => entry.ownerId === "owner-a")?.marginPercentAverage).toBe(
-      20,
-    );
+    expect(
+      result.find((entry) => entry.ownerId === "owner-a")?.marginPercentAverage,
+    ).toBe(20);
   });
 });

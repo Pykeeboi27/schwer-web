@@ -737,7 +737,9 @@ export async function updatePurchaseOrderDetails(input: {
   const itemRows = Array.isArray(po.purchase_order_items) ? po.purchase_order_items : [];
   // Direct cost per item is read fresh from the DB rather than trusted from
   // the client.
-  const lineTotalById = new Map(itemRows.map((item) => [item.id, Number(item.line_total)]));
+  const lineTotalById = new Map(
+    itemRows.map((item) => [item.id, Number(item.line_total)]),
+  );
 
   if (input.items.length === 0 || input.items.length !== itemRows.length) {
     throw new Error("Every line item on this purchase order needs pricing.");

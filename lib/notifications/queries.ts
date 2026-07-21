@@ -16,7 +16,10 @@ type NotificationRow = {
   read_at: string | null;
   seen_at: string | null;
   created_at: string;
-  actor: { full_name: string | null; email: string | null } | { full_name: string | null; email: string | null }[] | null;
+  actor:
+    | { full_name: string | null; email: string | null }
+    | { full_name: string | null; email: string | null }[]
+    | null;
 };
 
 /** Full name if set, else the email username (before the "@"), else null. */

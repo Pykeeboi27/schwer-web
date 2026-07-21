@@ -34,7 +34,10 @@ import {
   computeSalesPricing,
   computeVatBreakdown,
 } from "@/lib/sales/pricing";
-import type { SalesQuotation, SalesQuotationItemPricingInput } from "@/lib/sales/quotations";
+import type {
+  SalesQuotation,
+  SalesQuotationItemPricingInput,
+} from "@/lib/sales/quotations";
 import { cn } from "@/lib/utils";
 import { formatCurrency } from "@/lib/utils/number-format";
 import { useToast } from "@/lib/utils/toast-notification";
@@ -209,7 +212,8 @@ export function QuotationDetailsDialog({
     const nextItemPricing: Record<string, ItemPricingFields> = {};
     quotation.items.forEach((item) => {
       nextItemPricing[item.id] = {
-        marginPercentage: item.marginPercentage === null ? "" : String(item.marginPercentage),
+        marginPercentage:
+          item.marginPercentage === null ? "" : String(item.marginPercentage),
         bankPercentage: item.bankPercentage === null ? "" : String(item.bankPercentage),
         sopPercentage: item.sopPercentage === null ? "" : String(item.sopPercentage),
       };
@@ -225,10 +229,14 @@ export function QuotationDetailsDialog({
         : "",
     );
     setUniformBankPercentage(
-      firstItem && firstItem.bankPercentage !== null ? String(firstItem.bankPercentage) : "",
+      firstItem && firstItem.bankPercentage !== null
+        ? String(firstItem.bankPercentage)
+        : "",
     );
     setUniformSopPercentage(
-      firstItem && firstItem.sopPercentage !== null ? String(firstItem.sopPercentage) : "",
+      firstItem && firstItem.sopPercentage !== null
+        ? String(firstItem.sopPercentage)
+        : "",
     );
     setSelectedItemIds(new Set());
     setBulkMarginPercentage("");
@@ -311,10 +319,7 @@ export function QuotationDetailsDialog({
     leadTimeDays.trim() !== "";
 
   /** Unticked mode: writing one field broadcasts it onto every item's pricing. */
-  const applyUniformPercentage = (
-    field: keyof ItemPricingFields,
-    value: string,
-  ) => {
+  const applyUniformPercentage = (field: keyof ItemPricingFields, value: string) => {
     setItemPricing((prev) => {
       const next = { ...prev };
       for (const item of quotation.items) {
@@ -800,10 +805,7 @@ export function QuotationDetailsDialog({
                 </tbody>
                 <tfoot>
                   <tr className="border-t font-semibold">
-                    <td
-                      className="py-1 pr-3"
-                      colSpan={hasUnequalMargins ? 2 : 1}
-                    >
+                    <td className="py-1 pr-3" colSpan={hasUnequalMargins ? 2 : 1}>
                       Total
                     </td>
                     <td className="py-1 pr-3">{formatCurrency(pricing.directCost)}</td>
@@ -824,7 +826,9 @@ export function QuotationDetailsDialog({
               </span>
             </div>
 
-            {pricing.marginAmount > 0 || pricing.bankAmount > 0 || pricing.sopAmount > 0 ? (
+            {pricing.marginAmount > 0 ||
+            pricing.bankAmount > 0 ||
+            pricing.sopAmount > 0 ? (
               <div className="rounded-md border bg-muted/30 p-3 text-sm space-y-1">
                 <div className="flex justify-between text-muted-foreground">
                   <span>Selling Amount</span>
@@ -1029,20 +1033,30 @@ export function QuotationDetailsDialog({
                       <tr key={item.id} className="border-t">
                         <td className="py-1 pr-3">{item.description}</td>
                         <td className="py-1 pr-3">{formatCurrency(item.lineTotal)}</td>
-                        <td className="py-1 pr-3">{formatPercent(item.marginPercentage)}</td>
-                        <td className="py-1 pr-3">{formatPercent(item.bankPercentage)}</td>
-                        <td className="py-1 pr-3">{formatPercent(item.sopPercentage)}</td>
                         <td className="py-1 pr-3">
-                          {item.marginAmount === null ? "—" : formatCurrency(item.marginAmount)}
+                          {formatPercent(item.marginPercentage)}
                         </td>
                         <td className="py-1 pr-3">
-                          {item.bankAmount === null ? "—" : formatCurrency(item.bankAmount)}
+                          {formatPercent(item.bankPercentage)}
+                        </td>
+                        <td className="py-1 pr-3">{formatPercent(item.sopPercentage)}</td>
+                        <td className="py-1 pr-3">
+                          {item.marginAmount === null
+                            ? "—"
+                            : formatCurrency(item.marginAmount)}
+                        </td>
+                        <td className="py-1 pr-3">
+                          {item.bankAmount === null
+                            ? "—"
+                            : formatCurrency(item.bankAmount)}
                         </td>
                         <td className="py-1 pr-3">
                           {item.sopAmount === null ? "—" : formatCurrency(item.sopAmount)}
                         </td>
                         <td className="py-1">
-                          {item.sellingAmount === null ? "—" : formatCurrency(item.sellingAmount)}
+                          {item.sellingAmount === null
+                            ? "—"
+                            : formatCurrency(item.sellingAmount)}
                         </td>
                       </tr>
                     ))}
@@ -1055,8 +1069,12 @@ export function QuotationDetailsDialog({
                       <td className="py-1 pr-3">
                         {formatCurrency(quotation.marginAmount ?? 0)}
                       </td>
-                      <td className="py-1 pr-3">{formatCurrency(quotation.bankAmount ?? 0)}</td>
-                      <td className="py-1 pr-3">{formatCurrency(quotation.sopAmount ?? 0)}</td>
+                      <td className="py-1 pr-3">
+                        {formatCurrency(quotation.bankAmount ?? 0)}
+                      </td>
+                      <td className="py-1 pr-3">
+                        {formatCurrency(quotation.sopAmount ?? 0)}
+                      </td>
                       <td className="py-1">
                         {formatCurrency(quotation.sellingAmount ?? quotation.amount)}
                       </td>
@@ -1066,69 +1084,71 @@ export function QuotationDetailsDialog({
               </div>
             ) : null}
 
-          <dl className="mt-5 grid gap-3 rounded-md border bg-muted/20 p-4 text-sm">
-            <div className="rounded-md border bg-muted/30 p-3 text-sm space-y-1">
-              <div className="flex justify-between text-muted-foreground">
-                <span>Selling Amount</span>
-                <span>{formatCurrency(quotation.sellingAmount ?? quotation.amount)}</span>
+            <dl className="mt-5 grid gap-3 rounded-md border bg-muted/20 p-4 text-sm">
+              <div className="rounded-md border bg-muted/30 p-3 text-sm space-y-1">
+                <div className="flex justify-between text-muted-foreground">
+                  <span>Selling Amount</span>
+                  <span>
+                    {formatCurrency(quotation.sellingAmount ?? quotation.amount)}
+                  </span>
+                </div>
+                {blendedVat.marginVat > 0 ? (
+                  <div className="flex justify-between text-muted-foreground">
+                    <span>+ Margin VAT (12%)</span>
+                    <span>{formatCurrency(blendedVat.marginVat)}</span>
+                  </div>
+                ) : null}
+                {blendedVat.bankVat > 0 ? (
+                  <div className="flex justify-between text-muted-foreground">
+                    <span>+ Bank VAT (12%)</span>
+                    <span>{formatCurrency(blendedVat.bankVat)}</span>
+                  </div>
+                ) : null}
+                {blendedVat.sopVat > 0 ? (
+                  <div className="flex justify-between text-muted-foreground">
+                    <span>+ SOP VAT (12%)</span>
+                    <span>{formatCurrency(blendedVat.sopVat)}</span>
+                  </div>
+                ) : null}
+                <div className="flex justify-between border-t pt-1 font-bold">
+                  <span>Grand Total</span>
+                  <span>{formatCurrency(blendedVat.grandTotal)}</span>
+                </div>
               </div>
-              {blendedVat.marginVat > 0 ? (
-                <div className="flex justify-between text-muted-foreground">
-                  <span>+ Margin VAT (12%)</span>
-                  <span>{formatCurrency(blendedVat.marginVat)}</span>
-                </div>
-              ) : null}
-              {blendedVat.bankVat > 0 ? (
-                <div className="flex justify-between text-muted-foreground">
-                  <span>+ Bank VAT (12%)</span>
-                  <span>{formatCurrency(blendedVat.bankVat)}</span>
-                </div>
-              ) : null}
-              {blendedVat.sopVat > 0 ? (
-                <div className="flex justify-between text-muted-foreground">
-                  <span>+ SOP VAT (12%)</span>
-                  <span>{formatCurrency(blendedVat.sopVat)}</span>
-                </div>
-              ) : null}
-              <div className="flex justify-between border-t pt-1 font-bold">
-                <span>Grand Total</span>
-                <span>{formatCurrency(blendedVat.grandTotal)}</span>
-              </div>
-            </div>
-            <div className="grid grid-cols-1 sm:grid-cols-[160px_1fr] gap-2">
-              <dt className="text-muted-foreground">Payment Terms</dt>
-              <dd>
-                {quotation.paymentTerms === "Other"
-                  ? (quotation.paymentTermsCustom ?? "Other")
-                  : (quotation.paymentTerms ?? "—")}
-              </dd>
-            </div>
-            <div className="grid grid-cols-1 sm:grid-cols-[160px_1fr] gap-2">
-              <dt className="text-muted-foreground">Lead Time</dt>
-              <dd>{formatLeadTime(quotation.leadTimeDays)}</dd>
-            </div>
-            {quotation.googleDriveLink ? (
               <div className="grid grid-cols-1 sm:grid-cols-[160px_1fr] gap-2">
-                <dt className="text-muted-foreground">Google Drive</dt>
+                <dt className="text-muted-foreground">Payment Terms</dt>
                 <dd>
-                  <a
-                    href={quotation.googleDriveLink}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="text-primary hover:underline"
-                  >
-                    Open link
-                  </a>
+                  {quotation.paymentTerms === "Other"
+                    ? (quotation.paymentTermsCustom ?? "Other")
+                    : (quotation.paymentTerms ?? "—")}
                 </dd>
               </div>
-            ) : null}
-            {quotation.notes ? (
               <div className="grid grid-cols-1 sm:grid-cols-[160px_1fr] gap-2">
-                <dt className="text-muted-foreground">Comments</dt>
-                <dd>{quotation.notes}</dd>
+                <dt className="text-muted-foreground">Lead Time</dt>
+                <dd>{formatLeadTime(quotation.leadTimeDays)}</dd>
               </div>
-            ) : null}
-          </dl>
+              {quotation.googleDriveLink ? (
+                <div className="grid grid-cols-1 sm:grid-cols-[160px_1fr] gap-2">
+                  <dt className="text-muted-foreground">Google Drive</dt>
+                  <dd>
+                    <a
+                      href={quotation.googleDriveLink}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="text-primary hover:underline"
+                    >
+                      Open link
+                    </a>
+                  </dd>
+                </div>
+              ) : null}
+              {quotation.notes ? (
+                <div className="grid grid-cols-1 sm:grid-cols-[160px_1fr] gap-2">
+                  <dt className="text-muted-foreground">Comments</dt>
+                  <dd>{quotation.notes}</dd>
+                </div>
+              ) : null}
+            </dl>
           </>
         )}
 

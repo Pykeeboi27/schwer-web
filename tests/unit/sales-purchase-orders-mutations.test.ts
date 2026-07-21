@@ -467,7 +467,9 @@ describe("updatePurchaseOrderDetails", () => {
   const input = {
     purchaseOrderId: "p1",
     hasUnequalMargins: false,
-    items: [{ id: "i1", marginPercentage: 10, bankPercentage: null, sopPercentage: null }],
+    items: [
+      { id: "i1", marginPercentage: 10, bankPercentage: null, sopPercentage: null },
+    ],
     paymentTerms: "30 Days",
     paymentTermsCustom: null,
     leadTimeDays: 14,

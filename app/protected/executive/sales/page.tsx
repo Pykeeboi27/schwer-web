@@ -294,9 +294,7 @@ export default async function ExecutiveSalesDashboardPage({
                   <tr className="border-b text-xs font-medium uppercase tracking-widest text-muted-foreground">
                     <th className="w-8 px-3 py-1.5 text-left font-medium">#</th>
                     <th className="px-3 py-1.5 text-left font-medium">Owner</th>
-                    <th className="px-3 py-1.5 text-right font-medium">
-                      Booked Revenue
-                    </th>
+                    <th className="px-3 py-1.5 text-right font-medium">Booked Revenue</th>
                     <th className="px-3 py-1.5 text-right font-medium">Margin</th>
                     <th className="px-3 py-1.5 text-right font-medium">Margin %</th>
                   </tr>

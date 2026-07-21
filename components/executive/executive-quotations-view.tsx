@@ -78,7 +78,10 @@ export function ExecutiveQuotationsView({
     <div className="flex flex-col gap-4">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
         <Select value={ownerFilter} onValueChange={setOwnerFilter}>
-          <SelectTrigger className="w-full sm:w-[200px]" aria-label="Filter by sales owner">
+          <SelectTrigger
+            className="w-full sm:w-[200px]"
+            aria-label="Filter by sales owner"
+          >
             <SelectValue placeholder="All sales owners" />
           </SelectTrigger>
           <SelectContent>

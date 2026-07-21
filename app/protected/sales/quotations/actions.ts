@@ -319,7 +319,9 @@ export async function resubmitQuotationAction(
  * dialogs: a JSON array of `{ id, marginPercentage, bankPercentage,
  * sopPercentage }`, each percentage either a number or null (unset).
  */
-function parseItemPricingPayload(raw: FormDataEntryValue | null): SalesQuotationItemPricingInput[] {
+function parseItemPricingPayload(
+  raw: FormDataEntryValue | null,
+): SalesQuotationItemPricingInput[] {
   const normalized = String(raw ?? "").trim();
   if (!normalized) {
     throw new Error("At least one priced line item is required.");
