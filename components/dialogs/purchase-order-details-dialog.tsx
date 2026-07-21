@@ -2,6 +2,7 @@
 
 import {
   approvePurchaseOrderAction,
+  createProofOfPaymentSignedUrlAction,
   deleteCollectionAction,
   rejectPurchaseOrderAction,
   resubmitPurchaseOrderAction,
@@ -144,6 +145,8 @@ export function PurchaseOrderDetailsDialog({
   const [editingPayment, setEditingPayment] = useState<SalesPoPayment | null>(null);
   const [deletingPayment, setDeletingPayment] = useState<SalesPoPayment | null>(null);
   const [isDeletingPayment, setIsDeletingPayment] = useState(false);
+  const [viewingProofPaymentId, setViewingProofPaymentId] = useState<string | null>(null);
+  const [proofPreviewUrl, setProofPreviewUrl] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [rejectionReason, setRejectionReason] = useState("");
   const [editClientPoNumber, setEditClientPoNumber] = useState("");
@@ -200,6 +203,20 @@ export function PurchaseOrderDetailsDialog({
     setDeletingPayment(null);
     setIsDeletingPayment(false);
     router.refresh();
+  };
+
+  const handleViewProof = async (payment: SalesPoPayment) => {
+    if (!payment.proofPath) {
+      return;
+    }
+    setViewingProofPaymentId(payment.id);
+    const response = await createProofOfPaymentSignedUrlAction(payment.proofPath);
+    setViewingProofPaymentId(null);
+    if (!response.success || !response.data) {
+      error(response.error ?? "Failed to load proof of payment.");
+      return;
+    }
+    setProofPreviewUrl(response.data.url);
   };
 
   useEffect(() => {
@@ -1182,6 +1199,18 @@ export function PurchaseOrderDetailsDialog({
                                   ? ` • ${payment.referenceNumber}`
                                   : ""}
                               </p>
+                              {payment.proofPath ? (
+                                <button
+                                  type="button"
+                                  className="mt-1 text-xs text-primary underline disabled:opacity-50"
+                                  disabled={viewingProofPaymentId === payment.id}
+                                  onClick={() => handleViewProof(payment)}
+                                >
+                                  {viewingProofPaymentId === payment.id
+                                    ? "Loading..."
+                                    : "View proof"}
+                                </button>
+                              ) : null}
                             </div>
                             {isOwner ? (
                               <div className="flex shrink-0 gap-1">
@@ -1225,15 +1254,38 @@ export function PurchaseOrderDetailsDialog({
         </DialogContent>
       </Dialog>
 
+      <Dialog
+        open={Boolean(proofPreviewUrl)}
+        onOpenChange={(next) => {
+          if (!next) setProofPreviewUrl(null);
+        }}
+      >
+        <DialogContent className="max-h-[90vh] max-w-3xl overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Proof of Payment</DialogTitle>
+          </DialogHeader>
+          {proofPreviewUrl ? (
+            // eslint-disable-next-line @next/next/no-img-element -- short-lived signed URL, not a static asset
+            <img
+              src={proofPreviewUrl}
+              alt="Proof of payment"
+              className="max-h-[75vh] w-full rounded-md border object-contain"
+            />
+          ) : null}
+        </DialogContent>
+      </Dialog>
+
       <RecordCollectionDialog
         open={recordDialogOpen}
         purchaseOrder={purchaseOrder}
+        userId={currentUserId}
         onOpenChange={setRecordDialogOpen}
       />
 
       <RecordCollectionDialog
         open={Boolean(editingPayment)}
         purchaseOrder={purchaseOrder}
+        userId={currentUserId}
         mode="edit"
         payment={editingPayment}
         onOpenChange={(next) => {

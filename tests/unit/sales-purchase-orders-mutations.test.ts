@@ -566,7 +566,11 @@ describe("updatePurchaseOrderDetails", () => {
 });
 
 describe("addPoPayment", () => {
-  const input = { purchaseOrderId: "p1", amountCollected: 200000 };
+  const input = {
+    purchaseOrderId: "p1",
+    amountCollected: 200000,
+    proofPath: "user1/p1/proof.webp",
+  };
 
   it("throws when the purchase order is missing", async () => {
     mockClient = createSupabaseMock({
@@ -615,7 +619,11 @@ describe("addPoPayment", () => {
       },
     });
     await expect(
-      addPoPayment({ purchaseOrderId: "p1", amountCollected: 200000 }),
+      addPoPayment({
+        purchaseOrderId: "p1",
+        amountCollected: 200000,
+        proofPath: "user1/p1/proof.webp",
+      }),
     ).rejects.toThrow(/cannot exceed/);
   });
 
@@ -650,7 +658,11 @@ describe("addPoPayment", () => {
       },
     });
     await expect(
-      addPoPayment({ purchaseOrderId: "p1", amountCollected: 200000 }),
+      addPoPayment({
+        purchaseOrderId: "p1",
+        amountCollected: 200000,
+        proofPath: "user1/p1/proof.webp",
+      }),
     ).resolves.toBeUndefined();
   });
 });

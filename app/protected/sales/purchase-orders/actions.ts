@@ -13,6 +13,7 @@ import {
   updatePurchaseOrderDetails,
   type SalesPurchaseOrder,
 } from "@/lib/sales/purchase-orders";
+import { createProofOfPaymentSignedUrl } from "@/lib/sales/proof-of-payment-server";
 import { parseLeadTimeDays, parsePercentInput } from "@/lib/sales/quotations";
 import { revalidatePath } from "next/cache";
 
@@ -46,13 +47,21 @@ function normalizeRole(role: string | undefined): RequiredApproverRole | null {
 export async function recordCollectionAction(
   purchaseOrderId: string,
   amount: number,
+  proofPath: string,
 ): Promise<ActionResponse<{ poId: string }>> {
   const normalizedPoId = String(purchaseOrderId ?? "").trim();
+  const normalizedProofPath = String(proofPath ?? "").trim();
 
   if (!normalizedPoId) {
     return {
       success: false,
       error: "Purchase order id is required.",
+    };
+  }
+  if (!normalizedProofPath) {
+    return {
+      success: false,
+      error: "Proof of payment is required.",
     };
   }
 
@@ -62,6 +71,7 @@ export async function recordCollectionAction(
     await addPoPayment({
       purchaseOrderId: normalizedPoId,
       amountCollected: normalizedAmount,
+      proofPath: normalizedProofPath,
     });
 
     revalidatePath("/protected/sales/purchase-orders");
@@ -82,9 +92,11 @@ export async function updateCollectionAction(
   paymentId: string,
   purchaseOrderId: string,
   amount: number,
+  proofPath?: string,
 ): Promise<ActionResponse<{ poId: string }>> {
   const normalizedPaymentId = String(paymentId ?? "").trim();
   const normalizedPoId = String(purchaseOrderId ?? "").trim();
+  const normalizedProofPath = String(proofPath ?? "").trim();
 
   if (!normalizedPaymentId) {
     return { success: false, error: "Collection id is required." };
@@ -100,6 +112,7 @@ export async function updateCollectionAction(
       paymentId: normalizedPaymentId,
       purchaseOrderId: normalizedPoId,
       amountCollected: normalizedAmount,
+      ...(normalizedProofPath ? { proofPath: normalizedProofPath } : {}),
     });
 
     revalidatePath("/protected/sales/purchase-orders");
@@ -109,6 +122,26 @@ export async function updateCollectionAction(
     return {
       success: false,
       error: error instanceof Error ? error.message : "Failed to update collection.",
+    };
+  }
+}
+
+/** Mints a short-lived signed URL to view a collection's proof-of-payment image. */
+export async function createProofOfPaymentSignedUrlAction(
+  proofPath: string,
+): Promise<ActionResponse<{ url: string }>> {
+  const normalizedPath = String(proofPath ?? "").trim();
+  if (!normalizedPath) {
+    return { success: false, error: "Proof of payment path is required." };
+  }
+
+  try {
+    const url = await createProofOfPaymentSignedUrl(normalizedPath);
+    return { success: true, data: { url } };
+  } catch (error) {
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Failed to load proof of payment.",
     };
   }
 }

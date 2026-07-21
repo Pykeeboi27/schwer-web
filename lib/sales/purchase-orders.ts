@@ -78,6 +78,8 @@ export type SalesPoPayment = {
   paymentDate: string;
   paymentMethod: string | null;
   referenceNumber: string | null;
+  /** Storage path of the proof-of-payment image, or null for legacy rows. */
+  proofPath: string | null;
 };
 
 export type PendingPoApprovalItem = {
@@ -810,7 +812,7 @@ export async function listPoPayments(
   let query = supabase
     .from("po_payments")
     .select(
-      "id, po_id, purchase_order_id, amount_collected, payment_date, payment_method, reference_number",
+      "id, po_id, purchase_order_id, amount_collected, payment_date, payment_method, reference_number, proof_path",
     )
     .order("created_at", { ascending: false });
 
@@ -832,6 +834,7 @@ export async function listPoPayments(
     paymentDate: row.payment_date,
     paymentMethod: row.payment_method,
     referenceNumber: row.reference_number,
+    proofPath: row.proof_path ?? null,
   }));
 }
 
@@ -918,6 +921,8 @@ export async function addPoPayment(input: {
   paymentMethod?: string | null;
   referenceNumber?: string | null;
   notes?: string | null;
+  /** Storage path of the already-uploaded proof-of-payment image. */
+  proofPath: string;
 }): Promise<void> {
   const profile = await getCurrentProfile();
   if (!profile) {
@@ -945,6 +950,7 @@ export async function addPoPayment(input: {
     reference_number: input.referenceNumber ?? null,
     notes: input.notes ?? null,
     recorded_by: profile.id,
+    proof_path: input.proofPath,
   });
 
   if (error) {
@@ -954,11 +960,13 @@ export async function addPoPayment(input: {
   await recomputeAndSyncPoTotals(supabase, po.id, poAmount);
 }
 
-/** Update the amount of an existing collection record. */
+/** Update the amount (and optionally the proof photo) of an existing collection record. */
 export async function updatePoPayment(input: {
   paymentId: string;
   purchaseOrderId: string;
   amountCollected: number;
+  /** Storage path of a newly-uploaded proof image. Omitted keeps the existing proof. */
+  proofPath?: string;
 }): Promise<void> {
   const profile = await getCurrentProfile();
   if (!profile) {
@@ -991,7 +999,10 @@ export async function updatePoPayment(input: {
 
   const { error: updateError } = await supabase
     .from("po_payments")
-    .update({ amount_collected: input.amountCollected })
+    .update({
+      amount_collected: input.amountCollected,
+      ...(input.proofPath ? { proof_path: input.proofPath } : {}),
+    })
     .eq("id", input.paymentId);
 
   if (updateError) {

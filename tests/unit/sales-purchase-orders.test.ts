@@ -270,6 +270,7 @@ describe("listPoPayments", () => {
       paymentDate: "2026-02-01",
       paymentMethod: "bank",
       referenceNumber: "R1",
+      proofPath: null,
     });
   });
 

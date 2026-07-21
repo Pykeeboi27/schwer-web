@@ -378,6 +378,14 @@ ALTER TABLE public.po_payments
   ADD COLUMN IF NOT EXISTS purchase_order_id UUID REFERENCES public.purchase_orders(id) ON DELETE CASCADE;
 CREATE INDEX IF NOT EXISTS idx_po_payments_purchase_order_id ON public.po_payments(purchase_order_id);
 
+-- Proof of payment (see migrations/0023_po_payments_proof_of_payment.sql).
+-- Points at an object in the private `payment-proofs` Storage bucket, at
+-- path `${auth.uid()}/${purchaseOrderId}/${uuid}.webp`. Nullable at the DB
+-- level (legacy rows have none); required-for-new-collections is enforced
+-- in the app layer, not here.
+ALTER TABLE public.po_payments
+  ADD COLUMN IF NOT EXISTS proof_path TEXT;
+
 
 -- ============================================================
 -- SECTION 4b: PURCHASE ORDERS (Phase 2 — separate PO records)
@@ -1263,6 +1271,67 @@ CREATE POLICY "sales_po_payments_sales_all"
   )
   WITH CHECK (
     EXISTS (
+      SELECT 1 FROM public.profiles p
+      WHERE p.id = auth.uid() AND p.department = 'sales' AND p.is_active = TRUE
+    )
+  );
+
+-- Proof of payment storage (see migrations/0023_po_payments_proof_of_payment.sql).
+-- Private bucket; the anon/publishable key is the only key this project
+-- uses, so these storage.objects policies are the sole line of defense.
+-- Writes are scoped to the caller's own top-level folder
+-- (payment-proofs/<auth.uid()>/...); reads are department-wide, mirroring
+-- sales_po_payments_sales_all above.
+INSERT INTO storage.buckets (id, name, public)
+VALUES ('payment-proofs', 'payment-proofs', FALSE)
+ON CONFLICT (id) DO NOTHING;
+
+CREATE POLICY "sales_payment_proofs_insert"
+  ON storage.objects FOR INSERT
+  WITH CHECK (
+    bucket_id = 'payment-proofs'
+    AND (storage.foldername(name))[1] = auth.uid()::text
+    AND EXISTS (
+      SELECT 1 FROM public.profiles p
+      WHERE p.id = auth.uid() AND p.department = 'sales' AND p.is_active = TRUE
+    )
+  );
+
+CREATE POLICY "sales_payment_proofs_select"
+  ON storage.objects FOR SELECT
+  USING (
+    bucket_id = 'payment-proofs'
+    AND EXISTS (
+      SELECT 1 FROM public.profiles p
+      WHERE p.id = auth.uid() AND p.department = 'sales' AND p.is_active = TRUE
+    )
+  );
+
+CREATE POLICY "sales_payment_proofs_update"
+  ON storage.objects FOR UPDATE
+  USING (
+    bucket_id = 'payment-proofs'
+    AND (storage.foldername(name))[1] = auth.uid()::text
+    AND EXISTS (
+      SELECT 1 FROM public.profiles p
+      WHERE p.id = auth.uid() AND p.department = 'sales' AND p.is_active = TRUE
+    )
+  )
+  WITH CHECK (
+    bucket_id = 'payment-proofs'
+    AND (storage.foldername(name))[1] = auth.uid()::text
+    AND EXISTS (
+      SELECT 1 FROM public.profiles p
+      WHERE p.id = auth.uid() AND p.department = 'sales' AND p.is_active = TRUE
+    )
+  );
+
+CREATE POLICY "sales_payment_proofs_delete"
+  ON storage.objects FOR DELETE
+  USING (
+    bucket_id = 'payment-proofs'
+    AND (storage.foldername(name))[1] = auth.uid()::text
+    AND EXISTS (
       SELECT 1 FROM public.profiles p
       WHERE p.id = auth.uid() AND p.department = 'sales' AND p.is_active = TRUE
     )
