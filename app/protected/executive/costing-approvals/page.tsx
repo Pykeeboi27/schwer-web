@@ -1,7 +1,7 @@
 import { CostingApprovalHistoryTable } from "@/components/executive/costing-approval-history-table";
 import { ExecutiveCostingApprovalsTable } from "@/components/executive/costing-approvals-table";
 import { RealtimeRefresh } from "@/components/realtime/realtime-refresh";
-import { MarkSectionSeen } from "@/components/notifications/mark-section-seen";
+import { MarkSectionRead } from "@/components/notifications/mark-section-read";
 import { PageHeader, Panel } from "@/components/patterns";
 import { getExecutiveAccessRedirect } from "@/lib/executive/access";
 import {
@@ -32,7 +32,7 @@ export default async function ExecutiveCostingApprovalsPage() {
   return (
     <div className="flex flex-col gap-6">
       <RealtimeRefresh tables={["quotations", "quotation_items"]} />
-      <MarkSectionSeen section="costing_approvals" />
+      <MarkSectionRead section="costing_approvals" />
       <PageHeader
         title="Costing Approval"
         description={

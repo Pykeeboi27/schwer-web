@@ -1,7 +1,7 @@
 import { fetchPurchaseOrdersAction } from "@/app/protected/sales/purchase-orders/actions";
 import { PurchaseOrdersTable } from "@/components/tables/purchase-orders-table";
 import { RealtimeRefresh } from "@/components/realtime/realtime-refresh";
-import { MarkSectionSeen } from "@/components/notifications/mark-section-seen";
+import { MarkSectionRead } from "@/components/notifications/mark-section-read";
 import { PageHeader, Panel, StatCard } from "@/components/patterns";
 import { getCurrentProfile } from "@/lib/profile/get-current-profile";
 import { getSalesAccessRedirect } from "@/lib/sales/access";
@@ -62,7 +62,7 @@ export default async function SalesPurchaseOrdersPage() {
   return (
     <div className="flex flex-col gap-6">
       <RealtimeRefresh tables={["purchase_orders", "po_approvals"]} />
-      <MarkSectionSeen section="purchase_orders" />
+      <MarkSectionRead section="purchase_orders" />
       <PageHeader
         title="Purchase Orders"
         description="Purchase orders converted from approved quotations. Pending POs await approval; once approved, track collections here as payments come in."

@@ -15,8 +15,10 @@ import { NotificationItem } from "@/components/notifications/notification-item";
 import { MarkAllReadButton } from "@/components/notifications/mark-all-read-button";
 import { useNotificationsRealtime } from "@/components/notifications/use-notifications-realtime";
 import { useNotificationSound } from "@/components/notifications/use-notification-sound";
+import { useBackgroundUnreadBadge } from "@/components/notifications/use-background-unread-badge";
 import { useToast } from "@/lib/utils/toast-notification";
 import { formatUnreadCount } from "@/lib/notifications/links";
+import { groupNotifications } from "@/lib/notifications/group";
 import type { Notification } from "@/lib/notifications/types";
 
 type NotificationBellProps = {
@@ -37,6 +39,7 @@ export function NotificationBell({
   const [notifications, setNotifications] = useState(initialNotifications);
   const playSound = useNotificationSound();
   const toast = useToast();
+  useBackgroundUnreadBadge(unreadCount);
 
   // Server props are the source of truth; realtime only adds an optimistic
   // bump between the event and the debounced router.refresh() reconciling it.
@@ -71,6 +74,7 @@ export function NotificationBell({
   });
 
   const badgeLabel = formatUnreadCount(unreadCount);
+  const groupedNotifications = groupNotifications(notifications);
 
   return (
     <DropdownMenu open={open} onOpenChange={setOpen}>
@@ -96,12 +100,12 @@ export function NotificationBell({
         </div>
 
         <div className="max-h-[380px] overflow-y-auto p-1">
-          {notifications.length === 0 ? (
+          {groupedNotifications.length === 0 ? (
             <p className="px-3 py-6 text-center text-sm text-muted-foreground">
               You&apos;re all caught up.
             </p>
           ) : (
-            notifications.map((notification) => (
+            groupedNotifications.map((notification) => (
               <NotificationItem
                 key={notification.id}
                 notification={notification}

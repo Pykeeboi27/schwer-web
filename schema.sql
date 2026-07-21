@@ -1281,10 +1281,12 @@ CREATE POLICY "sales_po_payments_sales_all"
 -- mirroring fn_audit_trigger()/fn_set_updated_at() above.
 --
 -- Two independent "cleared" timestamps drive two different UI signals:
---   read_at  -> bell unread count; cleared when the user clicks that notification.
---   seen_at  -> nav-tab dot;       cleared when the user visits that section's tab
---               (app-level, via markSectionSeen()), even if the notification
---               itself was never opened.
+--   read_at  -> bell unread count; cleared when the user clicks that
+--               notification, or visits that section's tab (app-level, via
+--               markSectionRead()), even if the notification itself was
+--               never opened.
+--   seen_at  -> nav-tab dot; always cleared alongside read_at (read implies
+--               seen, not the reverse) by the same markSectionRead() call.
 --
 -- Scope is strictly personal: an approver assigned via quotation_approvals/
 -- po_approvals.approver_id, or the owner of a quotation/PO

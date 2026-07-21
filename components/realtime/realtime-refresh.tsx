@@ -45,7 +45,11 @@ export function RealtimeRefresh({ tables }: RealtimeRefreshProps) {
         scheduleRefresh,
       );
     }
-    channel.subscribe();
+    channel.subscribe((status, err) => {
+      if (status === "CHANNEL_ERROR" || status === "TIMED_OUT") {
+        console.error(`RealtimeRefresh[${tablesKey}] channel ${status}:`, err);
+      }
+    });
 
     return () => {
       if (timeoutRef.current) clearTimeout(timeoutRef.current);
