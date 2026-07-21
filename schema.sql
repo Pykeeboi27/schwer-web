@@ -629,6 +629,15 @@ CREATE TRIGGER trg_sync_quotation_totals_from_payments
 AFTER INSERT OR UPDATE OR DELETE ON public.po_payments
 FOR EACH ROW EXECUTE FUNCTION public.fn_sync_quotation_totals_from_payments();
 
+-- Also drives the sequential approval chain: sales_manager -> executive ->
+-- owner (amount >= 3,000,000 only; below that, sales_manager is terminal).
+-- The app only ever seeds the sales_manager row at submission
+-- (lib/sales/quotations.ts, submitQuotationForApproval); this function opens
+-- each subsequent stage once the prior one is approved, so a role never sees
+-- an item in its approval queue before its turn. The chain order and 3M
+-- threshold are intentionally duplicated in lib/sales/quotations.ts
+-- (requiredApproverRolesForAmount / approvalChainForAmount / nextApproverRole)
+-- for stage-1 seeding and UI display; keep both in sync if either changes.
 CREATE OR REPLACE FUNCTION public.fn_sync_quotation_status_from_approvals()
 RETURNS TRIGGER
 LANGUAGE plpgsql
@@ -637,6 +646,8 @@ SET search_path = public
 AS $$
 DECLARE
   qid UUID;
+  v_amount NUMERIC;
+  v_next user_role_enum;
 BEGIN
   qid := COALESCE(NEW.quotation_id, OLD.quotation_id);
 
@@ -653,6 +664,35 @@ BEGIN
       AND approver_role = NEW.approver_role
       AND status = 'pending'
       AND id <> NEW.id;
+
+    -- Sequential chain: sales_manager -> executive -> owner (owner only for
+    -- amount >= 3,000,000; below that, sales_manager approval is terminal).
+    -- Open the next stage here, inside the same trigger invocation, so the
+    -- status recompute below always sees a fresh pending row for a
+    -- not-yet-complete chain instead of transiently observing "no pending
+    -- rows" and marking the quotation approved early.
+    SELECT amount INTO v_amount FROM public.quotations WHERE id = qid;
+    v_next := CASE NEW.approver_role
+      WHEN 'sales_manager' THEN
+        CASE WHEN v_amount >= 3000000 THEN 'executive'::user_role_enum ELSE NULL END
+      WHEN 'executive' THEN 'owner'::user_role_enum
+      ELSE NULL -- owner is terminal
+    END;
+
+    IF v_next IS NOT NULL
+       AND NOT EXISTS (
+         SELECT 1 FROM public.quotation_approvals
+         WHERE quotation_id = qid AND approver_role = v_next
+       ) THEN
+      INSERT INTO public.quotation_approvals (quotation_id, approver_id, approver_role, status)
+      SELECT qid, p.id, v_next, 'pending'
+      FROM public.profiles p
+      WHERE p.role = v_next AND p.department = 'executive' AND p.is_active = TRUE;
+
+      IF NOT FOUND THEN
+        RAISE EXCEPTION 'No active approver for role % on quotation %', v_next, qid;
+      END IF;
+    END IF;
   END IF;
 
   UPDATE public.quotations q
@@ -675,20 +715,14 @@ BEGIN
     ) THEN 'approved'::approval_status_enum
     ELSE 'pending'::approval_status_enum
   END,
-  approved_at = CASE
-    WHEN q.approved_at IS NOT NULL THEN q.approved_at
-    WHEN EXISTS (
-      SELECT 1 FROM public.quotation_approvals qa
-      WHERE qa.quotation_id = qid AND qa.status = 'approved'
-    )
-    AND NOT EXISTS (
-      SELECT 1 FROM public.quotation_approvals qa
-      WHERE qa.quotation_id = qid AND qa.status IN ('pending', 'rejected')
-    ) THEN NOW()
-    ELSE q.approved_at
-  END,
   updated_at = NOW()
   WHERE q.id = qid;
+  -- Note: unlike the PO version below, this does not stamp
+  -- quotations.approved_at. That column exists but has never actually been
+  -- written by this trigger in production; an approved_at CASE branch was
+  -- drafted here at some point but never deployed, so this migration keeps
+  -- schema.sql matching deployed reality rather than silently introducing
+  -- that as a side effect of the approval-chain change.
 
   RETURN COALESCE(NEW, OLD);
 END;
@@ -704,6 +738,10 @@ FOR EACH ROW EXECUTE FUNCTION public.fn_sync_quotation_status_from_approvals();
 -- app fans out one po_approvals row per approver and nothing cancelled the
 -- sibling pending rows once one of them approved — the aggregate (which
 -- requires every row to be approved/cancelled) stayed "pending" forever.
+-- Also mirrors the sequential chain-advancement behavior described above the
+-- quotation version: the app seeds only the sales_manager po_approvals row on
+-- conversion (lib/sales/purchase-orders.ts, convertQuotationToPurchaseOrder),
+-- and this function opens each subsequent stage as the prior one is approved.
 CREATE OR REPLACE FUNCTION public.fn_sync_po_status_from_approvals()
 RETURNS TRIGGER
 LANGUAGE plpgsql
@@ -712,6 +750,8 @@ SET search_path = public
 AS $$
 DECLARE
   pid UUID;
+  v_amount NUMERIC;
+  v_next user_role_enum;
 BEGIN
   pid := COALESCE(NEW.po_id, OLD.po_id);
 
@@ -728,6 +768,32 @@ BEGIN
       AND approver_role = NEW.approver_role
       AND status = 'pending'
       AND id <> NEW.id;
+
+    -- Sequential chain: sales_manager -> executive -> owner (owner only for
+    -- amount >= 3,000,000). See fn_sync_quotation_status_from_approvals for
+    -- why the next stage is opened here rather than from the app session.
+    SELECT po_amount INTO v_amount FROM public.purchase_orders WHERE id = pid;
+    v_next := CASE NEW.approver_role
+      WHEN 'sales_manager' THEN
+        CASE WHEN v_amount >= 3000000 THEN 'executive'::user_role_enum ELSE NULL END
+      WHEN 'executive' THEN 'owner'::user_role_enum
+      ELSE NULL -- owner is terminal
+    END;
+
+    IF v_next IS NOT NULL
+       AND NOT EXISTS (
+         SELECT 1 FROM public.po_approvals
+         WHERE po_id = pid AND approver_role = v_next
+       ) THEN
+      INSERT INTO public.po_approvals (po_id, approver_id, approver_role, status)
+      SELECT pid, p.id, v_next, 'pending'
+      FROM public.profiles p
+      WHERE p.role = v_next AND p.department = 'executive' AND p.is_active = TRUE;
+
+      IF NOT FOUND THEN
+        RAISE EXCEPTION 'No active approver for role % on purchase order %', v_next, pid;
+      END IF;
+    END IF;
   END IF;
 
   UPDATE public.purchase_orders p

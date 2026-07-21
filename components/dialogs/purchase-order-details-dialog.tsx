@@ -79,6 +79,45 @@ function progressOf(purchaseOrder: SalesPurchaseOrder): number {
   );
 }
 
+function roleLabel(role: "sales_manager" | "owner" | "executive"): string {
+  if (role === "sales_manager") {
+    return "Sales Manager";
+  }
+
+  if (role === "owner") {
+    return "Owner";
+  }
+
+  return "Executive";
+}
+
+function stageStateLabel(state: "approved" | "current" | "upcoming"): string {
+  if (state === "approved") {
+    return "Approved";
+  }
+
+  if (state === "current") {
+    return "Pending";
+  }
+
+  return "Upcoming";
+}
+
+/**
+ * Renders the full sequential chain with each stage's state, since only the
+ * current stage's approval row actually exists at any given time -- e.g.
+ * "Sales Manager (Approved) -> Executive (Pending) -> Owner (Upcoming)".
+ */
+function formatApprovalStages(stages: SalesPurchaseOrder["approvalStages"]): string {
+  if (stages.length === 0) {
+    return "No approvers required";
+  }
+
+  return stages
+    .map((stage) => `${roleLabel(stage.role)} (${stageStateLabel(stage.state)})`)
+    .join(" -> ");
+}
+
 type ItemPricingFields = {
   marginPercentage: string;
   bankPercentage: string;
@@ -558,13 +597,13 @@ export function PurchaseOrderDetailsDialog({
                   </div>
                   <div className="grid grid-cols-[160px_1fr] gap-2">
                     <dt className="text-muted-foreground">Approval Status</dt>
-                    <dd className="flex flex-wrap items-center gap-x-1">
+                    <dd>
                       <StatusBadge status={purchaseOrder.status} />
-                      {purchaseOrder.status === "pending" &&
-                      purchaseOrder.pendingApprovalRoles.length > 0
-                        ? ` · awaiting ${purchaseOrder.pendingApprovalRoles.join(" -> ")}`
-                        : ""}
                     </dd>
+                  </div>
+                  <div className="grid grid-cols-[160px_1fr] gap-2">
+                    <dt className="text-muted-foreground">Approval Chain</dt>
+                    <dd>{formatApprovalStages(purchaseOrder.approvalStages)}</dd>
                   </div>
                   <div className="grid grid-cols-[160px_1fr] gap-2">
                     <dt className="text-muted-foreground">Approved At</dt>

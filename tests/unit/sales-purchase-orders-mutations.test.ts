@@ -250,7 +250,7 @@ describe("convertQuotationToPurchaseOrder", () => {
     ]);
   });
 
-  it("routes high-value quotations through sales_manager, owner, and executive", async () => {
+  it("still only seeds the sales_manager stage for a high-value quotation (chain is sequential)", async () => {
     mockClient = createSupabaseMock({
       user,
       tables: {
@@ -386,15 +386,11 @@ describe("findPendingPoApprovalForRole", () => {
 });
 
 describe("approvePoApproval", () => {
-  it("approves and refreshes the PO status to approved", async () => {
-    mockClient = createSupabaseMock({
-      tables: {
-        // 1) update approval, 2) select approval statuses (refresh)
-        po_approvals: [ok, { data: [{ status: "approved" }], error: null }],
-        // refresh updates purchase_orders
-        purchase_orders: ok,
-      },
-    });
+  it("marks the approval row approved", async () => {
+    // Status rollup and next-stage row creation now happen in the
+    // fn_sync_po_status_from_approvals Postgres trigger, not here -- this
+    // only needs to update the one po_approvals row.
+    mockClient = createSupabaseMock({ tables: { po_approvals: ok } });
     await expect(
       approvePoApproval({ poId: "p1", approvalId: "pa1" }),
     ).resolves.toBeUndefined();
