@@ -117,6 +117,45 @@ function statusLabel(status: SalesQuotation["status"]): string {
   return "Cancelled";
 }
 
+function roleLabel(role: "sales_manager" | "owner" | "executive"): string {
+  if (role === "sales_manager") {
+    return "Sales Manager";
+  }
+
+  if (role === "owner") {
+    return "Owner";
+  }
+
+  return "Executive";
+}
+
+function stageStateLabel(state: "approved" | "current" | "upcoming"): string {
+  if (state === "approved") {
+    return "Approved";
+  }
+
+  if (state === "current") {
+    return "Pending";
+  }
+
+  return "Upcoming";
+}
+
+/**
+ * Renders the full sequential chain with each stage's state, since only the
+ * current stage's approval row actually exists at any given time -- e.g.
+ * "Sales Manager (Approved) -> Executive (Pending) -> Owner (Upcoming)".
+ */
+function formatApprovalStages(stages: SalesQuotation["approvalStages"]): string {
+  if (stages.length === 0) {
+    return "No approvers required";
+  }
+
+  return stages
+    .map((stage) => `${roleLabel(stage.role)} (${stageStateLabel(stage.state)})`)
+    .join(" -> ");
+}
+
 export function QuotationDetailsDialog({
   open,
   onOpenChange,
@@ -178,10 +217,9 @@ export function QuotationDetailsDialog({
       normalizedRole as "sales_manager" | "owner" | "executive",
     );
 
-  const pendingApprovalText =
-    quotation && quotation.pendingApprovalRoles.length > 0
-      ? quotation.pendingApprovalRoles.join(" -> ")
-      : "No pending approvers";
+  const approvalChainText = quotation
+    ? formatApprovalStages(quotation.approvalStages)
+    : "No pending approvers";
 
   const handleClose = () => {
     onOpenChange(false);
@@ -625,7 +663,7 @@ export function QuotationDetailsDialog({
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-[160px_1fr] gap-2">
             <dt className="text-muted-foreground">Approval Chain</dt>
-            <dd>{pendingApprovalText}</dd>
+            <dd>{approvalChainText}</dd>
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-[160px_1fr] gap-2">
             <dt className="text-muted-foreground">Created</dt>

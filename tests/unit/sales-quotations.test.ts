@@ -136,6 +136,12 @@ describe("listSalesQuotations", () => {
     expect(quotation.marginAmount).toBe(100000);
     expect(quotation.leadTimeDays).toBe(14);
     expect(quotation.pendingApprovalRoles).toEqual(["sales_manager"]);
+    // Below the 3M threshold the chain is sales_manager-only, so the
+    // unrelated "owner approved" row above is irrelevant to this quotation's
+    // stages.
+    expect(quotation.approvalStages).toEqual([
+      { role: "sales_manager", state: "current" },
+    ]);
     expect(quotation.convertedPoStatus).toBeNull();
     expect(quotation.preparedByName).toBe("Jane Author");
   });

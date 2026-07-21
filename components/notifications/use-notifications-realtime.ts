@@ -68,7 +68,19 @@ export function useNotificationsRealtime(
           scheduleRefresh();
         },
       )
-      .subscribe();
+      .subscribe((status, err) => {
+        // This channel has no visible UI of its own (unlike a failed data
+        // fetch, which renders an error state) -- a silently failed
+        // subscription here means notifications never arrive live with no
+        // other symptom, so surface every non-happy status loudly.
+        if (status === "CHANNEL_ERROR" || status === "TIMED_OUT") {
+          console.error(`Notifications realtime channel ${status}:`, err);
+        } else if (status === "CLOSED") {
+          console.warn("Notifications realtime channel closed unexpectedly");
+        } else {
+          console.info(`Notifications realtime channel: ${status}`);
+        }
+      });
 
     return () => {
       if (timeoutRef.current) clearTimeout(timeoutRef.current);

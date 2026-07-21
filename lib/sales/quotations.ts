@@ -40,6 +40,7 @@ export type SalesQuotation = {
   salesPersonId: string | null;
   salesPersonName: string | null;
   pendingApprovalRoles: RequiredApproverRole[];
+  approvalStages: ApprovalStage[];
   rejectionReason: string | null;
   rejectedByName: string | null;
   createdAt: string;
@@ -180,12 +181,95 @@ export function determineApprovalLevel(
     : "sales_manager_only";
 }
 
-export function requiredApproverRolesForAmount(amount: number): RequiredApproverRole[] {
+/**
+ * Full approval chain for a given amount, in order. Sequential: an approver
+ * only sees the item in their queue once every prior role in this chain has
+ * approved. Mirrors the chain-advancement logic in the
+ * fn_sync_quotation_status_from_approvals / fn_sync_po_status_from_approvals
+ * Postgres triggers (schema.sql) -- keep both in sync if this changes.
+ */
+export function approvalChainForAmount(amount: number): RequiredApproverRole[] {
   if (requiresExecutiveApproval(amount)) {
-    return ["sales_manager", "owner", "executive"];
+    return ["sales_manager", "executive", "owner"];
   }
 
   return ["sales_manager"];
+}
+
+/** @deprecated Use {@link approvalChainForAmount}. Kept as an alias for existing call sites. */
+export function requiredApproverRolesForAmount(amount: number): RequiredApproverRole[] {
+  return approvalChainForAmount(amount);
+}
+
+/**
+ * The role that should be opened next after `currentRole` approves, or null
+ * if `currentRole` is terminal for this amount (chain complete).
+ */
+export function nextApproverRole(
+  currentRole: RequiredApproverRole,
+  amount: number,
+): RequiredApproverRole | null {
+  const chain = approvalChainForAmount(amount);
+  const index = chain.indexOf(currentRole);
+
+  if (index === -1 || index === chain.length - 1) {
+    return null;
+  }
+
+  return chain[index + 1];
+}
+
+/**
+ * Given the set of roles that have already approved (in any order -- e.g.
+ * legacy items approved under the old sales_manager -> owner -> executive
+ * ordering), returns the first role in the current chain order that has not
+ * yet approved, or null if the whole chain is satisfied. Used both by the
+ * one-time data migration (0022_sequential_approval_chain.sql) to determine
+ * whose turn it is, and unit-tested to keep that SQL logic's intent honest.
+ */
+export function firstUnsatisfiedRole(
+  approvedRoles: RequiredApproverRole[],
+  amount: number,
+): RequiredApproverRole | null {
+  const chain = approvalChainForAmount(amount);
+  const approved = new Set(approvedRoles);
+
+  return chain.find((role) => !approved.has(role)) ?? null;
+}
+
+export type ApprovalStageState = "approved" | "current" | "upcoming";
+
+export type ApprovalStage = {
+  role: RequiredApproverRole;
+  state: ApprovalStageState;
+};
+
+/**
+ * Reconstructs the full chain (with each stage's state) for display, since
+ * only the current stage's approval row actually exists at any given time
+ * under the sequential model -- `pendingApprovalRoles` alone can no longer
+ * show "what's still ahead". `approvals` should be every
+ * quotation_approvals/po_approvals row for the item (any status).
+ */
+export function buildApprovalStages(
+  amount: number,
+  approvals: Array<{ role: RequiredApproverRole; status: string }>,
+): ApprovalStage[] {
+  const approvedRoles = new Set(
+    approvals.filter((a) => a.status === "approved").map((a) => a.role),
+  );
+  const pendingRoles = new Set(
+    approvals.filter((a) => a.status === "pending").map((a) => a.role),
+  );
+
+  return approvalChainForAmount(amount).map((role) => ({
+    role,
+    state: approvedRoles.has(role)
+      ? "approved"
+      : pendingRoles.has(role)
+        ? "current"
+        : "upcoming",
+  }));
 }
 
 export function aggregateQuotationStatus(
@@ -383,6 +467,19 @@ export async function listSalesQuotations(): Promise<SalesQuotation[]> {
         .filter((role): role is RequiredApproverRole => role !== null),
     );
 
+    const approvalStages = buildApprovalStages(
+      Number(row.amount),
+      approvals
+        .map((approval) => ({
+          role: toRequiredApproverRole(approval.approver_role),
+          status: approval.status,
+        }))
+        .filter(
+          (approval): approval is { role: RequiredApproverRole; status: string } =>
+            approval.role !== null,
+        ),
+    );
+
     const rejectedApproval = approvals
       .filter((approval) => approval.status === "rejected")
       .sort(
@@ -430,6 +527,7 @@ export async function listSalesQuotations(): Promise<SalesQuotation[]> {
       salesPersonId: row.sales_person_id ?? null,
       salesPersonName: resolveDisplayName(salesPerson),
       pendingApprovalRoles,
+      approvalStages,
       rejectionReason: rejectedApproval?.rejection_reason ?? null,
       rejectedByName: resolveDisplayName(rejectedByProfile),
       createdAt: row.created_at,
@@ -688,27 +786,23 @@ export async function submitQuotationForApproval(quotationId: string): Promise<v
 
   assertQuotationReadyForApproval(quotation);
 
-  const roles = requiredApproverRolesForAmount(Number(quotation.amount));
-  const approversByRole = await Promise.all(
-    roles.map((role) => findApproversForRole(role)),
-  );
+  // Sequential chain: only the first stage is seeded here. Approving it
+  // opens the next stage (fn_sync_quotation_status_from_approvals in
+  // schema.sql), so a role never sees this quotation in its approval queue
+  // before its turn.
+  const [firstRole] = approvalChainForAmount(Number(quotation.amount));
+  const firstStageApprovers = await findApproversForRole(firstRole);
   const rows: Array<{
     quotation_id: string;
     approver_id: string;
     approver_role: RequiredApproverRole;
     status: "pending";
-  }> = [];
-
-  roles.forEach((role, index) => {
-    for (const approver of approversByRole[index]) {
-      rows.push({
-        quotation_id: quotationId,
-        approver_id: approver.id,
-        approver_role: role,
-        status: "pending",
-      });
-    }
-  });
+  }> = firstStageApprovers.map((approver) => ({
+    quotation_id: quotationId,
+    approver_id: approver.id,
+    approver_role: firstRole,
+    status: "pending",
+  }));
 
   const { error: insertError } = await supabase.from("quotation_approvals").insert(rows);
   if (insertError) {
@@ -887,30 +981,23 @@ export async function resubmitQuotationForApproval(quotationId: string): Promise
     throw new Error(updateError.message || "Failed to resubmit quotation.");
   }
 
-  // Clear previous approval rows and create a fresh cycle.
+  // Clear previous approval rows and restart the sequential chain at stage
+  // one; approving it opens the next stage (see submitQuotationForApproval).
   await supabase.from("quotation_approvals").delete().eq("quotation_id", quotationId);
 
-  const roles = requiredApproverRolesForAmount(Number(row.amount));
-  const approversByRole = await Promise.all(
-    roles.map((role) => findApproversForRole(role)),
-  );
+  const [firstRole] = approvalChainForAmount(Number(row.amount));
+  const firstStageApprovers = await findApproversForRole(firstRole);
   const rows: Array<{
     quotation_id: string;
     approver_id: string;
     approver_role: RequiredApproverRole;
     status: "pending";
-  }> = [];
-
-  roles.forEach((role, index) => {
-    for (const approver of approversByRole[index]) {
-      rows.push({
-        quotation_id: quotationId,
-        approver_id: approver.id,
-        approver_role: role,
-        status: "pending",
-      });
-    }
-  });
+  }> = firstStageApprovers.map((approver) => ({
+    quotation_id: quotationId,
+    approver_id: approver.id,
+    approver_role: firstRole,
+    status: "pending",
+  }));
 
   if (rows.length > 0) {
     const { error: insertError } = await supabase

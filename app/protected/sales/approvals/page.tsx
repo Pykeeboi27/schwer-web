@@ -3,7 +3,7 @@ import { fetchPurchaseOrdersAction } from "@/app/protected/sales/purchase-orders
 import { QuotationsTable } from "@/components/tables/quotations-table";
 import { PurchaseOrdersTable } from "@/components/tables/purchase-orders-table";
 import { RealtimeRefresh } from "@/components/realtime/realtime-refresh";
-import { MarkSectionSeen } from "@/components/notifications/mark-section-seen";
+import { MarkSectionRead } from "@/components/notifications/mark-section-read";
 import { PageHeader, Panel } from "@/components/patterns";
 import { getCurrentProfile } from "@/lib/profile/get-current-profile";
 import { getSalesAccessRedirect } from "@/lib/sales/access";
@@ -66,7 +66,7 @@ export default async function SalesApprovalsPage() {
       <RealtimeRefresh
         tables={["quotations", "quotation_approvals", "purchase_orders", "po_approvals"]}
       />
-      <MarkSectionSeen section="approvals" />
+      <MarkSectionRead section="approvals" />
       <PageHeader
         title="Quotation Approvals"
         description="Quotations submitted by the sales team for your review. Approve to advance through the workflow, or reject to return them for correction."

@@ -1,7 +1,8 @@
 import {
-  aggregateQuotationStatus,
+  approvalChainForAmount,
+  buildApprovalStages,
   findApproversForRole,
-  requiredApproverRolesForAmount,
+  type ApprovalStage,
   type RequiredApproverRole,
 } from "@/lib/sales/quotations";
 import { getCurrentProfile } from "@/lib/profile/get-current-profile";
@@ -59,6 +60,7 @@ export type SalesPurchaseOrder = {
   salesMarginPercent: number | null;
   status: PurchaseOrderStatus;
   pendingApprovalRoles: RequiredApproverRole[];
+  approvalStages: ApprovalStage[];
   rejectionReason: string | null;
   rejectedByName: string | null;
   approvedAt: string | null;
@@ -203,6 +205,15 @@ export async function listPurchaseOrders(): Promise<SalesPurchaseOrder[]> {
       ),
     );
 
+    const approvalStages = buildApprovalStages(
+      Number(row.po_amount),
+      approvals
+        .map((a) => ({ role: toRequiredApproverRole(a.approver_role), status: a.status }))
+        .filter(
+          (a): a is { role: RequiredApproverRole; status: string } => a.role !== null,
+        ),
+    );
+
     const rejectedApproval = approvals
       .filter((a) => a.status === "rejected")
       .sort(
@@ -264,6 +275,7 @@ export async function listPurchaseOrders(): Promise<SalesPurchaseOrder[]> {
       salesMarginPercent: numberOrNull(row.margin_percentage),
       status: (row.status ?? "pending") as PurchaseOrderStatus,
       pendingApprovalRoles,
+      approvalStages,
       rejectionReason: rejectedApproval?.rejection_reason ?? null,
       rejectedByName: resolveDisplayName(rejectedByProfile),
       approvedAt: row.approved_at ?? null,
@@ -436,27 +448,22 @@ export async function convertQuotationToPurchaseOrder(
     }
   }
 
-  const roles = requiredApproverRolesForAmount(poAmount);
-  const approversByRole = await Promise.all(
-    roles.map((role) => findApproversForRole(role)),
-  );
+  // Sequential chain: only the first stage is seeded here. Approving it
+  // opens the next stage (fn_sync_po_status_from_approvals in schema.sql), so
+  // a role never sees this PO in its approval queue before its turn.
+  const [firstRole] = approvalChainForAmount(poAmount);
+  const firstStageApprovers = await findApproversForRole(firstRole);
   const rows: Array<{
     po_id: string;
     approver_id: string;
     approver_role: RequiredApproverRole;
     status: "pending";
-  }> = [];
-
-  roles.forEach((role, index) => {
-    for (const approver of approversByRole[index]) {
-      rows.push({
-        po_id: po.id,
-        approver_id: approver.id,
-        approver_role: role,
-        status: "pending",
-      });
-    }
-  });
+  }> = firstStageApprovers.map((approver) => ({
+    po_id: po.id,
+    approver_id: approver.id,
+    approver_role: firstRole,
+    status: "pending",
+  }));
 
   const { error: approvalError } = await supabase.from("po_approvals").insert(rows);
   if (approvalError) {
@@ -479,31 +486,6 @@ export async function convertQuotationToPurchaseOrder(
   }
 
   return { purchaseOrderId: po.id };
-}
-
-async function refreshPurchaseOrderStatus(poId: string): Promise<void> {
-  const supabase = await createClient();
-  const { data: approvals, error } = await supabase
-    .from("po_approvals")
-    .select("status")
-    .eq("po_id", poId);
-
-  if (error) {
-    throw new Error("Failed to refresh purchase order status.");
-  }
-
-  const statuses = (approvals ?? []).map(
-    (a) => a.status as "pending" | "approved" | "rejected" | "cancelled",
-  );
-  const aggregate = aggregateQuotationStatus(statuses);
-
-  await supabase
-    .from("purchase_orders")
-    .update({
-      status: aggregate,
-      approved_at: aggregate === "approved" ? new Date().toISOString() : null,
-    })
-    .eq("id", poId);
 }
 
 export async function findPendingPoApprovalForRole(input: {
@@ -602,7 +584,10 @@ export async function approvePoApproval(input: {
     throw new Error(error.message || "Failed to approve purchase order.");
   }
 
-  await refreshPurchaseOrderStatus(input.poId);
+  // Status/approved_at rollup and next-stage row creation are handled by the
+  // fn_sync_po_status_from_approvals trigger (schema.sql) in response to this
+  // update, not here -- see that trigger for why it must happen atomically
+  // with this row's status change rather than as a separate follow-up call.
 }
 
 export async function rejectPoApproval(input: {
@@ -661,30 +646,23 @@ export async function resubmitPurchaseOrderForApproval(poId: string): Promise<vo
     throw new Error(poError.message || "Failed to resubmit purchase order.");
   }
 
-  // Clear previous approval rows and create fresh ones.
+  // Clear previous approval rows and restart the sequential chain at stage
+  // one; approving it opens the next stage (see convertQuotationToPurchaseOrder).
   await supabase.from("po_approvals").delete().eq("po_id", poId);
 
-  const roles = requiredApproverRolesForAmount(Number(po.po_amount));
-  const approversByRole = await Promise.all(
-    roles.map((role) => findApproversForRole(role)),
-  );
+  const [firstRole] = approvalChainForAmount(Number(po.po_amount));
+  const firstStageApprovers = await findApproversForRole(firstRole);
   const rows: Array<{
     po_id: string;
     approver_id: string;
     approver_role: RequiredApproverRole;
     status: "pending";
-  }> = [];
-
-  roles.forEach((role, index) => {
-    for (const approver of approversByRole[index]) {
-      rows.push({
-        po_id: poId,
-        approver_id: approver.id,
-        approver_role: role,
-        status: "pending",
-      });
-    }
-  });
+  }> = firstStageApprovers.map((approver) => ({
+    po_id: poId,
+    approver_id: approver.id,
+    approver_role: firstRole,
+    status: "pending",
+  }));
 
   if (rows.length > 0) {
     const { error: approvalError } = await supabase.from("po_approvals").insert(rows);
