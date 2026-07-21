@@ -3,7 +3,9 @@ import { describe, expect, it } from "vitest";
 import { groupNotifications } from "@/lib/notifications/group";
 import type { Notification } from "@/lib/notifications/types";
 
-function makeNotification(overrides: Partial<Notification> & { id: string }): Notification {
+function makeNotification(
+  overrides: Partial<Notification> & { id: string },
+): Notification {
   return {
     type: "quotation_approved",
     section: "quotations",
@@ -65,8 +67,16 @@ describe("groupNotifications", () => {
 
   it("never merges across different entities, even within the window", () => {
     const groups = groupNotifications([
-      makeNotification({ id: "n2", entityId: "q2", createdAt: "2026-07-21T12:01:00.000Z" }),
-      makeNotification({ id: "n1", entityId: "q1", createdAt: "2026-07-21T12:00:00.000Z" }),
+      makeNotification({
+        id: "n2",
+        entityId: "q2",
+        createdAt: "2026-07-21T12:01:00.000Z",
+      }),
+      makeNotification({
+        id: "n1",
+        entityId: "q1",
+        createdAt: "2026-07-21T12:00:00.000Z",
+      }),
     ]);
 
     expect(groups).toHaveLength(2);
@@ -105,8 +115,16 @@ describe("groupNotifications", () => {
 
   it("uses a single actor name with no 'others' suffix when only one actor is present", () => {
     const groups = groupNotifications([
-      makeNotification({ id: "n2", createdAt: "2026-07-21T12:02:00.000Z", actorName: "Maria" }),
-      makeNotification({ id: "n1", createdAt: "2026-07-21T12:00:00.000Z", actorName: "Maria" }),
+      makeNotification({
+        id: "n2",
+        createdAt: "2026-07-21T12:02:00.000Z",
+        actorName: "Maria",
+      }),
+      makeNotification({
+        id: "n1",
+        createdAt: "2026-07-21T12:00:00.000Z",
+        actorName: "Maria",
+      }),
     ]);
 
     expect(groups[0].actorSummary).toBe("Maria");
