@@ -6,11 +6,7 @@ import {
   type RequiredApproverRole,
 } from "@/lib/sales/quotations";
 import { getCurrentProfile } from "@/lib/profile/get-current-profile";
-import {
-  computeAggregatePricing,
-  computeSalesPricing,
-  computeVatBreakdown,
-} from "@/lib/sales/pricing";
+import { computeAggregatePricing, computeSalesPricing } from "@/lib/sales/pricing";
 import { createClient } from "@/lib/supabase/server";
 import { validatePoTotalAmount } from "@/lib/utils/form-validation";
 
@@ -702,7 +698,7 @@ export async function updatePurchaseOrderDetails(input: {
 
   const { data: po, error: poError } = await supabase
     .from("purchase_orders")
-    .select("id, status, purchase_order_items(id, line_total)")
+    .select("id, status, purchase_order_items(id, line_total, quantity)")
     .eq("id", input.purchaseOrderId)
     .single();
 
@@ -716,10 +712,12 @@ export async function updatePurchaseOrderDetails(input: {
 
   const itemRows = Array.isArray(po.purchase_order_items) ? po.purchase_order_items : [];
   // Direct cost per item is read fresh from the DB rather than trusted from
-  // the client.
+  // the client. Quantity comes along so computeSalesPricing can recover the
+  // per-unit price it rounds against.
   const lineTotalById = new Map(
     itemRows.map((item) => [item.id, Number(item.line_total)]),
   );
+  const quantityById = new Map(itemRows.map((item) => [item.id, Number(item.quantity)]));
 
   if (input.items.length === 0 || input.items.length !== itemRows.length) {
     throw new Error("Every line item on this purchase order needs pricing.");
@@ -733,6 +731,7 @@ export async function updatePurchaseOrderDetails(input: {
 
     const pricing = computeSalesPricing({
       directCost,
+      quantity: quantityById.get(item.id),
       marginPercentage: item.marginPercentage ?? 0,
       bankPercentage: item.bankPercentage ?? 0,
       sopPercentage: item.sopPercentage ?? 0,
@@ -772,11 +771,10 @@ export async function updatePurchaseOrderDetails(input: {
 
   // Blended weighted-average percentages + summed amounts, written back to
   // the record-level columns (same rollup as the quotation-side update). VAT
-  // is applied once here, on the rolled-up aggregate -- not per item -- so
-  // `selling_amount` stays the pre-VAT figure and `po_amount` becomes the
-  // VAT-inclusive grand total.
+  // is already resolved within cost and the margin gross-up (see
+  // computeSalesPricing) -- `po_amount` is just the aggregate sellingAmount,
+  // not sellingAmount plus additional VAT.
   const aggregate = computeAggregatePricing(pricedItems);
-  const vat = computeVatBreakdown(aggregate);
 
   const { error: updateError } = await supabase
     .from("purchase_orders")
@@ -788,7 +786,7 @@ export async function updatePurchaseOrderDetails(input: {
       sop_percentage: aggregate.sopPercentage,
       sop_amount: aggregate.sopAmount,
       selling_amount: aggregate.sellingAmount,
-      po_amount: vat.grandTotal,
+      po_amount: aggregate.sellingAmount,
       has_unequal_margins: input.hasUnequalMargins,
       payment_terms: input.paymentTerms,
       payment_terms_custom: input.paymentTermsCustom,

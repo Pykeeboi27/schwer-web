@@ -21,8 +21,8 @@ const baseData: PurchaseOrderWorksheetData = {
       quantity: 2,
       unitCost: 300_000,
       lineTotal: 600_000,
-      // sellingAmount 660,000 (600,000 + 10% margin) + 12% VAT on the 60,000
-      // margin (7,200) = 667,200 printed on the line.
+      // sellingAmount 660,000 (600,000 + 10% margin) is already VAT-inclusive
+      // (VAT is resolved within cost/margin), so it prints as-is on the line.
       sellingAmount: 660_000,
       marginAmount: 60_000,
       bankAmount: 0,
@@ -36,8 +36,8 @@ const baseData: PurchaseOrderWorksheetData = {
       quantity: 1,
       unitCost: 150_000,
       lineTotal: 150_000,
-      // sellingAmount 165,000 (150,000 + 10% margin) + 12% VAT on the 15,000
-      // margin (1,800) = 166,800 printed on the line.
+      // sellingAmount 165,000 (150,000 + 10% margin) is already VAT-inclusive,
+      // printed as-is on the line.
       sellingAmount: 165_000,
       marginAmount: 15_000,
       bankAmount: 0,
@@ -127,10 +127,10 @@ describe("generatePurchaseOrderWorksheetXlsx", () => {
     expect(sheet).not.toContain("<engineering>");
   });
 
-  it("sets the grand total to the sum of each line's VAT-inclusive selling price, not the PO amount", async () => {
+  it("sets the grand total to the sum of each line's (already VAT-inclusive) selling price, not the PO amount", async () => {
     const { sheet } = await generateSheet(baseData);
     const cell = sheet.match(/<c r="R42"[^>]*>([\s\S]*?)<\/c>/);
-    expect(cell?.[1]).toContain("<v>834000</v>"); // 667200 + 166800
+    expect(cell?.[1]).toContain("<v>825000</v>"); // 660000 + 165000, nothing added on top
     expect(cell?.[1]).not.toContain("750000"); // not the direct cost total
     expect(cell?.[1]).not.toContain("1250000"); // not the po_amount
   });
@@ -148,9 +148,9 @@ describe("generatePurchaseOrderWorksheetXlsx", () => {
       sheet.match(new RegExp(`<c r="${addr}"[^>]*>([\\s\\S]*?)</c>`))?.[1] ?? "";
     // Both items share the same 10% margin, so there's exactly one group.
     expect(cell("N49")).toContain("Margin 10.00%: Fire pump unit, Control panel");
-    expect(cell("N50")).toContain("+ Margin VAT (12%)");
-    expect(cell("N51")).toContain("+ Bank VAT (12%)");
-    expect(cell("N52")).toContain("+ SOP VAT (12%)"); // bottom-most line
+    expect(cell("N50")).toContain("Margin VAT (12%, incl.)");
+    expect(cell("N51")).toContain("Bank VAT (12%, incl.)");
+    expect(cell("N52")).toContain("SOP VAT (12%, incl.)"); // bottom-most line
   });
 
   it("does NOT average differing percentages -- lists each distinct percentage with only the items that got it", async () => {
@@ -170,15 +170,16 @@ describe("generatePurchaseOrderWorksheetXlsx", () => {
     expect(sheet).not.toContain("Margin 15.00%");
   });
 
-  it("computes each VAT line as 12% of the blended margin/bank/sop amount", async () => {
+  it("decomposes each already-included amount into its 12% VAT piece (net = amount / 1.12)", async () => {
     const { sheet } = await generateSheet(baseData);
     const cell = (addr: string) =>
       sheet.match(new RegExp(`<c r="${addr}"[^>]*>([\\s\\S]*?)</c>`))?.[1] ?? "";
-    // marginAmount 100,000 * 12% = 12,000; bankAmount 50,000 * 12% = 6,000;
-    // sopAmount 20,000 * 12% = 2,400.
-    expect(cell("N50")).toContain("12,000.00");
-    expect(cell("N51")).toContain("6,000.00");
-    expect(cell("N52")).toContain("2,400.00");
+    // marginAmount 100,000 / 1.12 = 89,285.71 net -> VAT 10,714.29;
+    // bankAmount 50,000 / 1.12 = 44,642.86 net -> VAT 5,357.14;
+    // sopAmount 20,000 / 1.12 = 17,857.14 net -> VAT 2,142.86.
+    expect(cell("N50")).toContain("10,714.29");
+    expect(cell("N51")).toContain("5,357.14");
+    expect(cell("N52")).toContain("2,142.86");
   });
 
   it("anchors a single percentage group and its VAT to the box's bottom lines", async () => {
@@ -190,7 +191,7 @@ describe("generatePurchaseOrderWorksheetXlsx", () => {
     const cell = (addr: string) =>
       sheet.match(new RegExp(`<c r="${addr}"[^>]*?(?:/>|>([\\s\\S]*?)</c>)`))?.[1] ?? "";
     expect(cell("N51")).toContain("Margin 10.00%: Fire pump unit, Control panel");
-    expect(cell("N52")).toContain("+ Margin VAT (12%)"); // bottom-most line
+    expect(cell("N52")).toContain("Margin VAT (12%, incl.)"); // bottom-most line
     expect(cell("N50")).not.toContain("Margin");
     expect(cell("N49")).not.toContain("Margin");
   });
@@ -215,7 +216,7 @@ describe("generatePurchaseOrderWorksheetXlsx", () => {
     }
   });
 
-  it("fills item rows with description, qty, unit cost, and the VAT-inclusive selling price", async () => {
+  it("fills item rows with description, qty, unit cost, and the (already VAT-inclusive) selling price", async () => {
     const { sheet } = await generateSheet(baseData);
     expect(sheet.match(/<c r="D20"[^>]*>([\s\S]*?)<\/c>/)?.[1]).toContain(
       "Fire pump unit",
@@ -224,16 +225,15 @@ describe("generatePurchaseOrderWorksheetXlsx", () => {
     expect(sheet.match(/<c r="P20"[^>]*>([\s\S]*?)<\/c>/)?.[1]).toContain(
       "<v>300000</v>",
     );
-    // 660,000 selling amount + 7,200 VAT (12% of the 60,000 margin) = 667,200.
+    // sellingAmount prints as-is -- nothing added on top.
     expect(sheet.match(/<c r="R20"[^>]*>([\s\S]*?)<\/c>/)?.[1]).toContain(
-      "<v>667200</v>",
+      "<v>660000</v>",
     );
     expect(sheet.match(/<c r="D21"[^>]*>([\s\S]*?)<\/c>/)?.[1]).toContain(
       "Control panel",
     );
-    // 165,000 selling amount + 1,800 VAT (12% of the 15,000 margin) = 166,800.
     expect(sheet.match(/<c r="R21"[^>]*>([\s\S]*?)<\/c>/)?.[1]).toContain(
-      "<v>166800</v>",
+      "<v>165000</v>",
     );
   });
 

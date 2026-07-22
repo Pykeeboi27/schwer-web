@@ -29,13 +29,14 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Callout, ConfirmDialog, StatusBadge } from "@/components/patterns";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
-  computeAggregatePricing,
-  computeSalesPricing,
-  computeVatBreakdown,
-} from "@/lib/sales/pricing";
+  Callout,
+  ConfirmDialog,
+  PricingBreakdown,
+  StatusBadge,
+} from "@/components/patterns";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { computeAggregatePricing, computeSalesPricing } from "@/lib/sales/pricing";
 import type { SalesPoPayment, SalesPurchaseOrder } from "@/lib/sales/purchase-orders";
 import { cn } from "@/lib/utils";
 import { formatCurrency } from "@/lib/utils/number-format";
@@ -125,8 +126,13 @@ type ItemPricingFields = {
   sopPercentage: string;
 };
 
+// Margin defaults to 25% (SPMC's standard MARKUP% across its costing sheets)
+// for new/unpriced items -- still fully editable. Bank% and SOP% have no such
+// standard and stay blank until the sales rep enters them.
+const DEFAULT_MARGIN_PERCENTAGE = "25";
+
 const emptyItemPricing: ItemPricingFields = {
-  marginPercentage: "",
+  marginPercentage: DEFAULT_MARGIN_PERCENTAGE,
   bankPercentage: "",
   sopPercentage: "",
 };
@@ -230,7 +236,9 @@ export function PurchaseOrderDetailsDialog({
     purchaseOrder.items.forEach((item) => {
       nextItemPricing[item.id] = {
         marginPercentage:
-          item.marginPercentage === null ? "" : String(item.marginPercentage),
+          item.marginPercentage === null
+            ? DEFAULT_MARGIN_PERCENTAGE
+            : String(item.marginPercentage),
         bankPercentage: item.bankPercentage === null ? "" : String(item.bankPercentage),
         sopPercentage: item.sopPercentage === null ? "" : String(item.sopPercentage),
       };
@@ -242,7 +250,7 @@ export function PurchaseOrderDetailsDialog({
     setUniformMarginPercentage(
       firstItem && firstItem.marginPercentage !== null
         ? String(firstItem.marginPercentage)
-        : "",
+        : DEFAULT_MARGIN_PERCENTAGE,
     );
     setUniformBankPercentage(
       firstItem && firstItem.bankPercentage !== null
@@ -301,6 +309,7 @@ export function PurchaseOrderDetailsDialog({
     const row = itemPricing[item.id] ?? emptyItemPricing;
     const itemPricingResult = computeSalesPricing({
       directCost: item.lineTotal,
+      quantity: item.quantity,
       marginPercentage: Number(row.marginPercentage) || 0,
       bankPercentage: Number(row.bankPercentage) || 0,
       sopPercentage: Number(row.sopPercentage) || 0,
@@ -315,17 +324,6 @@ export function PurchaseOrderDetailsDialog({
   });
 
   const pricingPreview = computeAggregatePricing(pricedItems);
-  // VAT applies once, to the rolled-up aggregate -- not per item -- so
-  // pricingPreview.sellingAmount stays pre-VAT and vat.grandTotal is the final amount.
-  const vat = computeVatBreakdown(pricingPreview);
-  // Read-only summary VAT, derived from the PO's already-persisted blended
-  // amounts (not the live edit-state pricing above).
-  const blendedVat = computeVatBreakdown({
-    marginAmount: purchaseOrder.marginAmount ?? 0,
-    bankAmount: purchaseOrder.bankAmount ?? 0,
-    sopAmount: purchaseOrder.sopAmount ?? 0,
-    sellingAmount: purchaseOrder.sellingAmount ?? purchaseOrder.poAmount,
-  });
 
   /** Unticked mode: writing one field broadcasts it onto every item's pricing. */
   const applyUniformPercentage = (field: keyof ItemPricingFields, value: string) => {
@@ -948,45 +946,13 @@ export function PurchaseOrderDetailsDialog({
                       </table>
                     </div>
 
-                    <div className="grid grid-cols-[160px_1fr] items-center gap-2 border-t pt-3">
-                      <Label className="font-semibold">Selling Amount</Label>
-                      <span className="text-base font-semibold">
-                        {formatCurrency(pricingPreview.sellingAmount)}
-                      </span>
-                    </div>
-
-                    {pricingPreview.marginAmount > 0 ||
-                    pricingPreview.bankAmount > 0 ||
-                    pricingPreview.sopAmount > 0 ? (
-                      <div className="rounded-md border bg-muted/30 p-3 text-sm space-y-1">
-                        <div className="flex justify-between text-muted-foreground">
-                          <span>Selling Amount</span>
-                          <span>{formatCurrency(pricingPreview.sellingAmount)}</span>
-                        </div>
-                        {pricingPreview.marginAmount > 0 ? (
-                          <div className="flex justify-between text-muted-foreground">
-                            <span>+ Margin VAT (12%)</span>
-                            <span>{formatCurrency(vat.marginVat)}</span>
-                          </div>
-                        ) : null}
-                        {pricingPreview.bankAmount > 0 ? (
-                          <div className="flex justify-between text-muted-foreground">
-                            <span>+ Bank VAT (12%)</span>
-                            <span>{formatCurrency(vat.bankVat)}</span>
-                          </div>
-                        ) : null}
-                        {pricingPreview.sopAmount > 0 ? (
-                          <div className="flex justify-between text-muted-foreground">
-                            <span>+ SOP VAT (12%)</span>
-                            <span>{formatCurrency(vat.sopVat)}</span>
-                          </div>
-                        ) : null}
-                        <div className="flex justify-between border-t pt-1 font-semibold">
-                          <span>Grand Total (incl. VAT)</span>
-                          <span>{formatCurrency(vat.grandTotal)}</span>
-                        </div>
-                      </div>
-                    ) : null}
+                    <PricingBreakdown
+                      directCost={pricingPreview.directCost}
+                      marginAmount={pricingPreview.marginAmount}
+                      bankAmount={pricingPreview.bankAmount}
+                      sopAmount={pricingPreview.sopAmount}
+                      sellingAmount={pricingPreview.sellingAmount}
+                    />
 
                     <div className="grid gap-3 sm:grid-cols-2">
                       <div>
@@ -1063,38 +1029,15 @@ export function PurchaseOrderDetailsDialog({
                     <p className="text-xs text-muted-foreground">
                       Per-item breakdown is on the Line Items tab.
                     </p>
-                    <div className="rounded-md border bg-muted/30 p-3 text-sm space-y-1">
-                      <div className="flex justify-between text-muted-foreground">
-                        <span>Selling Amount</span>
-                        <span>
-                          {formatCurrency(
-                            purchaseOrder.sellingAmount ?? purchaseOrder.poAmount,
-                          )}
-                        </span>
-                      </div>
-                      {blendedVat.marginVat > 0 ? (
-                        <div className="flex justify-between text-muted-foreground">
-                          <span>+ Margin VAT (12%)</span>
-                          <span>{formatCurrency(blendedVat.marginVat)}</span>
-                        </div>
-                      ) : null}
-                      {blendedVat.bankVat > 0 ? (
-                        <div className="flex justify-between text-muted-foreground">
-                          <span>+ Bank VAT (12%)</span>
-                          <span>{formatCurrency(blendedVat.bankVat)}</span>
-                        </div>
-                      ) : null}
-                      {blendedVat.sopVat > 0 ? (
-                        <div className="flex justify-between text-muted-foreground">
-                          <span>+ SOP VAT (12%)</span>
-                          <span>{formatCurrency(blendedVat.sopVat)}</span>
-                        </div>
-                      ) : null}
-                      <div className="flex justify-between border-t pt-1 font-bold">
-                        <span>Grand Total</span>
-                        <span>{formatCurrency(blendedVat.grandTotal)}</span>
-                      </div>
-                    </div>
+                    <PricingBreakdown
+                      directCost={purchaseOrder.cost ?? 0}
+                      marginAmount={purchaseOrder.marginAmount ?? 0}
+                      bankAmount={purchaseOrder.bankAmount ?? 0}
+                      sopAmount={purchaseOrder.sopAmount ?? 0}
+                      sellingAmount={
+                        purchaseOrder.sellingAmount ?? purchaseOrder.poAmount
+                      }
+                    />
                     <div className="grid grid-cols-[160px_1fr] gap-2">
                       <dt className="text-muted-foreground">Payment Terms</dt>
                       <dd>
