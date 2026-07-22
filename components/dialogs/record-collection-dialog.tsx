@@ -15,7 +15,10 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { buildProofOfPaymentPath, PROOF_OF_PAYMENT_BUCKET } from "@/lib/sales/proof-of-payment";
+import {
+  buildProofOfPaymentPath,
+  PROOF_OF_PAYMENT_BUCKET,
+} from "@/lib/sales/proof-of-payment";
 import type { SalesPoPayment, SalesPurchaseOrder } from "@/lib/sales/purchase-orders";
 import { createClient } from "@/lib/supabase/client";
 import { cn } from "@/lib/utils";
@@ -56,7 +59,9 @@ export function RecordCollectionDialog({
   const { success, error } = useToast();
   const [amount, setAmount] = useState("");
   const [proofFile, setProofFile] = useState<File | null>(null);
-  const [existingProofPreviewUrl, setExistingProofPreviewUrl] = useState<string | null>(null);
+  const [existingProofPreviewUrl, setExistingProofPreviewUrl] = useState<string | null>(
+    null,
+  );
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [amountError, setAmountError] = useState<string | null>(null);
   const [proofError, setProofError] = useState<string | null>(null);
@@ -190,7 +195,11 @@ export function RecordCollectionDialog({
             parsedAmount,
             uploadedPath ?? undefined,
           )
-        : await recordCollectionAction(purchaseOrder.id, parsedAmount, uploadedPath ?? "");
+        : await recordCollectionAction(
+            purchaseOrder.id,
+            parsedAmount,
+            uploadedPath ?? "",
+          );
 
     if (!response.success) {
       // Best-effort cleanup so a failed save doesn't leave an orphaned object.
@@ -304,7 +313,9 @@ export function RecordCollectionDialog({
                 setProofFile(file);
                 if (proofError) {
                   const stillMissing = !isEdit && !file;
-                  setProofError(stillMissing ? "A proof-of-payment photo is required." : null);
+                  setProofError(
+                    stillMissing ? "A proof-of-payment photo is required." : null,
+                  );
                   if (!stillMissing && !amountError) {
                     setFormError(null);
                   }
