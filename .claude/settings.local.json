@@ -88,9 +88,13 @@
       "PowerShell(npx vitest run tests/unit/notification-mutations.test.ts tests/unit/notification-grouping.test.ts tests/unit/notification-count.test.ts tests/unit/notification-links.test.ts 2>&1 | Select-Object -Last 40)",
       "PowerShell(\\(Get-Item \"C:\\\\Users\\\\SPM\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\schwer-xlsx-extract\\\\xl\\\\worksheets\\\\sheet1.xml\"\\).Length)",
       "PowerShell(\\(Get-Content \"C:\\\\Users\\\\SPM\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\schwer-xlsx-extract\\\\xl\\\\worksheets\\\\sheet1.xml\" -Raw\\) -split \"<row \" | Measure-Object | Select-Object -ExpandProperty Count)",
-      "PowerShell(Get-ChildItem *)"
+      "PowerShell(Get-ChildItem *)",
+      "WebSearch",
+      "WebFetch(domain:vercel.com)"
     ]
   },
   "enableAllProjectMcpServers": true,
-  "enabledMcpjsonServers": ["supabase"]
+  "enabledMcpjsonServers": [
+    "supabase"
+  ]
 }
