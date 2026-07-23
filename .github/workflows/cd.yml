@@ -5,14 +5,14 @@ on:
     workflows: ["TypeScript CI"]
     types:
       - completed
-    branches:
-      - main
-      - dev
 
 jobs:
-  deploy:
-    name: Deploy to Vercel
-    if: github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'push'
+  deploy-branch:
+    name: Deploy to Vercel (main/dev push)
+    if: >
+      github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.event == 'push' &&
+      (github.event.workflow_run.head_branch == 'main' || github.event.workflow_run.head_branch == 'dev')
     runs-on: ubuntu-latest
     env:
       VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
@@ -46,3 +46,45 @@ jobs:
 
       - name: Deploy prebuilt artifacts
         run: vercel deploy --prebuilt ${{ steps.target.outputs.prod_flag }} --token=$VERCEL_TOKEN
+
+  deploy-pr-preview:
+    name: Deploy PR Preview to Vercel
+    if: >
+      github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.event == 'pull_request' &&
+      github.event.workflow_run.pull_requests[0] != null
+    runs-on: ubuntu-latest
+    permissions:
+      pull-requests: write
+    env:
+      VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+      VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+      VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+
+      - name: Install Vercel CLI
+        run: npm install -g vercel@latest
+
+      - name: Pull Vercel environment
+        run: vercel pull --yes --environment=preview --token=$VERCEL_TOKEN
+
+      - name: Build project artifacts
+        run: vercel build --token=$VERCEL_TOKEN
+
+      - name: Deploy prebuilt artifacts
+        id: deploy
+        run: |
+          url=$(vercel deploy --prebuilt --token=$VERCEL_TOKEN)
+          echo "url=$url" >> "$GITHUB_OUTPUT"
+
+      - name: Comment preview URL on PR
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh pr comment ${{ github.event.workflow_run.pull_requests[0].number }} \
+            --repo ${{ github.repository }} \
+            --body "CI passed — preview deployment ready: ${{ steps.deploy.outputs.url }}"
