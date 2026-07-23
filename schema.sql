@@ -378,6 +378,14 @@ ALTER TABLE public.po_payments
   ADD COLUMN IF NOT EXISTS purchase_order_id UUID REFERENCES public.purchase_orders(id) ON DELETE CASCADE;
 CREATE INDEX IF NOT EXISTS idx_po_payments_purchase_order_id ON public.po_payments(purchase_order_id);
 
+-- Proof of payment (see migrations/0023_po_payments_proof_of_payment.sql).
+-- Points at an object in the private `payment-proofs` Storage bucket, at
+-- path `${auth.uid()}/${purchaseOrderId}/${uuid}.webp`. Nullable at the DB
+-- level (legacy rows have none); required-for-new-collections is enforced
+-- in the app layer, not here.
+ALTER TABLE public.po_payments
+  ADD COLUMN IF NOT EXISTS proof_path TEXT;
+
 
 -- ============================================================
 -- SECTION 4b: PURCHASE ORDERS (Phase 2 — separate PO records)
@@ -449,6 +457,77 @@ ALTER TABLE public.quotations
   ADD COLUMN IF NOT EXISTS client_confirmed_at TIMESTAMPTZ,
   ADD COLUMN IF NOT EXISTS converted_po_id     UUID REFERENCES public.purchase_orders(id) ON DELETE SET NULL,
   ADD COLUMN IF NOT EXISTS po_converted_at     TIMESTAMPTZ;
+
+-- Per-item Sales Margin/Bank/SOP pricing (migration 0020). Sales can price
+-- each quotation_items/purchase_order_items row individually instead of one
+-- shared percentage for the whole record; has_unequal_margins records
+-- whether the record is using per-item percentages or one shared value
+-- broadcast to every item. The *_amount/percentage columns on the item
+-- tables are plain (not GENERATED — they'd need to reference the already-
+-- GENERATED line_total column, which Postgres disallows) and are written
+-- app-side by lib/sales/pricing.ts, same as the record-level columns below.
+-- quotation_items and purchase_order_items themselves are created by
+-- migration 0008 (multi-item quotations), not inline in this file.
+ALTER TABLE public.quotations
+  ADD COLUMN IF NOT EXISTS has_unequal_margins BOOLEAN NOT NULL DEFAULT FALSE;
+
+ALTER TABLE public.purchase_orders
+  ADD COLUMN IF NOT EXISTS has_unequal_margins BOOLEAN NOT NULL DEFAULT FALSE;
+
+ALTER TABLE public.quotation_items
+  ADD COLUMN IF NOT EXISTS margin_percentage NUMERIC(6, 2),
+  ADD COLUMN IF NOT EXISTS margin_amount     NUMERIC(15, 2),
+  ADD COLUMN IF NOT EXISTS bank_percentage   NUMERIC(6, 2),
+  ADD COLUMN IF NOT EXISTS bank_amount       NUMERIC(15, 2),
+  ADD COLUMN IF NOT EXISTS sop_percentage    NUMERIC(6, 2),
+  ADD COLUMN IF NOT EXISTS sop_amount        NUMERIC(15, 2),
+  ADD COLUMN IF NOT EXISTS selling_amount    NUMERIC(15, 2);
+
+ALTER TABLE public.purchase_order_items
+  ADD COLUMN IF NOT EXISTS margin_percentage NUMERIC(6, 2),
+  ADD COLUMN IF NOT EXISTS margin_amount     NUMERIC(15, 2),
+  ADD COLUMN IF NOT EXISTS bank_percentage   NUMERIC(6, 2),
+  ADD COLUMN IF NOT EXISTS bank_amount       NUMERIC(15, 2),
+  ADD COLUMN IF NOT EXISTS sop_percentage    NUMERIC(6, 2),
+  ADD COLUMN IF NOT EXISTS sop_amount        NUMERIC(15, 2),
+  ADD COLUMN IF NOT EXISTS selling_amount    NUMERIC(15, 2);
+
+-- Exact-decimal landed unit cost (migration 0024). The source Excel costing
+-- template never has Engineering type the final per-unit cost directly: they
+-- type a clean 2-decimal raw material+labor figure, and the sheet
+-- automatically applies a fixed +3% OPEX loading then a fixed +1.5% delivery
+-- fee (Q = P*1.03, R = Q*1.015), carrying that full-precision result into the
+-- line total and rounding only once, for display. raw_cost is that new input
+-- column; line_total is redefined to compute straight from
+-- raw_cost * 1.03 * 1.015 * quantity (Postgres NUMERIC arithmetic is exact
+-- decimal, reproducing Excel's total to the centavo) when raw_cost is set,
+-- falling back to the pre-existing quantity * unit_cost behavior otherwise --
+-- every row from before this migration has raw_cost NULL, so nothing about
+-- their stored total changes. unit_cost remains a plain column: for new
+-- items it's now the *display* landed cost (computed app-side by
+-- lib/engineering/costing-quotations.ts::computeLandedUnitCost) but no
+-- longer participates in computing line_total once raw_cost is present.
+ALTER TABLE public.quotation_items
+  ADD COLUMN IF NOT EXISTS raw_cost NUMERIC(15, 2) CHECK (raw_cost IS NULL OR raw_cost >= 0);
+ALTER TABLE public.quotation_items DROP COLUMN IF EXISTS line_total;
+ALTER TABLE public.quotation_items ADD COLUMN IF NOT EXISTS line_total NUMERIC(15, 2)
+  GENERATED ALWAYS AS (
+    quantity * CASE
+      WHEN raw_cost IS NOT NULL THEN raw_cost * 1.03 * 1.015
+      ELSE COALESCE(unit_cost, 0)
+    END
+  ) STORED;
+
+ALTER TABLE public.purchase_order_items
+  ADD COLUMN IF NOT EXISTS raw_cost NUMERIC(15, 2) CHECK (raw_cost IS NULL OR raw_cost >= 0);
+ALTER TABLE public.purchase_order_items DROP COLUMN IF EXISTS line_total;
+ALTER TABLE public.purchase_order_items ADD COLUMN IF NOT EXISTS line_total NUMERIC(15, 2)
+  GENERATED ALWAYS AS (
+    quantity * CASE
+      WHEN raw_cost IS NOT NULL THEN raw_cost * 1.03 * 1.015
+      ELSE COALESCE(unit_cost, 0)
+    END
+  ) STORED;
 
 
 -- ============================================================
@@ -595,6 +674,15 @@ CREATE TRIGGER trg_sync_quotation_totals_from_payments
 AFTER INSERT OR UPDATE OR DELETE ON public.po_payments
 FOR EACH ROW EXECUTE FUNCTION public.fn_sync_quotation_totals_from_payments();
 
+-- Also drives the sequential approval chain: sales_manager -> executive ->
+-- owner (amount >= 3,000,000 only; below that, sales_manager is terminal).
+-- The app only ever seeds the sales_manager row at submission
+-- (lib/sales/quotations.ts, submitQuotationForApproval); this function opens
+-- each subsequent stage once the prior one is approved, so a role never sees
+-- an item in its approval queue before its turn. The chain order and 3M
+-- threshold are intentionally duplicated in lib/sales/quotations.ts
+-- (requiredApproverRolesForAmount / approvalChainForAmount / nextApproverRole)
+-- for stage-1 seeding and UI display; keep both in sync if either changes.
 CREATE OR REPLACE FUNCTION public.fn_sync_quotation_status_from_approvals()
 RETURNS TRIGGER
 LANGUAGE plpgsql
@@ -603,6 +691,8 @@ SET search_path = public
 AS $$
 DECLARE
   qid UUID;
+  v_amount NUMERIC;
+  v_next user_role_enum;
 BEGIN
   qid := COALESCE(NEW.quotation_id, OLD.quotation_id);
 
@@ -619,6 +709,35 @@ BEGIN
       AND approver_role = NEW.approver_role
       AND status = 'pending'
       AND id <> NEW.id;
+
+    -- Sequential chain: sales_manager -> executive -> owner (owner only for
+    -- amount >= 3,000,000; below that, sales_manager approval is terminal).
+    -- Open the next stage here, inside the same trigger invocation, so the
+    -- status recompute below always sees a fresh pending row for a
+    -- not-yet-complete chain instead of transiently observing "no pending
+    -- rows" and marking the quotation approved early.
+    SELECT amount INTO v_amount FROM public.quotations WHERE id = qid;
+    v_next := CASE NEW.approver_role
+      WHEN 'sales_manager' THEN
+        CASE WHEN v_amount >= 3000000 THEN 'executive'::user_role_enum ELSE NULL END
+      WHEN 'executive' THEN 'owner'::user_role_enum
+      ELSE NULL -- owner is terminal
+    END;
+
+    IF v_next IS NOT NULL
+       AND NOT EXISTS (
+         SELECT 1 FROM public.quotation_approvals
+         WHERE quotation_id = qid AND approver_role = v_next
+       ) THEN
+      INSERT INTO public.quotation_approvals (quotation_id, approver_id, approver_role, status)
+      SELECT qid, p.id, v_next, 'pending'
+      FROM public.profiles p
+      WHERE p.role = v_next AND p.department = 'executive' AND p.is_active = TRUE;
+
+      IF NOT FOUND THEN
+        RAISE EXCEPTION 'No active approver for role % on quotation %', v_next, qid;
+      END IF;
+    END IF;
   END IF;
 
   UPDATE public.quotations q
@@ -641,20 +760,14 @@ BEGIN
     ) THEN 'approved'::approval_status_enum
     ELSE 'pending'::approval_status_enum
   END,
-  approved_at = CASE
-    WHEN q.approved_at IS NOT NULL THEN q.approved_at
-    WHEN EXISTS (
-      SELECT 1 FROM public.quotation_approvals qa
-      WHERE qa.quotation_id = qid AND qa.status = 'approved'
-    )
-    AND NOT EXISTS (
-      SELECT 1 FROM public.quotation_approvals qa
-      WHERE qa.quotation_id = qid AND qa.status IN ('pending', 'rejected')
-    ) THEN NOW()
-    ELSE q.approved_at
-  END,
   updated_at = NOW()
   WHERE q.id = qid;
+  -- Note: unlike the PO version below, this does not stamp
+  -- quotations.approved_at. That column exists but has never actually been
+  -- written by this trigger in production; an approved_at CASE branch was
+  -- drafted here at some point but never deployed, so this migration keeps
+  -- schema.sql matching deployed reality rather than silently introducing
+  -- that as a side effect of the approval-chain change.
 
   RETURN COALESCE(NEW, OLD);
 END;
@@ -670,6 +783,10 @@ FOR EACH ROW EXECUTE FUNCTION public.fn_sync_quotation_status_from_approvals();
 -- app fans out one po_approvals row per approver and nothing cancelled the
 -- sibling pending rows once one of them approved — the aggregate (which
 -- requires every row to be approved/cancelled) stayed "pending" forever.
+-- Also mirrors the sequential chain-advancement behavior described above the
+-- quotation version: the app seeds only the sales_manager po_approvals row on
+-- conversion (lib/sales/purchase-orders.ts, convertQuotationToPurchaseOrder),
+-- and this function opens each subsequent stage as the prior one is approved.
 CREATE OR REPLACE FUNCTION public.fn_sync_po_status_from_approvals()
 RETURNS TRIGGER
 LANGUAGE plpgsql
@@ -678,6 +795,8 @@ SET search_path = public
 AS $$
 DECLARE
   pid UUID;
+  v_amount NUMERIC;
+  v_next user_role_enum;
 BEGIN
   pid := COALESCE(NEW.po_id, OLD.po_id);
 
@@ -694,6 +813,32 @@ BEGIN
       AND approver_role = NEW.approver_role
       AND status = 'pending'
       AND id <> NEW.id;
+
+    -- Sequential chain: sales_manager -> executive -> owner (owner only for
+    -- amount >= 3,000,000). See fn_sync_quotation_status_from_approvals for
+    -- why the next stage is opened here rather than from the app session.
+    SELECT po_amount INTO v_amount FROM public.purchase_orders WHERE id = pid;
+    v_next := CASE NEW.approver_role
+      WHEN 'sales_manager' THEN
+        CASE WHEN v_amount >= 3000000 THEN 'executive'::user_role_enum ELSE NULL END
+      WHEN 'executive' THEN 'owner'::user_role_enum
+      ELSE NULL -- owner is terminal
+    END;
+
+    IF v_next IS NOT NULL
+       AND NOT EXISTS (
+         SELECT 1 FROM public.po_approvals
+         WHERE po_id = pid AND approver_role = v_next
+       ) THEN
+      INSERT INTO public.po_approvals (po_id, approver_id, approver_role, status)
+      SELECT pid, p.id, v_next, 'pending'
+      FROM public.profiles p
+      WHERE p.role = v_next AND p.department = 'executive' AND p.is_active = TRUE;
+
+      IF NOT FOUND THEN
+        RAISE EXCEPTION 'No active approver for role % on purchase order %', v_next, pid;
+      END IF;
+    END IF;
   END IF;
 
   UPDATE public.purchase_orders p
@@ -1028,6 +1173,23 @@ CREATE POLICY "sales_quotations_executive_high_value_select"
     )
   );
 
+-- Executive tracking (migration 0021): unrestricted quotation visibility for the
+-- Executive > Quotations tab, mirroring the already-unrestricted po_executive_select
+-- on purchase_orders. Additive alongside the high-value policy above (RLS policies
+-- for a command are OR'd). quotation_items needs no matching policy -- migration 0009
+-- already delegates item visibility to "can you see the parent quotations row".
+CREATE POLICY "quotations_executive_select_all"
+  ON public.quotations FOR SELECT
+  USING (
+    EXISTS (
+      SELECT 1 FROM public.profiles p
+      WHERE p.id = auth.uid()
+        AND p.department = 'executive'
+        AND p.role IN ('owner', 'executive')
+        AND p.is_active = TRUE
+    )
+  );
+
 -- Quotation approvals
 CREATE POLICY "sales_quotation_approvals_sales_select"
   ON public.quotation_approvals FOR SELECT
@@ -1151,6 +1313,67 @@ CREATE POLICY "sales_po_payments_sales_all"
     )
   );
 
+-- Proof of payment storage (see migrations/0023_po_payments_proof_of_payment.sql).
+-- Private bucket; the anon/publishable key is the only key this project
+-- uses, so these storage.objects policies are the sole line of defense.
+-- Writes are scoped to the caller's own top-level folder
+-- (payment-proofs/<auth.uid()>/...); reads are department-wide, mirroring
+-- sales_po_payments_sales_all above.
+INSERT INTO storage.buckets (id, name, public)
+VALUES ('payment-proofs', 'payment-proofs', FALSE)
+ON CONFLICT (id) DO NOTHING;
+
+CREATE POLICY "sales_payment_proofs_insert"
+  ON storage.objects FOR INSERT
+  WITH CHECK (
+    bucket_id = 'payment-proofs'
+    AND (storage.foldername(name))[1] = auth.uid()::text
+    AND EXISTS (
+      SELECT 1 FROM public.profiles p
+      WHERE p.id = auth.uid() AND p.department = 'sales' AND p.is_active = TRUE
+    )
+  );
+
+CREATE POLICY "sales_payment_proofs_select"
+  ON storage.objects FOR SELECT
+  USING (
+    bucket_id = 'payment-proofs'
+    AND EXISTS (
+      SELECT 1 FROM public.profiles p
+      WHERE p.id = auth.uid() AND p.department = 'sales' AND p.is_active = TRUE
+    )
+  );
+
+CREATE POLICY "sales_payment_proofs_update"
+  ON storage.objects FOR UPDATE
+  USING (
+    bucket_id = 'payment-proofs'
+    AND (storage.foldername(name))[1] = auth.uid()::text
+    AND EXISTS (
+      SELECT 1 FROM public.profiles p
+      WHERE p.id = auth.uid() AND p.department = 'sales' AND p.is_active = TRUE
+    )
+  )
+  WITH CHECK (
+    bucket_id = 'payment-proofs'
+    AND (storage.foldername(name))[1] = auth.uid()::text
+    AND EXISTS (
+      SELECT 1 FROM public.profiles p
+      WHERE p.id = auth.uid() AND p.department = 'sales' AND p.is_active = TRUE
+    )
+  );
+
+CREATE POLICY "sales_payment_proofs_delete"
+  ON storage.objects FOR DELETE
+  USING (
+    bucket_id = 'payment-proofs'
+    AND (storage.foldername(name))[1] = auth.uid()::text
+    AND EXISTS (
+      SELECT 1 FROM public.profiles p
+      WHERE p.id = auth.uid() AND p.department = 'sales' AND p.is_active = TRUE
+    )
+  );
+
 
 -- ============================================================
 -- SECTION 10: NOTIFICATIONS
@@ -1164,10 +1387,12 @@ CREATE POLICY "sales_po_payments_sales_all"
 -- mirroring fn_audit_trigger()/fn_set_updated_at() above.
 --
 -- Two independent "cleared" timestamps drive two different UI signals:
---   read_at  -> bell unread count; cleared when the user clicks that notification.
---   seen_at  -> nav-tab dot;       cleared when the user visits that section's tab
---               (app-level, via markSectionSeen()), even if the notification
---               itself was never opened.
+--   read_at  -> bell unread count; cleared when the user clicks that
+--               notification, or visits that section's tab (app-level, via
+--               markSectionRead()), even if the notification itself was
+--               never opened.
+--   seen_at  -> nav-tab dot; always cleared alongside read_at (read implies
+--               seen, not the reverse) by the same markSectionRead() call.
 --
 -- Scope is strictly personal: an approver assigned via quotation_approvals/
 -- po_approvals.approver_id, or the owner of a quotation/PO

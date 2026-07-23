@@ -45,7 +45,7 @@ export default async function EngineeringDashboardPage() {
       <RealtimeRefresh tables={["quotations"]} />
       <PageHeader
         title="Engineering Dashboard"
-        description="Set the unit cost for each item on a Sales-raised request for quotation, attach a Google Drive link, then submit for executive costing approval."
+        description="Set the unit direct cost for each item on a Sales-raised request for quotation, attach a Google Drive link, then submit for executive costing approval."
       />
 
       <StatCard

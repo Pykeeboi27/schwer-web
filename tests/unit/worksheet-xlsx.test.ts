@@ -10,12 +10,42 @@ const baseData: PurchaseOrderWorksheetData = {
   quotationNumber: "QTN-2026-777",
   subject: "Supply and install fire pumps",
   poAmount: 1_250_000,
-  marginPercent: 23.5,
-  bankPercent: 5,
-  sopPercent: 2.5,
+  // Blended (record-level) amounts, used only for the REMARKS box's aggregate
+  // VAT lines -- independent of each item's own percentage below.
+  marginAmount: 100_000,
+  bankAmount: 50_000,
+  sopAmount: 20_000,
   items: [
-    { description: "Fire pump unit", quantity: 2, unitCost: 300_000, lineTotal: 600_000 },
-    { description: "Control panel", quantity: 1, unitCost: 150_000, lineTotal: 150_000 },
+    {
+      description: "Fire pump unit",
+      quantity: 2,
+      unitCost: 300_000,
+      lineTotal: 600_000,
+      // sellingAmount 660,000 (600,000 + 10% margin) is already VAT-inclusive
+      // (VAT is resolved within cost/margin), so it prints as-is on the line.
+      sellingAmount: 660_000,
+      marginAmount: 60_000,
+      bankAmount: 0,
+      sopAmount: 0,
+      marginPercentage: 10,
+      bankPercentage: null,
+      sopPercentage: null,
+    },
+    {
+      description: "Control panel",
+      quantity: 1,
+      unitCost: 150_000,
+      lineTotal: 150_000,
+      // sellingAmount 165,000 (150,000 + 10% margin) is already VAT-inclusive,
+      // printed as-is on the line.
+      sellingAmount: 165_000,
+      marginAmount: 15_000,
+      bankAmount: 0,
+      sopAmount: 0,
+      marginPercentage: 10,
+      bankPercentage: null,
+      sopPercentage: null,
+    },
   ],
   paymentTerms: "50% down, 50% on delivery",
   leadTimeDays: 45,
@@ -97,11 +127,12 @@ describe("generatePurchaseOrderWorksheetXlsx", () => {
     expect(sheet).not.toContain("<engineering>");
   });
 
-  it("sets the grand total to the sum of line costs, not the PO amount", async () => {
+  it("sets the grand total to the sum of each line's (already VAT-inclusive) selling price, not the PO amount", async () => {
     const { sheet } = await generateSheet(baseData);
     const cell = sheet.match(/<c r="R42"[^>]*>([\s\S]*?)<\/c>/);
-    expect(cell?.[1]).toContain("<v>750000</v>"); // 600000 + 150000
-    expect(cell?.[1]).not.toContain("1250000"); // not the selling amount
+    expect(cell?.[1]).toContain("<v>825000</v>"); // 660000 + 165000, nothing added on top
+    expect(cell?.[1]).not.toContain("750000"); // not the direct cost total
+    expect(cell?.[1]).not.toContain("1250000"); // not the po_amount
   });
 
   it("sets the Contract Amount to the total cost, not the selling amount", async () => {
@@ -111,34 +142,72 @@ describe("generatePurchaseOrderWorksheetXlsx", () => {
     expect(cell?.[1]).not.toContain("1250000"); // not the po_amount
   });
 
-  it("stacks margin, bank, and SOP on the bottom rows of the REMARKS box", async () => {
+  it("lists the margin percentage group (with its items) and the VAT lines on the bottom rows of the REMARKS box", async () => {
     const { sheet } = await generateSheet(baseData);
     const cell = (addr: string) =>
       sheet.match(new RegExp(`<c r="${addr}"[^>]*>([\\s\\S]*?)</c>`))?.[1] ?? "";
-    expect(cell("N50")).toContain("Margin: 23.50%");
-    expect(cell("N51")).toContain("Bank: 5.00%");
-    expect(cell("N52")).toContain("SOP: 2.50%"); // bottom-most line
+    // Both items share the same 10% margin, so there's exactly one group.
+    expect(cell("N49")).toContain("Margin 10.00%: Fire pump unit, Control panel");
+    expect(cell("N50")).toContain("Margin VAT (12%, incl.)");
+    expect(cell("N51")).toContain("Bank VAT (12%, incl.)");
+    expect(cell("N52")).toContain("SOP VAT (12%, incl.)"); // bottom-most line
   });
 
-  it("anchors a single percentage to the box's bottom line", async () => {
+  it("does NOT average differing percentages -- lists each distinct percentage with only the items that got it", async () => {
     const { sheet } = await generateSheet({
       ...baseData,
-      bankPercent: null,
-      sopPercent: null,
+      items: [
+        { ...baseData.items[0], marginPercentage: 10 },
+        { ...baseData.items[1], marginPercentage: 20 },
+      ],
+    });
+    const cell = (addr: string) =>
+      sheet.match(new RegExp(`<c r="${addr}"[^>]*>([\\s\\S]*?)</c>`))?.[1] ?? "";
+    // Two distinct groups (sorted ascending), each naming only its own item(s) --
+    // never a blended/averaged 15%.
+    expect(cell("N48")).toContain("Margin 10.00%: Fire pump unit");
+    expect(cell("N49")).toContain("Margin 20.00%: Control panel");
+    expect(sheet).not.toContain("Margin 15.00%");
+  });
+
+  it("decomposes each already-included amount into its 12% VAT piece (net = amount / 1.12)", async () => {
+    const { sheet } = await generateSheet(baseData);
+    const cell = (addr: string) =>
+      sheet.match(new RegExp(`<c r="${addr}"[^>]*>([\\s\\S]*?)</c>`))?.[1] ?? "";
+    // marginAmount 100,000 / 1.12 = 89,285.71 net -> VAT 10,714.29;
+    // bankAmount 50,000 / 1.12 = 44,642.86 net -> VAT 5,357.14;
+    // sopAmount 20,000 / 1.12 = 17,857.14 net -> VAT 2,142.86.
+    expect(cell("N50")).toContain("10,714.29");
+    expect(cell("N51")).toContain("5,357.14");
+    expect(cell("N52")).toContain("2,142.86");
+  });
+
+  it("anchors a single percentage group and its VAT to the box's bottom lines", async () => {
+    const { sheet } = await generateSheet({
+      ...baseData,
+      bankAmount: 0,
+      sopAmount: 0,
     });
     const cell = (addr: string) =>
       sheet.match(new RegExp(`<c r="${addr}"[^>]*?(?:/>|>([\\s\\S]*?)</c>)`))?.[1] ?? "";
-    expect(cell("N52")).toContain("Margin: 23.50%");
+    expect(cell("N51")).toContain("Margin 10.00%: Fire pump unit, Control panel");
+    expect(cell("N52")).toContain("Margin VAT (12%, incl.)"); // bottom-most line
     expect(cell("N50")).not.toContain("Margin");
-    expect(cell("N51")).not.toContain("Margin");
+    expect(cell("N49")).not.toContain("Margin");
   });
 
-  it("omits percentages that are not set on the PO", async () => {
+  it("omits percentage/VAT lines entirely when nothing is priced", async () => {
     const { sheet } = await generateSheet({
       ...baseData,
-      marginPercent: null,
-      bankPercent: null,
-      sopPercent: null,
+      marginAmount: 0,
+      bankAmount: 0,
+      sopAmount: 0,
+      items: baseData.items.map((item) => ({
+        ...item,
+        marginPercentage: null,
+        bankPercentage: null,
+        sopPercentage: null,
+      })),
     });
     const cell = (addr: string) =>
       sheet.match(new RegExp(`<c r="${addr}"[^>]*?(?:/>|>([\\s\\S]*?)</c>)`))?.[1] ?? "";
@@ -147,7 +216,7 @@ describe("generatePurchaseOrderWorksheetXlsx", () => {
     }
   });
 
-  it("fills item rows with description, qty, unit cost, and line total", async () => {
+  it("fills item rows with description, qty, unit cost, and the (already VAT-inclusive) selling price", async () => {
     const { sheet } = await generateSheet(baseData);
     expect(sheet.match(/<c r="D20"[^>]*>([\s\S]*?)<\/c>/)?.[1]).toContain(
       "Fire pump unit",
@@ -156,11 +225,15 @@ describe("generatePurchaseOrderWorksheetXlsx", () => {
     expect(sheet.match(/<c r="P20"[^>]*>([\s\S]*?)<\/c>/)?.[1]).toContain(
       "<v>300000</v>",
     );
+    // sellingAmount prints as-is -- nothing added on top.
     expect(sheet.match(/<c r="R20"[^>]*>([\s\S]*?)<\/c>/)?.[1]).toContain(
-      "<v>600000</v>",
+      "<v>660000</v>",
     );
     expect(sheet.match(/<c r="D21"[^>]*>([\s\S]*?)<\/c>/)?.[1]).toContain(
       "Control panel",
+    );
+    expect(sheet.match(/<c r="R21"[^>]*>([\s\S]*?)<\/c>/)?.[1]).toContain(
+      "<v>165000</v>",
     );
   });
 
@@ -170,11 +243,17 @@ describe("generatePurchaseOrderWorksheetXlsx", () => {
       quantity: 1,
       unitCost: 100,
       lineTotal: 100,
+      sellingAmount: 100,
+      marginAmount: 0,
+      bankAmount: 0,
+      sopAmount: 0,
+      marginPercentage: null,
+      bankPercentage: null,
+      sopPercentage: null,
     }));
     const { sheet } = await generateSheet({
       ...baseData,
       items: many,
-      marginPercent: null,
     });
     expect(sheet.match(/<c r="R42"[^>]*>([\s\S]*?)<\/c>/)?.[1]).toContain("<v>2500</v>");
     expect(sheet.match(/<c r="N45"[^>]*>([\s\S]*?)<\/c>/)?.[1]).toContain(

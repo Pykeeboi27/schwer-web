@@ -19,10 +19,7 @@ export function AuthShell({ children, showBackLink = true }: AuthShellProps) {
       {/* Desktop brand panel */}
       <div className="hidden flex-col justify-between bg-secondary p-10 text-secondary-foreground lg:flex xl:p-12">
         <Link href="/" className="inline-flex items-center gap-3">
-          <SchwerLogo
-            className="h-8"
-            barColor="hsl(var(--secondary-foreground))"
-          />
+          <SchwerLogo className="h-8" barColor="hsl(var(--secondary-foreground))" />
           <span className="text-sm font-semibold tracking-tight">
             Schwer Online Management
           </span>

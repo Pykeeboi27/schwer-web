@@ -34,6 +34,8 @@ export type PurchaseOrderMetricRow = {
   margin_amount: number | string | null;
   po_date: string | null;
   created_by?: string | null;
+  margin_percentage?: number | string | null;
+  recognized_amount?: number | string | null;
 };
 
 type PurchaseOrderRange = {
@@ -60,6 +62,7 @@ export const EMPTY_EXECUTIVE_PO_SUMMARY: ExecutivePoSummary = {
   poCount: 0,
   totalPoValue: 0,
   totalMarginAmount: 0,
+  totalCollectedAmount: 0,
 };
 
 export const EMPTY_EXECUTIVE_REVENUE_BREAKDOWN: ExecutiveRevenueBreakdown = {
@@ -80,6 +83,15 @@ function toNumber(value: number | string | null | undefined): number {
   }
 
   return 0;
+}
+
+function toNullableNumber(value: number | string | null | undefined): number | null {
+  if (value === null || value === undefined) {
+    return null;
+  }
+
+  const parsed = toNumber(value);
+  return Number.isFinite(parsed) ? parsed : null;
 }
 
 function getMonthFromPoDate(dateValue: string | null): number | null {
@@ -118,7 +130,9 @@ const fetchPurchaseOrderRowsCached = cache(
     const supabase = await createClient();
     const { data, error } = await supabase
       .from("purchase_orders")
-      .select("po_amount, margin_amount, po_date:approved_at, created_by")
+      .select(
+        "po_amount, margin_amount, po_date:approved_at, created_by, margin_percentage, recognized_amount",
+      )
       .eq("status", "approved")
       .gte("approved_at", startDate)
       .lte("approved_at", `${endDate}T23:59:59.999Z`);
@@ -334,6 +348,10 @@ export function buildPoSummaryFromRows(
     poCount: rows.length,
     totalPoValue: rows.reduce((sum, row) => sum + toNumber(row.po_amount), 0),
     totalMarginAmount: rows.reduce((sum, row) => sum + toNumber(row.margin_amount), 0),
+    totalCollectedAmount: rows.reduce(
+      (sum, row) => sum + toNumber(row.recognized_amount),
+      0,
+    ),
   };
 }
 
@@ -349,6 +367,11 @@ export function buildSalesPerformanceFromRows(
       ownerName: string;
       bookedRevenue: number;
       marginAmount: number;
+      // Simple (unweighted) mean of each PO's own margin_percentage: sum + count
+      // of the rows that actually had one, so POs never priced per-item don't
+      // drag the average toward zero.
+      marginPercentSum: number;
+      marginPercentCount: number;
     }
   >();
 
@@ -358,6 +381,8 @@ export function buildSalesPerformanceFromRows(
       ownerName: owner.ownerName,
       bookedRevenue: 0,
       marginAmount: 0,
+      marginPercentSum: 0,
+      marginPercentCount: 0,
     });
   }
 
@@ -372,12 +397,20 @@ export function buildSalesPerformanceFromRows(
         ownerName,
         bookedRevenue: 0,
         marginAmount: 0,
+        marginPercentSum: 0,
+        marginPercentCount: 0,
       });
     }
 
     const current = aggregateMap.get(ownerId)!;
     current.bookedRevenue += toNumber(row.po_amount);
     current.marginAmount += toNumber(row.margin_amount);
+
+    const marginPercentage = toNullableNumber(row.margin_percentage);
+    if (marginPercentage !== null) {
+      current.marginPercentSum += marginPercentage;
+      current.marginPercentCount += 1;
+    }
   }
 
   return Array.from(aggregateMap.values())
@@ -393,6 +426,10 @@ export function buildSalesPerformanceFromRows(
       ownerName: entry.ownerName,
       bookedRevenue: entry.bookedRevenue,
       marginAmount: entry.marginAmount,
+      marginPercentAverage:
+        entry.marginPercentCount > 0
+          ? Math.round((entry.marginPercentSum / entry.marginPercentCount) * 100) / 100
+          : null,
     }));
 }
 

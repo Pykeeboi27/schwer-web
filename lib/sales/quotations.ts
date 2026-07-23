@@ -1,5 +1,9 @@
 import { getCurrentProfile } from "@/lib/profile/get-current-profile";
-import { computeSalesPricing } from "@/lib/sales/pricing";
+import {
+  computeAggregatePricing,
+  computeSalesPricing,
+  repriceStoredItems,
+} from "@/lib/sales/pricing";
 import { createClient } from "@/lib/supabase/server";
 
 export type RequiredApproverRole = "sales_manager" | "owner" | "executive";
@@ -10,6 +14,13 @@ export type SalesQuotationItem = {
   quantity: number;
   unitCost: number | null;
   lineTotal: number;
+  marginPercentage: number | null;
+  marginAmount: number | null;
+  bankPercentage: number | null;
+  bankAmount: number | null;
+  sopPercentage: number | null;
+  sopAmount: number | null;
+  sellingAmount: number | null;
 };
 
 export type SalesQuotation = {
@@ -29,6 +40,7 @@ export type SalesQuotation = {
   salesPersonId: string | null;
   salesPersonName: string | null;
   pendingApprovalRoles: RequiredApproverRole[];
+  approvalStages: ApprovalStage[];
   rejectionReason: string | null;
   rejectedByName: string | null;
   createdAt: string;
@@ -41,6 +53,7 @@ export type SalesQuotation = {
   sopPercentage: number | null;
   sopAmount: number | null;
   sellingAmount: number | null;
+  hasUnequalMargins: boolean;
   paymentTerms: string | null;
   paymentTermsCustom: string | null;
   leadTimeDays: number | null;
@@ -168,12 +181,95 @@ export function determineApprovalLevel(
     : "sales_manager_only";
 }
 
-export function requiredApproverRolesForAmount(amount: number): RequiredApproverRole[] {
+/**
+ * Full approval chain for a given amount, in order. Sequential: an approver
+ * only sees the item in their queue once every prior role in this chain has
+ * approved. Mirrors the chain-advancement logic in the
+ * fn_sync_quotation_status_from_approvals / fn_sync_po_status_from_approvals
+ * Postgres triggers (schema.sql) -- keep both in sync if this changes.
+ */
+export function approvalChainForAmount(amount: number): RequiredApproverRole[] {
   if (requiresExecutiveApproval(amount)) {
-    return ["sales_manager", "owner", "executive"];
+    return ["sales_manager", "executive", "owner"];
   }
 
   return ["sales_manager"];
+}
+
+/** @deprecated Use {@link approvalChainForAmount}. Kept as an alias for existing call sites. */
+export function requiredApproverRolesForAmount(amount: number): RequiredApproverRole[] {
+  return approvalChainForAmount(amount);
+}
+
+/**
+ * The role that should be opened next after `currentRole` approves, or null
+ * if `currentRole` is terminal for this amount (chain complete).
+ */
+export function nextApproverRole(
+  currentRole: RequiredApproverRole,
+  amount: number,
+): RequiredApproverRole | null {
+  const chain = approvalChainForAmount(amount);
+  const index = chain.indexOf(currentRole);
+
+  if (index === -1 || index === chain.length - 1) {
+    return null;
+  }
+
+  return chain[index + 1];
+}
+
+/**
+ * Given the set of roles that have already approved (in any order -- e.g.
+ * legacy items approved under the old sales_manager -> owner -> executive
+ * ordering), returns the first role in the current chain order that has not
+ * yet approved, or null if the whole chain is satisfied. Used both by the
+ * one-time data migration (0022_sequential_approval_chain.sql) to determine
+ * whose turn it is, and unit-tested to keep that SQL logic's intent honest.
+ */
+export function firstUnsatisfiedRole(
+  approvedRoles: RequiredApproverRole[],
+  amount: number,
+): RequiredApproverRole | null {
+  const chain = approvalChainForAmount(amount);
+  const approved = new Set(approvedRoles);
+
+  return chain.find((role) => !approved.has(role)) ?? null;
+}
+
+export type ApprovalStageState = "approved" | "current" | "upcoming";
+
+export type ApprovalStage = {
+  role: RequiredApproverRole;
+  state: ApprovalStageState;
+};
+
+/**
+ * Reconstructs the full chain (with each stage's state) for display, since
+ * only the current stage's approval row actually exists at any given time
+ * under the sequential model -- `pendingApprovalRoles` alone can no longer
+ * show "what's still ahead". `approvals` should be every
+ * quotation_approvals/po_approvals row for the item (any status).
+ */
+export function buildApprovalStages(
+  amount: number,
+  approvals: Array<{ role: RequiredApproverRole; status: string }>,
+): ApprovalStage[] {
+  const approvedRoles = new Set(
+    approvals.filter((a) => a.status === "approved").map((a) => a.role),
+  );
+  const pendingRoles = new Set(
+    approvals.filter((a) => a.status === "pending").map((a) => a.role),
+  );
+
+  return approvalChainForAmount(amount).map((role) => ({
+    role,
+    state: approvedRoles.has(role)
+      ? "approved"
+      : pendingRoles.has(role)
+        ? "current"
+        : "upcoming",
+  }));
 }
 
 export function aggregateQuotationStatus(
@@ -345,7 +441,7 @@ export async function listSalesQuotations(): Promise<SalesQuotation[]> {
   const { data, error } = await supabase
     .from("quotations")
     .select(
-      "id, quotation_number, client_id, subject, amount, cost, google_drive_link, notes, status, prepared_by, sales_person_id, created_at, costing_approved_at, sales_margin_percent, margin_percentage, margin_amount, bank_percentage, bank_amount, sop_percentage, sop_amount, selling_amount, payment_terms, payment_terms_custom, lead_time_days, client_po_number, client_confirmed_at, converted_po_id, po_converted_at, clients:client_id(company_name), converted_po:converted_po_id(status), quotation_approvals(approver_role, status, rejection_reason, updated_at, approver:approver_id(full_name, email)), preparer:prepared_by(full_name, email), sales_person:sales_person_id(full_name, email), quotation_items(id, description, quantity, unit_cost, line_total, sort_order)",
+      "id, quotation_number, client_id, subject, amount, cost, google_drive_link, notes, status, prepared_by, sales_person_id, created_at, costing_approved_at, sales_margin_percent, margin_percentage, margin_amount, bank_percentage, bank_amount, sop_percentage, sop_amount, selling_amount, has_unequal_margins, payment_terms, payment_terms_custom, lead_time_days, client_po_number, client_confirmed_at, converted_po_id, po_converted_at, clients:client_id(company_name), converted_po:converted_po_id(status), quotation_approvals(approver_role, status, rejection_reason, updated_at, approver:approver_id(full_name, email)), preparer:prepared_by(full_name, email), sales_person:sales_person_id(full_name, email), quotation_items(id, description, quantity, unit_cost, line_total, margin_percentage, margin_amount, bank_percentage, bank_amount, sop_percentage, sop_amount, selling_amount, sort_order)",
     )
     .eq("phase", "sales")
     .order("created_at", { ascending: false });
@@ -371,6 +467,19 @@ export async function listSalesQuotations(): Promise<SalesQuotation[]> {
         .filter((role): role is RequiredApproverRole => role !== null),
     );
 
+    const approvalStages = buildApprovalStages(
+      Number(row.amount),
+      approvals
+        .map((approval) => ({
+          role: toRequiredApproverRole(approval.approver_role),
+          status: approval.status,
+        }))
+        .filter(
+          (approval): approval is { role: RequiredApproverRole; status: string } =>
+            approval.role !== null,
+        ),
+    );
+
     const rejectedApproval = approvals
       .filter((approval) => approval.status === "rejected")
       .sort(
@@ -383,7 +492,7 @@ export async function listSalesQuotations(): Promise<SalesQuotation[]> {
         : rejectedApproval.approver
       : null;
 
-    const items = (Array.isArray(row.quotation_items) ? row.quotation_items : [])
+    const storedItems = (Array.isArray(row.quotation_items) ? row.quotation_items : [])
       .slice()
       .sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0))
       .map((item) => ({
@@ -392,7 +501,32 @@ export async function listSalesQuotations(): Promise<SalesQuotation[]> {
         quantity: Number(item.quantity),
         unitCost: item.unit_cost === null ? null : Number(item.unit_cost),
         lineTotal: Number(item.line_total),
+        marginPercentage: numberOrNull(item.margin_percentage),
+        bankPercentage: numberOrNull(item.bank_percentage),
+        sopPercentage: numberOrNull(item.sop_percentage),
       }));
+
+    // Recomputed from stored cost + percentages rather than trusting the
+    // persisted *_amount columns -- see repriceStoredItems for why (amounts
+    // saved under an older pricing formula never get corrected in place).
+    // This also drives the displayed headline `amount` below so the
+    // breakdown always foots to the total; the stored `row.amount` used for
+    // approvalStages above is left alone since that reflects the amount the
+    // approval chain actually ran against historically.
+    const repriced = repriceStoredItems(
+      storedItems.map((item) => ({
+        directCost: item.lineTotal,
+        quantity: item.quantity,
+        marginPercentage: item.marginPercentage,
+        bankPercentage: item.bankPercentage,
+        sopPercentage: item.sopPercentage,
+      })),
+    );
+
+    const items = storedItems.map((item, index) => ({
+      ...item,
+      ...repriced.items[index],
+    }));
 
     return {
       id: row.id,
@@ -400,7 +534,7 @@ export async function listSalesQuotations(): Promise<SalesQuotation[]> {
       clientId: row.client_id,
       clientName: client?.company_name ?? "Unknown client",
       subject: row.subject,
-      amount: Number(row.amount),
+      amount: repriced.aggregate ? repriced.aggregate.sellingAmount : Number(row.amount),
       cost: row.cost === null ? null : Number(row.cost),
       items,
       googleDriveLink: row.google_drive_link,
@@ -411,6 +545,7 @@ export async function listSalesQuotations(): Promise<SalesQuotation[]> {
       salesPersonId: row.sales_person_id ?? null,
       salesPersonName: resolveDisplayName(salesPerson),
       pendingApprovalRoles,
+      approvalStages,
       rejectionReason: rejectedApproval?.rejection_reason ?? null,
       rejectedByName: resolveDisplayName(rejectedByProfile),
       createdAt: row.created_at,
@@ -420,12 +555,21 @@ export async function listSalesQuotations(): Promise<SalesQuotation[]> {
           ? null
           : Number(row.sales_margin_percent),
       marginPercentage: numberOrNull(row.margin_percentage),
-      marginAmount: numberOrNull(row.margin_amount),
+      marginAmount: repriced.aggregate
+        ? repriced.aggregate.marginAmount
+        : numberOrNull(row.margin_amount),
       bankPercentage: numberOrNull(row.bank_percentage),
-      bankAmount: numberOrNull(row.bank_amount),
+      bankAmount: repriced.aggregate
+        ? repriced.aggregate.bankAmount
+        : numberOrNull(row.bank_amount),
       sopPercentage: numberOrNull(row.sop_percentage),
-      sopAmount: numberOrNull(row.sop_amount),
-      sellingAmount: numberOrNull(row.selling_amount),
+      sopAmount: repriced.aggregate
+        ? repriced.aggregate.sopAmount
+        : numberOrNull(row.sop_amount),
+      sellingAmount: repriced.aggregate
+        ? repriced.aggregate.sellingAmount
+        : numberOrNull(row.selling_amount),
+      hasUnequalMargins: Boolean(row.has_unequal_margins),
       paymentTerms: row.payment_terms ?? null,
       paymentTermsCustom: row.payment_terms_custom ?? null,
       leadTimeDays:
@@ -446,11 +590,17 @@ export async function listSalesQuotations(): Promise<SalesQuotation[]> {
   });
 }
 
-export async function updateSalesQuotationDetails(input: {
-  quotationId: string;
+export type SalesQuotationItemPricingInput = {
+  id: string;
   marginPercentage: number | null;
   bankPercentage: number | null;
   sopPercentage: number | null;
+};
+
+export async function updateSalesQuotationDetails(input: {
+  quotationId: string;
+  hasUnequalMargins: boolean;
+  items: SalesQuotationItemPricingInput[];
   googleDriveLink: string | null;
   paymentTerms: string | null;
   paymentTermsCustom: string | null;
@@ -466,7 +616,9 @@ export async function updateSalesQuotationDetails(input: {
 
   const { data: quotationRow, error: quotationError } = await supabase
     .from("quotations")
-    .select("id, status, phase, cost, client_confirmed_at, converted_po_id")
+    .select(
+      "id, status, phase, client_confirmed_at, converted_po_id, quotation_items(id, line_total, quantity)",
+    )
     .eq("id", input.quotationId)
     .single();
 
@@ -493,28 +645,93 @@ export async function updateSalesQuotationDetails(input: {
     );
   }
 
-  const directCost = Number(quotationRow.cost ?? 0);
-  const pricing = computeSalesPricing({
-    directCost,
-    marginPercentage: input.marginPercentage ?? 0,
-    bankPercentage: input.bankPercentage ?? 0,
-    sopPercentage: input.sopPercentage ?? 0,
+  const itemRows = Array.isArray(quotationRow.quotation_items)
+    ? quotationRow.quotation_items
+    : [];
+  // Direct cost per item is read fresh from the DB rather than trusted from
+  // the client, same as the aggregate `cost` was read before this change.
+  // Quantity comes along so computeSalesPricing can recover the per-unit
+  // price it rounds against.
+  const lineTotalById = new Map(
+    itemRows.map((item) => [item.id, Number(item.line_total)]),
+  );
+  const quantityById = new Map(itemRows.map((item) => [item.id, Number(item.quantity)]));
+
+  if (input.items.length === 0 || input.items.length !== itemRows.length) {
+    throw new Error("Every line item on this quotation needs pricing.");
+  }
+
+  const pricedItems = input.items.map((item) => {
+    const directCost = lineTotalById.get(item.id);
+    if (directCost === undefined) {
+      throw new Error("One of the priced items does not belong to this quotation.");
+    }
+
+    const pricing = computeSalesPricing({
+      directCost,
+      quantity: quantityById.get(item.id),
+      marginPercentage: item.marginPercentage ?? 0,
+      bankPercentage: item.bankPercentage ?? 0,
+      sopPercentage: item.sopPercentage ?? 0,
+    });
+
+    return {
+      id: item.id,
+      directCost,
+      marginPercentage: item.marginPercentage,
+      bankPercentage: item.bankPercentage,
+      sopPercentage: item.sopPercentage,
+      ...pricing,
+    };
   });
+
+  // Sequential, not Promise.all: every quotation_items write fires
+  // trg_sync_quotation_cost_from_items, which UPDATEs the shared parent
+  // quotations row (see the identical rationale in
+  // lib/engineering/costing-quotations.ts setQuotationItemCosts).
+  for (const item of pricedItems) {
+    const { error: itemError } = await supabase
+      .from("quotation_items")
+      .update({
+        margin_percentage: item.marginPercentage,
+        margin_amount: item.marginAmount,
+        bank_percentage: item.bankPercentage,
+        bank_amount: item.bankAmount,
+        sop_percentage: item.sopPercentage,
+        sop_amount: item.sopAmount,
+        selling_amount: item.sellingAmount,
+      })
+      .eq("id", item.id)
+      .eq("quotation_id", input.quotationId);
+
+    if (itemError) {
+      throw new Error(itemError.message || "Failed to update an item's pricing.");
+    }
+  }
+
+  // Blended weighted-average percentages + summed amounts, written back to
+  // the record-level columns so every existing reader (executive dashboard,
+  // worksheet exports, the >=3M approval threshold via `amount`) keeps
+  // working unchanged. VAT is already resolved within cost and the margin
+  // gross-up (see computeSalesPricing) -- `amount` is just the aggregate
+  // sellingAmount, not sellingAmount plus additional VAT.
+  const aggregate = computeAggregatePricing(pricedItems);
 
   const { error: updateError } = await supabase
     .from("quotations")
     .update({
       // Keep the legacy sales_margin_percent in sync so existing approval
       // checks and displays continue to work.
-      sales_margin_percent: input.marginPercentage,
-      margin_percentage: input.marginPercentage,
-      margin_amount: pricing.marginAmount,
-      bank_percentage: input.bankPercentage,
-      bank_amount: pricing.bankAmount,
-      sop_percentage: input.sopPercentage,
-      sop_amount: pricing.sopAmount,
-      selling_amount: pricing.sellingAmount,
-      amount: pricing.sellingAmount,
+      sales_margin_percent: aggregate.marginPercentage,
+      margin_percentage: aggregate.marginPercentage,
+      margin_amount: aggregate.marginAmount,
+      bank_percentage: aggregate.bankPercentage,
+      bank_amount: aggregate.bankAmount,
+      sop_percentage: aggregate.sopPercentage,
+      sop_amount: aggregate.sopAmount,
+      selling_amount: aggregate.sellingAmount,
+      amount: aggregate.sellingAmount,
+      has_unequal_margins: input.hasUnequalMargins,
       google_drive_link: input.googleDriveLink,
       payment_terms: input.paymentTerms,
       payment_terms_custom: input.paymentTermsCustom,
@@ -598,27 +815,23 @@ export async function submitQuotationForApproval(quotationId: string): Promise<v
 
   assertQuotationReadyForApproval(quotation);
 
-  const roles = requiredApproverRolesForAmount(Number(quotation.amount));
-  const approversByRole = await Promise.all(
-    roles.map((role) => findApproversForRole(role)),
-  );
+  // Sequential chain: only the first stage is seeded here. Approving it
+  // opens the next stage (fn_sync_quotation_status_from_approvals in
+  // schema.sql), so a role never sees this quotation in its approval queue
+  // before its turn.
+  const [firstRole] = approvalChainForAmount(Number(quotation.amount));
+  const firstStageApprovers = await findApproversForRole(firstRole);
   const rows: Array<{
     quotation_id: string;
     approver_id: string;
     approver_role: RequiredApproverRole;
     status: "pending";
-  }> = [];
-
-  roles.forEach((role, index) => {
-    for (const approver of approversByRole[index]) {
-      rows.push({
-        quotation_id: quotationId,
-        approver_id: approver.id,
-        approver_role: role,
-        status: "pending",
-      });
-    }
-  });
+  }> = firstStageApprovers.map((approver) => ({
+    quotation_id: quotationId,
+    approver_id: approver.id,
+    approver_role: firstRole,
+    status: "pending",
+  }));
 
   const { error: insertError } = await supabase.from("quotation_approvals").insert(rows);
   if (insertError) {
@@ -797,30 +1010,23 @@ export async function resubmitQuotationForApproval(quotationId: string): Promise
     throw new Error(updateError.message || "Failed to resubmit quotation.");
   }
 
-  // Clear previous approval rows and create a fresh cycle.
+  // Clear previous approval rows and restart the sequential chain at stage
+  // one; approving it opens the next stage (see submitQuotationForApproval).
   await supabase.from("quotation_approvals").delete().eq("quotation_id", quotationId);
 
-  const roles = requiredApproverRolesForAmount(Number(row.amount));
-  const approversByRole = await Promise.all(
-    roles.map((role) => findApproversForRole(role)),
-  );
+  const [firstRole] = approvalChainForAmount(Number(row.amount));
+  const firstStageApprovers = await findApproversForRole(firstRole);
   const rows: Array<{
     quotation_id: string;
     approver_id: string;
     approver_role: RequiredApproverRole;
     status: "pending";
-  }> = [];
-
-  roles.forEach((role, index) => {
-    for (const approver of approversByRole[index]) {
-      rows.push({
-        quotation_id: quotationId,
-        approver_id: approver.id,
-        approver_role: role,
-        status: "pending",
-      });
-    }
-  });
+  }> = firstStageApprovers.map((approver) => ({
+    quotation_id: quotationId,
+    approver_id: approver.id,
+    approver_role: firstRole,
+    status: "pending",
+  }));
 
   if (rows.length > 0) {
     const { error: insertError } = await supabase

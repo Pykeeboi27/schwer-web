@@ -230,6 +230,7 @@ export async function addPoPaymentAction(formData: FormData): Promise<SalesActio
     const paymentMethod = String(formData.get("paymentMethod") ?? "").trim() || null;
     const referenceNumber = String(formData.get("referenceNumber") ?? "").trim() || null;
     const notes = String(formData.get("notes") ?? "").trim() || null;
+    const proofPath = getRequiredString(formData, "proofPath");
 
     await addPoPayment({
       purchaseOrderId,
@@ -238,6 +239,7 @@ export async function addPoPaymentAction(formData: FormData): Promise<SalesActio
       paymentMethod,
       referenceNumber,
       notes,
+      proofPath,
     });
 
     return { ok: true, error: null };

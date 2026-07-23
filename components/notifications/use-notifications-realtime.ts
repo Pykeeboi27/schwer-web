@@ -45,6 +45,7 @@ export function useNotificationsRealtime(
 
     const supabase = createClient();
     const timeoutRef = { current: null as ReturnType<typeof setTimeout> | null };
+    const hasSubscribedRef = { current: false };
 
     const scheduleRefresh = () => {
       if (timeoutRef.current) clearTimeout(timeoutRef.current);
@@ -68,7 +69,31 @@ export function useNotificationsRealtime(
           scheduleRefresh();
         },
       )
-      .subscribe();
+      .subscribe((status, err) => {
+        // This channel has no visible UI of its own (unlike a failed data
+        // fetch, which renders an error state) -- a silently failed
+        // subscription here means notifications never arrive live with no
+        // other symptom, so surface every non-happy status loudly.
+        //
+        // The underlying client auto-rejoins on a backoff timer whenever the
+        // socket is still connected, so a blip on a channel that already
+        // subscribed once (e.g. the Realtime tenant cold-starting after
+        // being idle) is expected and self-heals -- only the initial join
+        // failing points to a real config/RLS problem.
+        if (status === "SUBSCRIBED") {
+          hasSubscribedRef.current = true;
+        } else if (status === "CHANNEL_ERROR" || status === "TIMED_OUT") {
+          if (hasSubscribedRef.current) {
+            console.warn(`Notifications realtime channel ${status}, reconnecting:`, err);
+          } else {
+            console.error(`Notifications realtime channel ${status}:`, err);
+          }
+        } else if (status === "CLOSED") {
+          console.warn("Notifications realtime channel closed unexpectedly");
+        } else {
+          console.info(`Notifications realtime channel: ${status}`);
+        }
+      });
 
     return () => {
       if (timeoutRef.current) clearTimeout(timeoutRef.current);

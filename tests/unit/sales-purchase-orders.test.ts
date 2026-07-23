@@ -173,6 +173,89 @@ describe("listPurchaseOrders", () => {
     expect(po.rejectionReason).toBeNull();
     expect(po.rejectedByName).toBeNull();
   });
+
+  it("recomputes item and record amounts from stored cost/percentages instead of trusting stale stored amounts", async () => {
+    // Same stale-formula scenario as the quotations test: this row's
+    // margin/bank/sop_amount were persisted under the pre-1119d85 flat
+    // formula. listPurchaseOrders must recompute, not echo, sop_amount.
+    mockClient = createSupabaseMock({
+      tables: {
+        purchase_orders: {
+          data: [
+            {
+              ...baseRow,
+              margin_amount: "85500",
+              bank_amount: "14250",
+              sop_amount: "14250",
+              selling_amount: "399000",
+              purchase_order_items: [
+                {
+                  id: "i1",
+                  description: "Panel",
+                  quantity: "1",
+                  unit_cost: "285000",
+                  line_total: "285000",
+                  sort_order: 1,
+                  margin_percentage: "30",
+                  margin_amount: "85500",
+                  bank_percentage: "5",
+                  bank_amount: "14250",
+                  sop_percentage: "5",
+                  sop_amount: "14250",
+                  selling_amount: "399000",
+                },
+              ],
+            },
+          ],
+          error: null,
+        },
+      },
+    });
+
+    const [po] = await listPurchaseOrders();
+
+    expect(po.items[0].sopAmount).toBeCloseTo(21375, 2);
+    expect(po.sopAmount).toBeCloseTo(21375, 2);
+    expect(po.poAmount).toBeCloseTo(po.items[0].sellingAmount!, 2);
+  });
+
+  it("falls back to stored record amounts when no item is priced", async () => {
+    mockClient = createSupabaseMock({
+      tables: {
+        purchase_orders: {
+          data: [
+            {
+              ...baseRow,
+              purchase_order_items: [
+                {
+                  id: "i1",
+                  description: "Unpriced legacy item",
+                  quantity: "1",
+                  unit_cost: "285000",
+                  line_total: "285000",
+                  sort_order: 1,
+                  margin_percentage: null,
+                  margin_amount: null,
+                  bank_percentage: null,
+                  bank_amount: null,
+                  sop_percentage: null,
+                  sop_amount: null,
+                  selling_amount: null,
+                },
+              ],
+            },
+          ],
+          error: null,
+        },
+      },
+    });
+
+    const [po] = await listPurchaseOrders();
+
+    expect(po.items[0].sopAmount).toBeNull();
+    expect(po.marginAmount).toBe(100000);
+    expect(po.poAmount).toBe(1500000);
+  });
 });
 
 describe("listPendingPoApprovalsForCurrentUser", () => {
@@ -270,6 +353,7 @@ describe("listPoPayments", () => {
       paymentDate: "2026-02-01",
       paymentMethod: "bank",
       referenceNumber: "R1",
+      proofPath: null,
     });
   });
 

@@ -6,6 +6,7 @@ import { MarkAllReadButton } from "@/components/notifications/mark-all-read-butt
 import { NotificationItem } from "@/components/notifications/notification-item";
 import { getCurrentProfile } from "@/lib/profile/get-current-profile";
 import { listNotifications } from "@/lib/notifications/queries";
+import { groupNotifications } from "@/lib/notifications/group";
 
 const PAGE_SIZE = 20;
 
@@ -13,7 +14,9 @@ type NotificationsPageProps = {
   searchParams?: Promise<{ page?: string }>;
 };
 
-export default async function NotificationsPage({ searchParams }: NotificationsPageProps) {
+export default async function NotificationsPage({
+  searchParams,
+}: NotificationsPageProps) {
   const profile = await getCurrentProfile();
 
   if (!profile) {
@@ -23,7 +26,11 @@ export default async function NotificationsPage({ searchParams }: NotificationsP
   const resolvedSearchParams = searchParams ? await searchParams : undefined;
   const page = Math.max(1, Number(resolvedSearchParams?.page ?? "1") || 1);
 
-  const { items, total, hasMore } = await listNotifications({ page, pageSize: PAGE_SIZE });
+  const { items, total, hasMore } = await listNotifications({
+    page,
+    pageSize: PAGE_SIZE,
+  });
+  const groupedItems = groupNotifications(items);
 
   return (
     <div className="flex flex-col gap-6">
@@ -38,7 +45,7 @@ export default async function NotificationsPage({ searchParams }: NotificationsP
           <p className="text-sm text-muted-foreground">You have no notifications yet.</p>
         ) : (
           <div className="flex flex-col divide-y">
-            {items.map((notification) => (
+            {groupedItems.map((notification) => (
               <NotificationItem key={notification.id} notification={notification} />
             ))}
           </div>

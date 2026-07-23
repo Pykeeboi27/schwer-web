@@ -63,11 +63,12 @@ describe("getExecutiveKpiSummary", () => {
 });
 
 describe("getExecutivePoSummary", () => {
-  it("counts POs and sums value and margin", async () => {
+  it("counts POs and sums value, margin, and collected amounts", async () => {
     await expect(getExecutivePoSummary("ytd", { referenceDate })).resolves.toEqual({
       poCount: 2,
       totalPoValue: 300,
       totalMarginAmount: 50,
+      totalCollectedAmount: 0,
     });
   });
 });

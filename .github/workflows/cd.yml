@@ -1,0 +1,48 @@
+name: CD
+
+on:
+  workflow_run:
+    workflows: ["TypeScript CI"]
+    types:
+      - completed
+    branches:
+      - main
+      - dev
+
+jobs:
+  deploy:
+    name: Deploy to Vercel
+    if: github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'push'
+    runs-on: ubuntu-latest
+    env:
+      VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+      VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+      VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+
+      - name: Install Vercel CLI
+        run: npm install -g vercel@latest
+
+      - name: Set deploy target
+        id: target
+        run: |
+          if [ "${{ github.event.workflow_run.head_branch }}" = "main" ]; then
+            echo "environment=production" >> "$GITHUB_OUTPUT"
+            echo "prod_flag=--prod" >> "$GITHUB_OUTPUT"
+          else
+            echo "environment=preview" >> "$GITHUB_OUTPUT"
+            echo "prod_flag=" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Pull Vercel environment
+        run: vercel pull --yes --environment=${{ steps.target.outputs.environment }} --token=$VERCEL_TOKEN
+
+      - name: Build project artifacts
+        run: vercel build ${{ steps.target.outputs.prod_flag }} --token=$VERCEL_TOKEN
+
+      - name: Deploy prebuilt artifacts
+        run: vercel deploy --prebuilt ${{ steps.target.outputs.prod_flag }} --token=$VERCEL_TOKEN

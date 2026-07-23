@@ -13,6 +13,7 @@ import {
   updatePurchaseOrderDetails,
   type SalesPurchaseOrder,
 } from "@/lib/sales/purchase-orders";
+import { createProofOfPaymentSignedUrl } from "@/lib/sales/proof-of-payment-server";
 import { parseLeadTimeDays, parsePercentInput } from "@/lib/sales/quotations";
 import { revalidatePath } from "next/cache";
 
@@ -46,13 +47,21 @@ function normalizeRole(role: string | undefined): RequiredApproverRole | null {
 export async function recordCollectionAction(
   purchaseOrderId: string,
   amount: number,
+  proofPath: string,
 ): Promise<ActionResponse<{ poId: string }>> {
   const normalizedPoId = String(purchaseOrderId ?? "").trim();
+  const normalizedProofPath = String(proofPath ?? "").trim();
 
   if (!normalizedPoId) {
     return {
       success: false,
       error: "Purchase order id is required.",
+    };
+  }
+  if (!normalizedProofPath) {
+    return {
+      success: false,
+      error: "Proof of payment is required.",
     };
   }
 
@@ -62,6 +71,7 @@ export async function recordCollectionAction(
     await addPoPayment({
       purchaseOrderId: normalizedPoId,
       amountCollected: normalizedAmount,
+      proofPath: normalizedProofPath,
     });
 
     revalidatePath("/protected/sales/purchase-orders");
@@ -82,9 +92,11 @@ export async function updateCollectionAction(
   paymentId: string,
   purchaseOrderId: string,
   amount: number,
+  proofPath?: string,
 ): Promise<ActionResponse<{ poId: string }>> {
   const normalizedPaymentId = String(paymentId ?? "").trim();
   const normalizedPoId = String(purchaseOrderId ?? "").trim();
+  const normalizedProofPath = String(proofPath ?? "").trim();
 
   if (!normalizedPaymentId) {
     return { success: false, error: "Collection id is required." };
@@ -100,6 +112,7 @@ export async function updateCollectionAction(
       paymentId: normalizedPaymentId,
       purchaseOrderId: normalizedPoId,
       amountCollected: normalizedAmount,
+      ...(normalizedProofPath ? { proofPath: normalizedProofPath } : {}),
     });
 
     revalidatePath("/protected/sales/purchase-orders");
@@ -109,6 +122,26 @@ export async function updateCollectionAction(
     return {
       success: false,
       error: error instanceof Error ? error.message : "Failed to update collection.",
+    };
+  }
+}
+
+/** Mints a short-lived signed URL to view a collection's proof-of-payment image. */
+export async function createProofOfPaymentSignedUrlAction(
+  proofPath: string,
+): Promise<ActionResponse<{ url: string }>> {
+  const normalizedPath = String(proofPath ?? "").trim();
+  if (!normalizedPath) {
+    return { success: false, error: "Proof of payment path is required." };
+  }
+
+  try {
+    const url = await createProofOfPaymentSignedUrl(normalizedPath);
+    return { success: true, data: { url } };
+  } catch (error) {
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Failed to load proof of payment.",
     };
   }
 }
@@ -242,10 +275,16 @@ export async function resubmitPurchaseOrderAction(
   }
 }
 
-export type PurchaseOrderDetailsInput = {
+export type PurchaseOrderItemPricingFormInput = {
+  id: string;
   marginPercentage: string;
   bankPercentage: string;
   sopPercentage: string;
+};
+
+export type PurchaseOrderDetailsInput = {
+  hasUnequalMargins: boolean;
+  items: PurchaseOrderItemPricingFormInput[];
   paymentTerms: string;
   paymentTermsCustom: string;
   leadTimeDays: string;
@@ -254,8 +293,9 @@ export type PurchaseOrderDetailsInput = {
 };
 
 /**
- * Re-prices a rejected PO (margin/bank/sop %, lead time, payment terms) and
- * updates its references. Only permitted while the PO is `rejected`.
+ * Re-prices a rejected PO per line item (margin/bank/sop %, lead time,
+ * payment terms) and updates its references. Only permitted while the PO is
+ * `rejected`.
  */
 export async function updatePurchaseOrderDetailsAction(
   poId: string,
@@ -267,17 +307,27 @@ export async function updatePurchaseOrderDetailsAction(
   }
 
   try {
-    const rawMargin = String(input.marginPercentage ?? "").trim();
-    const marginPercentage =
-      rawMargin === "" ? null : parsePercentInput(rawMargin, "Margin percentage");
+    if (!Array.isArray(input.items) || input.items.length === 0) {
+      throw new Error("At least one priced line item is required.");
+    }
 
-    const rawBank = String(input.bankPercentage ?? "").trim();
-    const bankPercentage =
-      rawBank === "" ? null : parsePercentInput(rawBank, "Bank percentage");
+    const parsePercent = (raw: string, label: string): number | null => {
+      const normalized = String(raw ?? "").trim();
+      return normalized === "" ? null : parsePercentInput(normalized, label);
+    };
 
-    const rawSop = String(input.sopPercentage ?? "").trim();
-    const sopPercentage =
-      rawSop === "" ? null : parsePercentInput(rawSop, "SOP percentage");
+    const items = input.items.map((item) => {
+      const id = String(item.id ?? "").trim();
+      if (!id) {
+        throw new Error("Line item pricing was malformed.");
+      }
+      return {
+        id,
+        marginPercentage: parsePercent(item.marginPercentage, "Margin percentage"),
+        bankPercentage: parsePercent(item.bankPercentage, "Bank percentage"),
+        sopPercentage: parsePercent(item.sopPercentage, "SOP percentage"),
+      };
+    });
 
     const rawLeadTime = String(input.leadTimeDays ?? "").trim();
     const leadTimeDays = rawLeadTime === "" ? null : parseLeadTimeDays(rawLeadTime);
@@ -290,9 +340,8 @@ export async function updatePurchaseOrderDetailsAction(
 
     await updatePurchaseOrderDetails({
       purchaseOrderId: normalizedId,
-      marginPercentage,
-      bankPercentage,
-      sopPercentage,
+      hasUnequalMargins: Boolean(input.hasUnequalMargins),
+      items,
       paymentTerms,
       paymentTermsCustom,
       leadTimeDays,

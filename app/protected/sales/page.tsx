@@ -59,10 +59,7 @@ export default async function SalesDashboardPage() {
       </div>
 
       {myQuota ? (
-        <StatCard
-          label={`My quota — ${year}`}
-          value={formatCurrency(myQuota.achieved)}
-        >
+        <StatCard label={`My quota — ${year}`} value={formatCurrency(myQuota.achieved)}>
           <QuotaRail
             quotaAmount={myQuota.quotaAmount}
             achieved={myQuota.achieved}

@@ -169,7 +169,7 @@ export function CostingQuotationDetailsDialog({
                 <tr>
                   <th className="py-1 pr-3 font-medium">Item</th>
                   <th className="py-1 pr-3 font-medium">Qty</th>
-                  <th className="py-1 pr-3 font-medium">Unit Cost</th>
+                  <th className="py-1 pr-3 font-medium">Unit Direct Cost</th>
                   <th className="py-1 font-medium">Line Total</th>
                 </tr>
               </thead>
@@ -190,7 +190,7 @@ export function CostingQuotationDetailsDialog({
                 ))}
                 <tr className="border-t font-semibold">
                   <td className="py-1 pr-3" colSpan={3}>
-                    Total Cost
+                    Total Direct Cost
                   </td>
                   <td className="py-1">{formatCurrency(quotation.cost)}</td>
                 </tr>

@@ -1,3 +1,14 @@
+// @deprecated This single-status state machine is NOT the workflow that
+// drives the app -- the live approval engine is the quotation_approvals /
+// po_approvals join tables (see lib/sales/quotations.ts,
+// lib/sales/purchase-orders.ts, and the fn_sync_*_status_from_approvals
+// triggers in schema.sql). Nothing in app/, lib/, or components/ imports
+// determineNextQuotationStatus; only tests/unit/approval-workflow.test.ts and
+// tests/unit/quotation-approval-workflow.test.ts exercise it. It still
+// encodes the OLD sales_manager -> owner -> executive order and was
+// intentionally NOT updated to sales_manager -> executive -> owner when that
+// chain changed (migrations/0022_sequential_approval_chain.sql) -- do not
+// treat this file as a source of truth for the approval order.
 type WorkflowStatus =
   | "draft"
   | "pending_sales_manager"

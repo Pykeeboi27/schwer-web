@@ -12,6 +12,7 @@ import {
   updateSalesQuotationDetails,
   type RequiredApproverRole,
   type SalesQuotation,
+  type SalesQuotationItemPricingInput,
 } from "@/lib/sales/quotations";
 import {
   convertQuotationToPurchaseOrder,
@@ -313,23 +314,62 @@ export async function resubmitQuotationAction(
   }
 }
 
+/**
+ * Parses the per-item pricing payload sent by the quotation/PO pricing
+ * dialogs: a JSON array of `{ id, marginPercentage, bankPercentage,
+ * sopPercentage }`, each percentage either a number or null (unset).
+ */
+function parseItemPricingPayload(
+  raw: FormDataEntryValue | null,
+): SalesQuotationItemPricingInput[] {
+  const normalized = String(raw ?? "").trim();
+  if (!normalized) {
+    throw new Error("At least one priced line item is required.");
+  }
+
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(normalized);
+  } catch {
+    throw new Error("Line item pricing was malformed.");
+  }
+
+  if (!Array.isArray(parsed) || parsed.length === 0) {
+    throw new Error("At least one priced line item is required.");
+  }
+
+  return parsed.map((entry) => {
+    if (typeof entry !== "object" || entry === null || !("id" in entry)) {
+      throw new Error("Line item pricing was malformed.");
+    }
+    const record = entry as Record<string, unknown>;
+    const id = String(record.id ?? "").trim();
+    if (!id) {
+      throw new Error("Line item pricing was malformed.");
+    }
+
+    const parsePercent = (value: unknown, label: string): number | null =>
+      value === null || value === undefined || value === ""
+        ? null
+        : parsePercentInput(value, label);
+
+    return {
+      id,
+      marginPercentage: parsePercent(record.marginPercentage, "Margin percentage"),
+      bankPercentage: parsePercent(record.bankPercentage, "Bank percentage"),
+      sopPercentage: parsePercent(record.sopPercentage, "SOP percentage"),
+    };
+  });
+}
+
 export async function updateSalesQuotationDetailsAction(
   formData: FormData,
 ): Promise<ActionResponse<{ quotationId: string }>> {
   try {
     const quotationId = asRequiredString(formData.get("quotationId"), "Quotation");
 
-    const rawMargin = String(formData.get("marginPercentage") ?? "").trim();
-    const marginPercentage =
-      rawMargin === "" ? null : parsePercentInput(rawMargin, "Margin percentage");
-
-    const rawBank = String(formData.get("bankPercentage") ?? "").trim();
-    const bankPercentage =
-      rawBank === "" ? null : parsePercentInput(rawBank, "Bank percentage");
-
-    const rawSop = String(formData.get("sopPercentage") ?? "").trim();
-    const sopPercentage =
-      rawSop === "" ? null : parsePercentInput(rawSop, "SOP percentage");
+    const items = parseItemPricingPayload(formData.get("items"));
+    const hasUnequalMargins = String(formData.get("hasUnequalMargins") ?? "") === "true";
 
     const googleDriveLink = asOptionalString(formData.get("googleDriveLink"));
 
@@ -348,9 +388,8 @@ export async function updateSalesQuotationDetailsAction(
 
     await updateSalesQuotationDetails({
       quotationId,
-      marginPercentage,
-      bankPercentage,
-      sopPercentage,
+      hasUnequalMargins,
+      items,
       googleDriveLink,
       paymentTerms,
       paymentTermsCustom,

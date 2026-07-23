@@ -44,12 +44,16 @@ export type ExecutiveSalesPerformanceRow = {
   ownerName: string;
   bookedRevenue: number;
   marginAmount: number;
+  /** Simple (unweighted) mean of each owner's POs' own margin_percentage; null when none had one. */
+  marginPercentAverage: number | null;
 };
 
 export type ExecutivePoSummary = {
   poCount: number;
   totalPoValue: number;
   totalMarginAmount: number;
+  /** Sum of `recognized_amount` -- actual payments collected against these POs. */
+  totalCollectedAmount: number;
 };
 
 import type { SalesDashboardCharts } from "@/lib/sales/dashboard-charts";

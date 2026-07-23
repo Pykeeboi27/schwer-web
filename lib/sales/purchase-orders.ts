@@ -1,11 +1,16 @@
 import {
-  aggregateQuotationStatus,
+  approvalChainForAmount,
+  buildApprovalStages,
   findApproversForRole,
-  requiredApproverRolesForAmount,
+  type ApprovalStage,
   type RequiredApproverRole,
 } from "@/lib/sales/quotations";
 import { getCurrentProfile } from "@/lib/profile/get-current-profile";
-import { computeSalesPricing } from "@/lib/sales/pricing";
+import {
+  computeAggregatePricing,
+  computeSalesPricing,
+  repriceStoredItems,
+} from "@/lib/sales/pricing";
 import { createClient } from "@/lib/supabase/server";
 import { validatePoTotalAmount } from "@/lib/utils/form-validation";
 
@@ -18,6 +23,13 @@ export type SalesPurchaseOrderItem = {
   quantity: number;
   unitCost: number | null;
   lineTotal: number;
+  marginPercentage: number | null;
+  marginAmount: number | null;
+  bankPercentage: number | null;
+  bankAmount: number | null;
+  sopPercentage: number | null;
+  sopAmount: number | null;
+  sellingAmount: number | null;
 };
 
 export type SalesPurchaseOrder = {
@@ -39,6 +51,7 @@ export type SalesPurchaseOrder = {
   sopPercentage: number | null;
   sopAmount: number | null;
   sellingAmount: number | null;
+  hasUnequalMargins: boolean;
   recognizedAmount: number;
   paymentStatus: "unpaid" | "partial" | "paid" | "overdue";
   paymentTerms: string | null;
@@ -47,6 +60,7 @@ export type SalesPurchaseOrder = {
   salesMarginPercent: number | null;
   status: PurchaseOrderStatus;
   pendingApprovalRoles: RequiredApproverRole[];
+  approvalStages: ApprovalStage[];
   rejectionReason: string | null;
   rejectedByName: string | null;
   approvedAt: string | null;
@@ -64,6 +78,8 @@ export type SalesPoPayment = {
   paymentDate: string;
   paymentMethod: string | null;
   referenceNumber: string | null;
+  /** Storage path of the proof-of-payment image, or null for legacy rows. */
+  proofPath: string | null;
 };
 
 export type PendingPoApprovalItem = {
@@ -170,7 +186,7 @@ export async function listPurchaseOrders(): Promise<SalesPurchaseOrder[]> {
   const { data, error } = await supabase
     .from("purchase_orders")
     .select(
-      "id, quotation_id, po_number, client_po_number, quotation_reference, client_id, subject, po_amount, cost, margin_percentage, margin_amount, bank_percentage, bank_amount, sop_percentage, sop_amount, selling_amount, recognized_amount, payment_status, payment_terms, payment_terms_custom, lead_time_days, status, approved_at, created_at, created_by, clients:client_id(company_name), po_approvals(approver_role, status, rejection_reason, updated_at, approver:approver_id(full_name, email)), creator:created_by(full_name, email), purchase_order_items(id, description, quantity, unit_cost, line_total, sort_order)",
+      "id, quotation_id, po_number, client_po_number, quotation_reference, client_id, subject, po_amount, cost, margin_percentage, margin_amount, bank_percentage, bank_amount, sop_percentage, sop_amount, selling_amount, has_unequal_margins, recognized_amount, payment_status, payment_terms, payment_terms_custom, lead_time_days, status, approved_at, created_at, created_by, clients:client_id(company_name), po_approvals(approver_role, status, rejection_reason, updated_at, approver:approver_id(full_name, email)), creator:created_by(full_name, email), purchase_order_items(id, description, quantity, unit_cost, line_total, margin_percentage, margin_amount, bank_percentage, bank_amount, sop_percentage, sop_amount, selling_amount, sort_order)",
     )
     .order("created_at", { ascending: false });
 
@@ -191,6 +207,15 @@ export async function listPurchaseOrders(): Promise<SalesPurchaseOrder[]> {
       ),
     );
 
+    const approvalStages = buildApprovalStages(
+      Number(row.po_amount),
+      approvals
+        .map((a) => ({ role: toRequiredApproverRole(a.approver_role), status: a.status }))
+        .filter(
+          (a): a is { role: RequiredApproverRole; status: string } => a.role !== null,
+        ),
+    );
+
     const rejectedApproval = approvals
       .filter((a) => a.status === "rejected")
       .sort(
@@ -203,7 +228,7 @@ export async function listPurchaseOrders(): Promise<SalesPurchaseOrder[]> {
         : rejectedApproval.approver
       : null;
 
-    const items = (
+    const storedItems = (
       Array.isArray(row.purchase_order_items) ? row.purchase_order_items : []
     )
       .slice()
@@ -214,7 +239,30 @@ export async function listPurchaseOrders(): Promise<SalesPurchaseOrder[]> {
         quantity: Number(item.quantity),
         unitCost: item.unit_cost === null ? null : Number(item.unit_cost),
         lineTotal: Number(item.line_total),
+        marginPercentage: numberOrNull(item.margin_percentage),
+        bankPercentage: numberOrNull(item.bank_percentage),
+        sopPercentage: numberOrNull(item.sop_percentage),
       }));
+
+    // Recomputed from stored cost + percentages rather than trusting the
+    // persisted *_amount columns -- see repriceStoredItems for why. This also
+    // drives the displayed headline poAmount below; the stored row.po_amount
+    // used for approvalStages above is left alone since that reflects the
+    // amount the approval chain actually ran against historically.
+    const repriced = repriceStoredItems(
+      storedItems.map((item) => ({
+        directCost: item.lineTotal,
+        quantity: item.quantity,
+        marginPercentage: item.marginPercentage,
+        bankPercentage: item.bankPercentage,
+        sopPercentage: item.sopPercentage,
+      })),
+    );
+
+    const items = storedItems.map((item, index) => ({
+      ...item,
+      ...repriced.items[index],
+    }));
 
     return {
       id: row.id,
@@ -226,16 +274,27 @@ export async function listPurchaseOrders(): Promise<SalesPurchaseOrder[]> {
       clientId: row.client_id,
       clientName: client?.company_name ?? "Unknown client",
       subject: row.subject,
-      poAmount: Number(row.po_amount),
+      poAmount: repriced.aggregate
+        ? repriced.aggregate.sellingAmount
+        : Number(row.po_amount),
       cost: numberOrNull(row.cost),
       items,
       marginPercentage: numberOrNull(row.margin_percentage),
-      marginAmount: numberOrNull(row.margin_amount),
+      marginAmount: repriced.aggregate
+        ? repriced.aggregate.marginAmount
+        : numberOrNull(row.margin_amount),
       bankPercentage: numberOrNull(row.bank_percentage),
-      bankAmount: numberOrNull(row.bank_amount),
+      bankAmount: repriced.aggregate
+        ? repriced.aggregate.bankAmount
+        : numberOrNull(row.bank_amount),
       sopPercentage: numberOrNull(row.sop_percentage),
-      sopAmount: numberOrNull(row.sop_amount),
-      sellingAmount: numberOrNull(row.selling_amount),
+      sopAmount: repriced.aggregate
+        ? repriced.aggregate.sopAmount
+        : numberOrNull(row.sop_amount),
+      sellingAmount: repriced.aggregate
+        ? repriced.aggregate.sellingAmount
+        : numberOrNull(row.selling_amount),
+      hasUnequalMargins: Boolean(row.has_unequal_margins),
       recognizedAmount: Number(row.recognized_amount ?? 0),
       paymentStatus: row.payment_status ?? "unpaid",
       paymentTerms: row.payment_terms ?? null,
@@ -244,6 +303,7 @@ export async function listPurchaseOrders(): Promise<SalesPurchaseOrder[]> {
       salesMarginPercent: numberOrNull(row.margin_percentage),
       status: (row.status ?? "pending") as PurchaseOrderStatus,
       pendingApprovalRoles,
+      approvalStages,
       rejectionReason: rejectedApproval?.rejection_reason ?? null,
       rejectedByName: resolveDisplayName(rejectedByProfile),
       approvedAt: row.approved_at ?? null,
@@ -314,7 +374,7 @@ export async function convertQuotationToPurchaseOrder(
   const { data: q, error: qError } = await supabase
     .from("quotations")
     .select(
-      "id, status, phase, client_id, sector, subject, amount, cost, margin_percentage, margin_amount, bank_percentage, bank_amount, sop_percentage, sop_amount, selling_amount, payment_terms, payment_terms_custom, lead_time_days, client_po_number, client_confirmed_at, converted_po_id, quotation_items(description, quantity, unit_cost, sort_order)",
+      "id, status, phase, client_id, sector, subject, amount, cost, margin_percentage, margin_amount, bank_percentage, bank_amount, sop_percentage, sop_amount, selling_amount, has_unequal_margins, payment_terms, payment_terms_custom, lead_time_days, client_po_number, client_confirmed_at, converted_po_id, quotation_items(description, quantity, raw_cost, unit_cost, sort_order, margin_percentage, margin_amount, bank_percentage, bank_amount, sop_percentage, sop_amount, selling_amount)",
     )
     .eq("id", quotationId)
     .single();
@@ -361,6 +421,7 @@ export async function convertQuotationToPurchaseOrder(
     sop_percentage: q.sop_percentage,
     sop_amount: q.sop_amount,
     selling_amount: q.selling_amount,
+    has_unequal_margins: q.has_unequal_margins,
     payment_terms: q.payment_terms,
     payment_terms_custom: q.payment_terms_custom,
     lead_time_days: q.lead_time_days,
@@ -397,8 +458,16 @@ export async function convertQuotationToPurchaseOrder(
         purchase_order_id: po.id,
         description: item.description,
         quantity: item.quantity,
+        raw_cost: item.raw_cost,
         unit_cost: item.unit_cost,
         sort_order: item.sort_order ?? 0,
+        margin_percentage: item.margin_percentage,
+        margin_amount: item.margin_amount,
+        bank_percentage: item.bank_percentage,
+        bank_amount: item.bank_amount,
+        sop_percentage: item.sop_percentage,
+        sop_amount: item.sop_amount,
+        selling_amount: item.selling_amount,
       })),
     );
     if (itemsError) {
@@ -408,27 +477,22 @@ export async function convertQuotationToPurchaseOrder(
     }
   }
 
-  const roles = requiredApproverRolesForAmount(poAmount);
-  const approversByRole = await Promise.all(
-    roles.map((role) => findApproversForRole(role)),
-  );
+  // Sequential chain: only the first stage is seeded here. Approving it
+  // opens the next stage (fn_sync_po_status_from_approvals in schema.sql), so
+  // a role never sees this PO in its approval queue before its turn.
+  const [firstRole] = approvalChainForAmount(poAmount);
+  const firstStageApprovers = await findApproversForRole(firstRole);
   const rows: Array<{
     po_id: string;
     approver_id: string;
     approver_role: RequiredApproverRole;
     status: "pending";
-  }> = [];
-
-  roles.forEach((role, index) => {
-    for (const approver of approversByRole[index]) {
-      rows.push({
-        po_id: po.id,
-        approver_id: approver.id,
-        approver_role: role,
-        status: "pending",
-      });
-    }
-  });
+  }> = firstStageApprovers.map((approver) => ({
+    po_id: po.id,
+    approver_id: approver.id,
+    approver_role: firstRole,
+    status: "pending",
+  }));
 
   const { error: approvalError } = await supabase.from("po_approvals").insert(rows);
   if (approvalError) {
@@ -451,31 +515,6 @@ export async function convertQuotationToPurchaseOrder(
   }
 
   return { purchaseOrderId: po.id };
-}
-
-async function refreshPurchaseOrderStatus(poId: string): Promise<void> {
-  const supabase = await createClient();
-  const { data: approvals, error } = await supabase
-    .from("po_approvals")
-    .select("status")
-    .eq("po_id", poId);
-
-  if (error) {
-    throw new Error("Failed to refresh purchase order status.");
-  }
-
-  const statuses = (approvals ?? []).map(
-    (a) => a.status as "pending" | "approved" | "rejected" | "cancelled",
-  );
-  const aggregate = aggregateQuotationStatus(statuses);
-
-  await supabase
-    .from("purchase_orders")
-    .update({
-      status: aggregate,
-      approved_at: aggregate === "approved" ? new Date().toISOString() : null,
-    })
-    .eq("id", poId);
 }
 
 export async function findPendingPoApprovalForRole(input: {
@@ -574,7 +613,10 @@ export async function approvePoApproval(input: {
     throw new Error(error.message || "Failed to approve purchase order.");
   }
 
-  await refreshPurchaseOrderStatus(input.poId);
+  // Status/approved_at rollup and next-stage row creation are handled by the
+  // fn_sync_po_status_from_approvals trigger (schema.sql) in response to this
+  // update, not here -- see that trigger for why it must happen atomically
+  // with this row's status change rather than as a separate follow-up call.
 }
 
 export async function rejectPoApproval(input: {
@@ -633,30 +675,23 @@ export async function resubmitPurchaseOrderForApproval(poId: string): Promise<vo
     throw new Error(poError.message || "Failed to resubmit purchase order.");
   }
 
-  // Clear previous approval rows and create fresh ones.
+  // Clear previous approval rows and restart the sequential chain at stage
+  // one; approving it opens the next stage (see convertQuotationToPurchaseOrder).
   await supabase.from("po_approvals").delete().eq("po_id", poId);
 
-  const roles = requiredApproverRolesForAmount(Number(po.po_amount));
-  const approversByRole = await Promise.all(
-    roles.map((role) => findApproversForRole(role)),
-  );
+  const [firstRole] = approvalChainForAmount(Number(po.po_amount));
+  const firstStageApprovers = await findApproversForRole(firstRole);
   const rows: Array<{
     po_id: string;
     approver_id: string;
     approver_role: RequiredApproverRole;
     status: "pending";
-  }> = [];
-
-  roles.forEach((role, index) => {
-    for (const approver of approversByRole[index]) {
-      rows.push({
-        po_id: poId,
-        approver_id: approver.id,
-        approver_role: role,
-        status: "pending",
-      });
-    }
-  });
+  }> = firstStageApprovers.map((approver) => ({
+    po_id: poId,
+    approver_id: approver.id,
+    approver_role: firstRole,
+    status: "pending",
+  }));
 
   if (rows.length > 0) {
     const { error: approvalError } = await supabase.from("po_approvals").insert(rows);
@@ -668,16 +703,22 @@ export async function resubmitPurchaseOrderForApproval(poId: string): Promise<vo
   }
 }
 
-/**
- * Editing step for a rejected PO: re-price it (margin/bank/sop %, lead time,
- * payment terms) and update its references, ahead of resubmitting for approval.
- * Only permitted while the PO is in the `rejected` state.
- */
-export async function updatePurchaseOrderDetails(input: {
-  purchaseOrderId: string;
+export type PurchaseOrderItemPricingInput = {
+  id: string;
   marginPercentage: number | null;
   bankPercentage: number | null;
   sopPercentage: number | null;
+};
+
+/**
+ * Editing step for a rejected PO: re-price it per item (margin/bank/sop %,
+ * lead time, payment terms) and update its references, ahead of resubmitting
+ * for approval. Only permitted while the PO is in the `rejected` state.
+ */
+export async function updatePurchaseOrderDetails(input: {
+  purchaseOrderId: string;
+  hasUnequalMargins: boolean;
+  items: PurchaseOrderItemPricingInput[];
   paymentTerms: string | null;
   paymentTermsCustom: string | null;
   leadTimeDays: number | null;
@@ -688,7 +729,7 @@ export async function updatePurchaseOrderDetails(input: {
 
   const { data: po, error: poError } = await supabase
     .from("purchase_orders")
-    .select("id, status, cost")
+    .select("id, status, purchase_order_items(id, line_total, quantity)")
     .eq("id", input.purchaseOrderId)
     .single();
 
@@ -700,25 +741,84 @@ export async function updatePurchaseOrderDetails(input: {
     throw new Error("Only rejected purchase orders can be edited.");
   }
 
-  const directCost = Number(po.cost ?? 0);
-  const pricing = computeSalesPricing({
-    directCost,
-    marginPercentage: input.marginPercentage ?? 0,
-    bankPercentage: input.bankPercentage ?? 0,
-    sopPercentage: input.sopPercentage ?? 0,
+  const itemRows = Array.isArray(po.purchase_order_items) ? po.purchase_order_items : [];
+  // Direct cost per item is read fresh from the DB rather than trusted from
+  // the client. Quantity comes along so computeSalesPricing can recover the
+  // per-unit price it rounds against.
+  const lineTotalById = new Map(
+    itemRows.map((item) => [item.id, Number(item.line_total)]),
+  );
+  const quantityById = new Map(itemRows.map((item) => [item.id, Number(item.quantity)]));
+
+  if (input.items.length === 0 || input.items.length !== itemRows.length) {
+    throw new Error("Every line item on this purchase order needs pricing.");
+  }
+
+  const pricedItems = input.items.map((item) => {
+    const directCost = lineTotalById.get(item.id);
+    if (directCost === undefined) {
+      throw new Error("One of the priced items does not belong to this purchase order.");
+    }
+
+    const pricing = computeSalesPricing({
+      directCost,
+      quantity: quantityById.get(item.id),
+      marginPercentage: item.marginPercentage ?? 0,
+      bankPercentage: item.bankPercentage ?? 0,
+      sopPercentage: item.sopPercentage ?? 0,
+    });
+
+    return {
+      id: item.id,
+      directCost,
+      marginPercentage: item.marginPercentage,
+      bankPercentage: item.bankPercentage,
+      sopPercentage: item.sopPercentage,
+      ...pricing,
+    };
   });
+
+  // Sequential, matching the same rationale as
+  // lib/sales/quotations.ts updateSalesQuotationDetails.
+  for (const item of pricedItems) {
+    const { error: itemError } = await supabase
+      .from("purchase_order_items")
+      .update({
+        margin_percentage: item.marginPercentage,
+        margin_amount: item.marginAmount,
+        bank_percentage: item.bankPercentage,
+        bank_amount: item.bankAmount,
+        sop_percentage: item.sopPercentage,
+        sop_amount: item.sopAmount,
+        selling_amount: item.sellingAmount,
+      })
+      .eq("id", item.id)
+      .eq("purchase_order_id", input.purchaseOrderId);
+
+    if (itemError) {
+      throw new Error(itemError.message || "Failed to update an item's pricing.");
+    }
+  }
+
+  // Blended weighted-average percentages + summed amounts, written back to
+  // the record-level columns (same rollup as the quotation-side update). VAT
+  // is already resolved within cost and the margin gross-up (see
+  // computeSalesPricing) -- `po_amount` is just the aggregate sellingAmount,
+  // not sellingAmount plus additional VAT.
+  const aggregate = computeAggregatePricing(pricedItems);
 
   const { error: updateError } = await supabase
     .from("purchase_orders")
     .update({
-      margin_percentage: input.marginPercentage,
-      margin_amount: pricing.marginAmount,
-      bank_percentage: input.bankPercentage,
-      bank_amount: pricing.bankAmount,
-      sop_percentage: input.sopPercentage,
-      sop_amount: pricing.sopAmount,
-      selling_amount: pricing.sellingAmount,
-      po_amount: pricing.sellingAmount,
+      margin_percentage: aggregate.marginPercentage,
+      margin_amount: aggregate.marginAmount,
+      bank_percentage: aggregate.bankPercentage,
+      bank_amount: aggregate.bankAmount,
+      sop_percentage: aggregate.sopPercentage,
+      sop_amount: aggregate.sopAmount,
+      selling_amount: aggregate.sellingAmount,
+      po_amount: aggregate.sellingAmount,
+      has_unequal_margins: input.hasUnequalMargins,
       payment_terms: input.paymentTerms,
       payment_terms_custom: input.paymentTermsCustom,
       lead_time_days: input.leadTimeDays,
@@ -741,7 +841,7 @@ export async function listPoPayments(
   let query = supabase
     .from("po_payments")
     .select(
-      "id, po_id, purchase_order_id, amount_collected, payment_date, payment_method, reference_number",
+      "id, po_id, purchase_order_id, amount_collected, payment_date, payment_method, reference_number, proof_path",
     )
     .order("created_at", { ascending: false });
 
@@ -763,6 +863,7 @@ export async function listPoPayments(
     paymentDate: row.payment_date,
     paymentMethod: row.payment_method,
     referenceNumber: row.reference_number,
+    proofPath: row.proof_path ?? null,
   }));
 }
 
@@ -849,6 +950,8 @@ export async function addPoPayment(input: {
   paymentMethod?: string | null;
   referenceNumber?: string | null;
   notes?: string | null;
+  /** Storage path of the already-uploaded proof-of-payment image. */
+  proofPath: string;
 }): Promise<void> {
   const profile = await getCurrentProfile();
   if (!profile) {
@@ -876,6 +979,7 @@ export async function addPoPayment(input: {
     reference_number: input.referenceNumber ?? null,
     notes: input.notes ?? null,
     recorded_by: profile.id,
+    proof_path: input.proofPath,
   });
 
   if (error) {
@@ -885,11 +989,13 @@ export async function addPoPayment(input: {
   await recomputeAndSyncPoTotals(supabase, po.id, poAmount);
 }
 
-/** Update the amount of an existing collection record. */
+/** Update the amount (and optionally the proof photo) of an existing collection record. */
 export async function updatePoPayment(input: {
   paymentId: string;
   purchaseOrderId: string;
   amountCollected: number;
+  /** Storage path of a newly-uploaded proof image. Omitted keeps the existing proof. */
+  proofPath?: string;
 }): Promise<void> {
   const profile = await getCurrentProfile();
   if (!profile) {
@@ -922,7 +1028,10 @@ export async function updatePoPayment(input: {
 
   const { error: updateError } = await supabase
     .from("po_payments")
-    .update({ amount_collected: input.amountCollected })
+    .update({
+      amount_collected: input.amountCollected,
+      ...(input.proofPath ? { proof_path: input.proofPath } : {}),
+    })
     .eq("id", input.paymentId);
 
   if (updateError) {

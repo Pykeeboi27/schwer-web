@@ -5,24 +5,26 @@ import { useRouter } from "next/navigation";
 
 import { cn } from "@/lib/utils";
 import { formatRelativeTime } from "@/lib/notifications/links";
-import type { Notification } from "@/lib/notifications/types";
-import { markNotificationReadAction } from "@/app/protected/notifications/actions";
+import type { NotificationGroup } from "@/lib/notifications/group";
+import { markNotificationsReadAction } from "@/app/protected/notifications/actions";
 
 type NotificationItemProps = {
-  notification: Notification;
+  notification: NotificationGroup;
   /** Fired after the read-mark completes, before navigating (e.g. closes the bell dropdown). */
   onNavigate?: () => void;
 };
 
 /**
  * One notification row, shared by the bell dropdown and the full history
- * page. Clicking marks it read (bell count) and seen (nav dot), then
- * navigates to the entity's page/tab.
+ * page. Renders a single notification or a grouped one (multiple same-type
+ * events on the same entity, collapsed by groupNotifications). Clicking
+ * marks every underlying id in the group read (bell count) and seen (nav
+ * dot), then navigates to the entity's page/tab.
  */
 export function NotificationItem({ notification, onNavigate }: NotificationItemProps) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
-  const isUnread = notification.readAt === null;
+  const isUnread = notification.isUnread;
 
   const handleClick = () => {
     onNavigate?.();
@@ -30,7 +32,7 @@ export function NotificationItem({ notification, onNavigate }: NotificationItemP
 
     if (isUnread) {
       startTransition(() => {
-        void markNotificationReadAction(notification.id);
+        void markNotificationsReadAction(notification.ids);
       });
     }
   };
@@ -62,7 +64,8 @@ export function NotificationItem({ notification, onNavigate }: NotificationItemP
         </p>
       ) : null}
       <span className="text-xs text-muted-foreground">
-        {notification.actorName ? `${notification.actorName} · ` : ""}
+        {notification.actorSummary ? `${notification.actorSummary} · ` : ""}
+        {notification.count > 1 ? `${notification.count} updates · ` : ""}
         {formatRelativeTime(notification.createdAt)}
       </span>
     </button>

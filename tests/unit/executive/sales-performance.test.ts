@@ -28,6 +28,9 @@ describe("executive sales performance helpers", () => {
 
     expect(result.map((entry) => entry.ownerName)).toEqual(["Brian", "Aimee", "Cesar"]);
     expect(result[0].bookedRevenue).toBe(400);
+    // None of the fixture rows carry a margin_percentage -> average stays null (N/A),
+    // rather than silently collapsing to 0.
+    expect(result.every((entry) => entry.marginPercentAverage === null)).toBe(true);
   });
 
   it("uses fallback labels when owner name cannot be resolved", () => {
@@ -66,5 +69,57 @@ describe("executive sales performance helpers", () => {
 
     expect(result.map((entry) => entry.ownerName)).toEqual(["aimee", "brian"]);
     expect(result.find((entry) => entry.ownerId === "owner-b")?.bookedRevenue).toBe(0);
+  });
+
+  it("averages margin_percentage as a simple (unweighted) mean of each PO's own value", () => {
+    const rows: PurchaseOrderMetricRow[] = [
+      {
+        created_by: "owner-a",
+        po_amount: 1000,
+        margin_amount: 150,
+        po_date: "2026-04-01",
+        margin_percentage: 15,
+      },
+      {
+        created_by: "owner-a",
+        po_amount: 100,
+        margin_amount: 5,
+        po_date: "2026-04-02",
+        margin_percentage: 5,
+      },
+    ];
+
+    const result = buildSalesPerformanceFromRows(rows, new Map([["owner-a", "Aimee"]]));
+
+    // Simple mean (15 + 5) / 2 = 10 -- deliberately ignores PO size, unlike the
+    // amount-weighted KPI formula used elsewhere on the dashboard.
+    expect(
+      result.find((entry) => entry.ownerId === "owner-a")?.marginPercentAverage,
+    ).toBe(10);
+  });
+
+  it("excludes POs with no margin_percentage from the average instead of treating them as zero", () => {
+    const rows: PurchaseOrderMetricRow[] = [
+      {
+        created_by: "owner-a",
+        po_amount: 1000,
+        margin_amount: 200,
+        po_date: "2026-05-01",
+        margin_percentage: 20,
+      },
+      {
+        created_by: "owner-a",
+        po_amount: 500,
+        margin_amount: 50,
+        po_date: "2026-05-02",
+        margin_percentage: null,
+      },
+    ];
+
+    const result = buildSalesPerformanceFromRows(rows, new Map([["owner-a", "Aimee"]]));
+
+    expect(
+      result.find((entry) => entry.ownerId === "owner-a")?.marginPercentAverage,
+    ).toBe(20);
   });
 });

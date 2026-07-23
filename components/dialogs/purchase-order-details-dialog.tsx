@@ -2,13 +2,16 @@
 
 import {
   approvePurchaseOrderAction,
+  createProofOfPaymentSignedUrlAction,
   deleteCollectionAction,
   rejectPurchaseOrderAction,
   resubmitPurchaseOrderAction,
   updatePurchaseOrderDetailsAction,
+  type PurchaseOrderItemPricingFormInput,
 } from "@/app/protected/sales/purchase-orders/actions";
 import { RecordCollectionDialog } from "@/components/dialogs/record-collection-dialog";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { NumberInput } from "@/components/ui/number-input";
@@ -26,9 +29,14 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Callout, ConfirmDialog, StatusBadge } from "@/components/patterns";
+import {
+  Callout,
+  ConfirmDialog,
+  PricingBreakdown,
+  StatusBadge,
+} from "@/components/patterns";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { computeSalesPricing } from "@/lib/sales/pricing";
+import { computeAggregatePricing, computeSalesPricing } from "@/lib/sales/pricing";
 import type { SalesPoPayment, SalesPurchaseOrder } from "@/lib/sales/purchase-orders";
 import { cn } from "@/lib/utils";
 import { formatCurrency } from "@/lib/utils/number-format";
@@ -73,6 +81,62 @@ function progressOf(purchaseOrder: SalesPurchaseOrder): number {
   );
 }
 
+function roleLabel(role: "sales_manager" | "owner" | "executive"): string {
+  if (role === "sales_manager") {
+    return "Sales Manager";
+  }
+
+  if (role === "owner") {
+    return "Owner";
+  }
+
+  return "Executive";
+}
+
+function stageStateLabel(state: "approved" | "current" | "upcoming"): string {
+  if (state === "approved") {
+    return "Approved";
+  }
+
+  if (state === "current") {
+    return "Pending";
+  }
+
+  return "Upcoming";
+}
+
+/**
+ * Renders the full sequential chain with each stage's state, since only the
+ * current stage's approval row actually exists at any given time -- e.g.
+ * "Sales Manager (Approved) -> Executive (Pending) -> Owner (Upcoming)".
+ */
+function formatApprovalStages(stages: SalesPurchaseOrder["approvalStages"]): string {
+  if (stages.length === 0) {
+    return "No approvers required";
+  }
+
+  return stages
+    .map((stage) => `${roleLabel(stage.role)} (${stageStateLabel(stage.state)})`)
+    .join(" -> ");
+}
+
+type ItemPricingFields = {
+  marginPercentage: string;
+  bankPercentage: string;
+  sopPercentage: string;
+};
+
+// Margin defaults to 25% (SPMC's standard MARKUP% across its costing sheets)
+// for new/unpriced items -- still fully editable. Bank% and SOP% have no such
+// standard and stay blank until the sales rep enters them.
+const DEFAULT_MARGIN_PERCENTAGE = "25";
+
+const emptyItemPricing: ItemPricingFields = {
+  marginPercentage: DEFAULT_MARGIN_PERCENTAGE,
+  bankPercentage: "",
+  sopPercentage: "",
+};
+
 export function PurchaseOrderDetailsDialog({
   open,
   onOpenChange,
@@ -87,13 +151,21 @@ export function PurchaseOrderDetailsDialog({
   const [editingPayment, setEditingPayment] = useState<SalesPoPayment | null>(null);
   const [deletingPayment, setDeletingPayment] = useState<SalesPoPayment | null>(null);
   const [isDeletingPayment, setIsDeletingPayment] = useState(false);
+  const [viewingProofPaymentId, setViewingProofPaymentId] = useState<string | null>(null);
+  const [proofPreviewUrl, setProofPreviewUrl] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [rejectionReason, setRejectionReason] = useState("");
   const [editClientPoNumber, setEditClientPoNumber] = useState("");
   const [editQuotationReference, setEditQuotationReference] = useState("");
-  const [marginPercentage, setMarginPercentage] = useState("");
-  const [bankPercentage, setBankPercentage] = useState("");
-  const [sopPercentage, setSopPercentage] = useState("");
+  const [hasUnequalMargins, setHasUnequalMargins] = useState(false);
+  const [itemPricing, setItemPricing] = useState<Record<string, ItemPricingFields>>({});
+  const [uniformMarginPercentage, setUniformMarginPercentage] = useState("");
+  const [uniformBankPercentage, setUniformBankPercentage] = useState("");
+  const [uniformSopPercentage, setUniformSopPercentage] = useState("");
+  const [selectedItemIds, setSelectedItemIds] = useState<Set<string>>(new Set());
+  const [bulkMarginPercentage, setBulkMarginPercentage] = useState("");
+  const [bulkBankPercentage, setBulkBankPercentage] = useState("");
+  const [bulkSopPercentage, setBulkSopPercentage] = useState("");
   const [leadTimeDays, setLeadTimeDays] = useState("");
   const [paymentTermsSelect, setPaymentTermsSelect] = useState("");
   const [paymentTermsCustom, setPaymentTermsCustom] = useState("");
@@ -139,23 +211,61 @@ export function PurchaseOrderDetailsDialog({
     router.refresh();
   };
 
+  const handleViewProof = async (payment: SalesPoPayment) => {
+    if (!payment.proofPath) {
+      return;
+    }
+    setViewingProofPaymentId(payment.id);
+    const response = await createProofOfPaymentSignedUrlAction(payment.proofPath);
+    setViewingProofPaymentId(null);
+    if (!response.success || !response.data) {
+      error(response.error ?? "Failed to load proof of payment.");
+      return;
+    }
+    setProofPreviewUrl(response.data.url);
+  };
+
   useEffect(() => {
     if (!open || !purchaseOrder) {
       return;
     }
     setEditClientPoNumber(purchaseOrder.clientPoNumber ?? "");
     setEditQuotationReference(purchaseOrder.quotationReference ?? "");
-    setMarginPercentage(
-      purchaseOrder.marginPercentage === null
-        ? ""
-        : String(purchaseOrder.marginPercentage),
+    setHasUnequalMargins(purchaseOrder.hasUnequalMargins);
+    const nextItemPricing: Record<string, ItemPricingFields> = {};
+    purchaseOrder.items.forEach((item) => {
+      nextItemPricing[item.id] = {
+        marginPercentage:
+          item.marginPercentage === null
+            ? DEFAULT_MARGIN_PERCENTAGE
+            : String(item.marginPercentage),
+        bankPercentage: item.bankPercentage === null ? "" : String(item.bankPercentage),
+        sopPercentage: item.sopPercentage === null ? "" : String(item.sopPercentage),
+      };
+    });
+    setItemPricing(nextItemPricing);
+    // Mirrors the quotation dialog: the uniform-mode fields track the first
+    // item's values, which are kept equal across all items when unticked.
+    const firstItem = purchaseOrder.items[0];
+    setUniformMarginPercentage(
+      firstItem && firstItem.marginPercentage !== null
+        ? String(firstItem.marginPercentage)
+        : DEFAULT_MARGIN_PERCENTAGE,
     );
-    setBankPercentage(
-      purchaseOrder.bankPercentage === null ? "" : String(purchaseOrder.bankPercentage),
+    setUniformBankPercentage(
+      firstItem && firstItem.bankPercentage !== null
+        ? String(firstItem.bankPercentage)
+        : "",
     );
-    setSopPercentage(
-      purchaseOrder.sopPercentage === null ? "" : String(purchaseOrder.sopPercentage),
+    setUniformSopPercentage(
+      firstItem && firstItem.sopPercentage !== null
+        ? String(firstItem.sopPercentage)
+        : "",
     );
+    setSelectedItemIds(new Set());
+    setBulkMarginPercentage("");
+    setBulkBankPercentage("");
+    setBulkSopPercentage("");
     setLeadTimeDays(
       purchaseOrder.leadTimeDays === null ? "" : String(purchaseOrder.leadTimeDays),
     );
@@ -192,13 +302,91 @@ export function PurchaseOrderDetailsDialog({
       normalizedRole as "sales_manager" | "owner" | "executive",
     );
 
-  const directCost = purchaseOrder.cost ?? 0;
-  const pricingPreview = computeSalesPricing({
-    directCost,
-    marginPercentage: Number(marginPercentage) || 0,
-    bankPercentage: Number(bankPercentage) || 0,
-    sopPercentage: Number(sopPercentage) || 0,
+  // Per-item live pricing preview, mirroring the quotation dialog: each
+  // item's own direct cost (line total) is priced individually, then rolled
+  // into one aggregate for the totals footer.
+  const pricedItems = purchaseOrder.items.map((item) => {
+    const row = itemPricing[item.id] ?? emptyItemPricing;
+    const itemPricingResult = computeSalesPricing({
+      directCost: item.lineTotal,
+      quantity: item.quantity,
+      marginPercentage: Number(row.marginPercentage) || 0,
+      bankPercentage: Number(row.bankPercentage) || 0,
+      sopPercentage: Number(row.sopPercentage) || 0,
+    });
+    return {
+      id: item.id,
+      description: item.description,
+      directCost: item.lineTotal,
+      ...row,
+      ...itemPricingResult,
+    };
   });
+
+  const pricingPreview = computeAggregatePricing(pricedItems);
+
+  /** Unticked mode: writing one field broadcasts it onto every item's pricing. */
+  const applyUniformPercentage = (field: keyof ItemPricingFields, value: string) => {
+    setItemPricing((prev) => {
+      const next = { ...prev };
+      for (const item of purchaseOrder.items) {
+        next[item.id] = { ...(next[item.id] ?? emptyItemPricing), [field]: value };
+      }
+      return next;
+    });
+  };
+
+  const updateItemPercentage = (
+    itemId: string,
+    field: keyof ItemPricingFields,
+    value: string,
+  ) => {
+    setItemPricing((prev) => ({
+      ...prev,
+      [itemId]: { ...(prev[itemId] ?? emptyItemPricing), [field]: value },
+    }));
+  };
+
+  const toggleItemSelected = (itemId: string, checked: boolean) => {
+    setSelectedItemIds((prev) => {
+      const next = new Set(prev);
+      if (checked) {
+        next.add(itemId);
+      } else {
+        next.delete(itemId);
+      }
+      return next;
+    });
+  };
+
+  /** Ticked mode: stamps the bulk %s onto every selected item, once. */
+  const applyBulkPercentages = () => {
+    if (selectedItemIds.size === 0) {
+      error("Select at least one item to apply pricing to.");
+      return;
+    }
+
+    setItemPricing((prev) => {
+      const next = { ...prev };
+      for (const itemId of selectedItemIds) {
+        next[itemId] = {
+          marginPercentage:
+            bulkMarginPercentage.trim() !== ""
+              ? bulkMarginPercentage
+              : (next[itemId]?.marginPercentage ?? ""),
+          bankPercentage:
+            bulkBankPercentage.trim() !== ""
+              ? bulkBankPercentage
+              : (next[itemId]?.bankPercentage ?? ""),
+          sopPercentage:
+            bulkSopPercentage.trim() !== ""
+              ? bulkSopPercentage
+              : (next[itemId]?.sopPercentage ?? ""),
+        };
+      }
+      return next;
+    });
+  };
 
   const handleApprove = async () => {
     setIsSubmitting(true);
@@ -237,23 +425,31 @@ export function PurchaseOrderDetailsDialog({
   };
 
   const handleSaveDetails = async () => {
-    const trimmedMargin = marginPercentage.trim();
-    const trimmedBank = bankPercentage.trim();
-    const trimmedSop = sopPercentage.trim();
     const trimmedLeadTime = leadTimeDays.trim();
 
-    for (const [label, raw] of [
-      ["Margin", trimmedMargin],
-      ["Bank", trimmedBank],
-      ["SOP", trimmedSop],
-    ] as const) {
-      if (raw !== "") {
-        const value = Number(raw);
-        if (!Number.isFinite(value) || value < 0) {
-          error(`${label} percentage must be 0 or greater.`);
-          return;
+    const itemsPayload: PurchaseOrderItemPricingFormInput[] = [];
+    for (const item of purchaseOrder.items) {
+      const row = itemPricing[item.id] ?? emptyItemPricing;
+      for (const [field, label] of [
+        ["marginPercentage", "Margin"],
+        ["bankPercentage", "Bank"],
+        ["sopPercentage", "SOP"],
+      ] as const) {
+        const raw = row[field].trim();
+        if (raw !== "") {
+          const value = Number(raw);
+          if (!Number.isFinite(value) || value < 0) {
+            error(`${label} percentage for "${item.description}" must be 0 or greater.`);
+            return;
+          }
         }
       }
+      itemsPayload.push({
+        id: item.id,
+        marginPercentage: row.marginPercentage.trim(),
+        bankPercentage: row.bankPercentage.trim(),
+        sopPercentage: row.sopPercentage.trim(),
+      });
     }
 
     if (trimmedLeadTime !== "") {
@@ -271,9 +467,8 @@ export function PurchaseOrderDetailsDialog({
 
     setIsSubmitting(true);
     const response = await updatePurchaseOrderDetailsAction(purchaseOrder.id, {
-      marginPercentage: trimmedMargin,
-      bankPercentage: trimmedBank,
-      sopPercentage: trimmedSop,
+      hasUnequalMargins,
+      items: itemsPayload,
       paymentTerms: paymentTermsSelect.trim(),
       paymentTermsCustom: paymentTermsCustom.trim(),
       leadTimeDays: trimmedLeadTime,
@@ -314,7 +509,7 @@ export function PurchaseOrderDetailsDialog({
       >
         <DialogContent
           className={cn(
-            "max-h-[90vh] max-w-2xl overflow-y-auto",
+            "max-h-[90vh] max-w-2xl overflow-y-auto lg:max-w-6xl",
             "data-[state=open]:slide-in-from-left-1/2 data-[state=open]:slide-in-from-top-[48%]",
             "data-[state=closed]:slide-out-to-left-1/2 data-[state=closed]:slide-out-to-top-[48%]",
           )}
@@ -417,13 +612,13 @@ export function PurchaseOrderDetailsDialog({
                   </div>
                   <div className="grid grid-cols-[160px_1fr] gap-2">
                     <dt className="text-muted-foreground">Approval Status</dt>
-                    <dd className="flex flex-wrap items-center gap-x-1">
+                    <dd>
                       <StatusBadge status={purchaseOrder.status} />
-                      {purchaseOrder.status === "pending" &&
-                      purchaseOrder.pendingApprovalRoles.length > 0
-                        ? ` · awaiting ${purchaseOrder.pendingApprovalRoles.join(" -> ")}`
-                        : ""}
                     </dd>
+                  </div>
+                  <div className="grid grid-cols-[160px_1fr] gap-2">
+                    <dt className="text-muted-foreground">Approval Chain</dt>
+                    <dd>{formatApprovalStages(purchaseOrder.approvalStages)}</dd>
                   </div>
                   <div className="grid grid-cols-[160px_1fr] gap-2">
                     <dt className="text-muted-foreground">Approved At</dt>
@@ -458,14 +653,26 @@ export function PurchaseOrderDetailsDialog({
             </TabsContent>
 
             <TabsContent value="items">
-              <div className="space-y-3 rounded-md border p-4 text-sm">
+              <div className="space-y-3 overflow-x-auto rounded-md border p-4 text-sm">
+                {purchaseOrder.hasUnequalMargins ? (
+                  <span className="inline-block rounded-full border px-2 py-0.5 text-[10px] font-normal text-muted-foreground">
+                    Unequal margins
+                  </span>
+                ) : null}
                 <table className="w-full text-xs">
                   <thead className="text-left text-muted-foreground">
                     <tr>
                       <th className="py-1 pr-3 font-medium">Item</th>
                       <th className="py-1 pr-3 font-medium">Qty</th>
                       <th className="py-1 pr-3 font-medium">Unit Cost</th>
-                      <th className="py-1 font-medium">Line Total</th>
+                      <th className="py-1 pr-3 font-medium">Line Total</th>
+                      <th className="py-1 pr-3 font-medium">Margin %</th>
+                      <th className="py-1 pr-3 font-medium">Bank %</th>
+                      <th className="py-1 pr-3 font-medium">SOP %</th>
+                      <th className="py-1 pr-3 font-medium">Margin Amt</th>
+                      <th className="py-1 pr-3 font-medium">Bank Amt</th>
+                      <th className="py-1 pr-3 font-medium">SOP Amt</th>
+                      <th className="py-1 font-medium">Selling</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -480,14 +687,56 @@ export function PurchaseOrderDetailsDialog({
                             formatCurrency(item.unitCost)
                           )}
                         </td>
-                        <td className="py-1">{formatCurrency(item.lineTotal)}</td>
+                        <td className="py-1 pr-3">{formatCurrency(item.lineTotal)}</td>
+                        <td className="py-1 pr-3">
+                          {formatPercent(item.marginPercentage)}
+                        </td>
+                        <td className="py-1 pr-3">
+                          {formatPercent(item.bankPercentage)}
+                        </td>
+                        <td className="py-1 pr-3">{formatPercent(item.sopPercentage)}</td>
+                        <td className="py-1 pr-3">
+                          {item.marginAmount === null
+                            ? "—"
+                            : formatCurrency(item.marginAmount)}
+                        </td>
+                        <td className="py-1 pr-3">
+                          {item.bankAmount === null
+                            ? "—"
+                            : formatCurrency(item.bankAmount)}
+                        </td>
+                        <td className="py-1 pr-3">
+                          {item.sopAmount === null ? "—" : formatCurrency(item.sopAmount)}
+                        </td>
+                        <td className="py-1">
+                          {item.sellingAmount === null
+                            ? "—"
+                            : formatCurrency(item.sellingAmount)}
+                        </td>
                       </tr>
                     ))}
                     <tr className="border-t font-semibold">
                       <td className="py-1 pr-3" colSpan={3}>
-                        Total Cost
+                        Total
                       </td>
-                      <td className="py-1">{formatCurrency(purchaseOrder.cost ?? 0)}</td>
+                      <td className="py-1 pr-3">
+                        {formatCurrency(purchaseOrder.cost ?? 0)}
+                      </td>
+                      <td className="py-1 pr-3" colSpan={3}></td>
+                      <td className="py-1 pr-3">
+                        {formatCurrency(purchaseOrder.marginAmount ?? 0)}
+                      </td>
+                      <td className="py-1 pr-3">
+                        {formatCurrency(purchaseOrder.bankAmount ?? 0)}
+                      </td>
+                      <td className="py-1 pr-3">
+                        {formatCurrency(purchaseOrder.sopAmount ?? 0)}
+                      </td>
+                      <td className="py-1">
+                        {formatCurrency(
+                          purchaseOrder.sellingAmount ?? purchaseOrder.poAmount,
+                        )}
+                      </td>
                     </tr>
                   </tbody>
                 </table>
@@ -498,74 +747,212 @@ export function PurchaseOrderDetailsDialog({
               <div className="space-y-3 rounded-md border p-4 text-sm">
                 {isEditable ? (
                   <div className="space-y-4">
-                    <div className="grid grid-cols-[160px_1fr] items-center gap-2">
-                      <Label className="text-muted-foreground">Direct Cost</Label>
-                      <span className="font-medium">{formatCurrency(directCost)}</span>
+                    <div className="flex items-center gap-2">
+                      <Checkbox
+                        id="po-unequal-margins"
+                        checked={hasUnequalMargins}
+                        onCheckedChange={(checked) =>
+                          setHasUnequalMargins(checked === true)
+                        }
+                      />
+                      <Label htmlFor="po-unequal-margins" className="cursor-pointer">
+                        Unequal margins per item
+                      </Label>
                     </div>
 
-                    <div className="grid gap-3 sm:grid-cols-2">
-                      <div>
-                        <Label htmlFor="po-margin-percent">Margin %</Label>
-                        <NumberInput
-                          id="po-margin-percent"
-                          value={marginPercentage}
-                          onValueChange={setMarginPercentage}
-                          className="mt-1"
-                          placeholder="e.g. 25"
-                        />
+                    {!hasUnequalMargins ? (
+                      <div className="grid gap-3 sm:grid-cols-3">
+                        <div>
+                          <Label htmlFor="po-margin-percent">Margin %</Label>
+                          <NumberInput
+                            id="po-margin-percent"
+                            value={uniformMarginPercentage}
+                            onValueChange={(value) => {
+                              setUniformMarginPercentage(value);
+                              applyUniformPercentage("marginPercentage", value);
+                            }}
+                            className="mt-1"
+                            placeholder="e.g. 25"
+                          />
+                        </div>
+                        <div>
+                          <Label htmlFor="po-bank-percent">Bank %</Label>
+                          <NumberInput
+                            id="po-bank-percent"
+                            value={uniformBankPercentage}
+                            onValueChange={(value) => {
+                              setUniformBankPercentage(value);
+                              applyUniformPercentage("bankPercentage", value);
+                            }}
+                            className="mt-1"
+                            placeholder="e.g. 3"
+                          />
+                        </div>
+                        <div>
+                          <Label htmlFor="po-sop-percent">SOP %</Label>
+                          <NumberInput
+                            id="po-sop-percent"
+                            value={uniformSopPercentage}
+                            onValueChange={(value) => {
+                              setUniformSopPercentage(value);
+                              applyUniformPercentage("sopPercentage", value);
+                            }}
+                            className="mt-1"
+                            placeholder="e.g. 5"
+                          />
+                        </div>
                       </div>
-                      <div>
-                        <Label>Margin Amount</Label>
-                        <Input
-                          value={formatCurrency(pricingPreview.marginAmount)}
-                          readOnly
-                          className="mt-1 bg-muted/40"
-                        />
+                    ) : (
+                      <div className="space-y-2 rounded-md border bg-background p-3">
+                        <p className="text-xs text-muted-foreground">
+                          Select items below, enter percentages here, then apply to stamp
+                          them onto the selected rows.
+                        </p>
+                        <div className="grid gap-3 sm:grid-cols-3">
+                          <NumberInput
+                            value={bulkMarginPercentage}
+                            onValueChange={setBulkMarginPercentage}
+                            placeholder="Margin %"
+                          />
+                          <NumberInput
+                            value={bulkBankPercentage}
+                            onValueChange={setBulkBankPercentage}
+                            placeholder="Bank %"
+                          />
+                          <NumberInput
+                            value={bulkSopPercentage}
+                            onValueChange={setBulkSopPercentage}
+                            placeholder="SOP %"
+                          />
+                        </div>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={applyBulkPercentages}
+                          disabled={selectedItemIds.size === 0}
+                        >
+                          Apply to selected ({selectedItemIds.size})
+                        </Button>
                       </div>
-                      <div>
-                        <Label htmlFor="po-bank-percent">Bank %</Label>
-                        <NumberInput
-                          id="po-bank-percent"
-                          value={bankPercentage}
-                          onValueChange={setBankPercentage}
-                          className="mt-1"
-                          placeholder="e.g. 3"
-                        />
-                      </div>
-                      <div>
-                        <Label>Bank Amount</Label>
-                        <Input
-                          value={formatCurrency(pricingPreview.bankAmount)}
-                          readOnly
-                          className="mt-1 bg-muted/40"
-                        />
-                      </div>
-                      <div>
-                        <Label htmlFor="po-sop-percent">SOP %</Label>
-                        <NumberInput
-                          id="po-sop-percent"
-                          value={sopPercentage}
-                          onValueChange={setSopPercentage}
-                          className="mt-1"
-                          placeholder="e.g. 5"
-                        />
-                      </div>
-                      <div>
-                        <Label>SOP Amount</Label>
-                        <Input
-                          value={formatCurrency(pricingPreview.sopAmount)}
-                          readOnly
-                          className="mt-1 bg-muted/40"
-                        />
-                      </div>
+                    )}
+
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-xs">
+                        <thead className="text-left text-muted-foreground">
+                          <tr>
+                            {hasUnequalMargins ? <th className="w-6 py-1"></th> : null}
+                            <th className="py-1 pr-3 font-medium">Item</th>
+                            <th className="py-1 pr-3 font-medium">Direct Cost</th>
+                            <th className="py-1 pr-3 font-medium">Margin %</th>
+                            <th className="py-1 pr-3 font-medium">Bank %</th>
+                            <th className="py-1 pr-3 font-medium">SOP %</th>
+                            <th className="py-1 pr-3 font-medium">Margin Amt</th>
+                            <th className="py-1 pr-3 font-medium">Bank Amt</th>
+                            <th className="py-1 pr-3 font-medium">SOP Amt</th>
+                            <th className="py-1 font-medium">Selling</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {pricedItems.map((item) => (
+                            <tr key={item.id} className="border-t">
+                              {hasUnequalMargins ? (
+                                <td className="py-1">
+                                  <Checkbox
+                                    checked={selectedItemIds.has(item.id)}
+                                    onCheckedChange={(checked) =>
+                                      toggleItemSelected(item.id, checked === true)
+                                    }
+                                    aria-label={`Select ${item.description}`}
+                                  />
+                                </td>
+                              ) : null}
+                              <td className="py-1 pr-3">{item.description}</td>
+                              <td className="py-1 pr-3">
+                                {formatCurrency(item.directCost)}
+                              </td>
+                              <td className="py-1 pr-3">
+                                <NumberInput
+                                  value={item.marginPercentage}
+                                  onValueChange={(value) =>
+                                    updateItemPercentage(
+                                      item.id,
+                                      "marginPercentage",
+                                      value,
+                                    )
+                                  }
+                                  disabled={!hasUnequalMargins}
+                                  className="h-7 w-20 text-xs"
+                                />
+                              </td>
+                              <td className="py-1 pr-3">
+                                <NumberInput
+                                  value={item.bankPercentage}
+                                  onValueChange={(value) =>
+                                    updateItemPercentage(item.id, "bankPercentage", value)
+                                  }
+                                  disabled={!hasUnequalMargins}
+                                  className="h-7 w-20 text-xs"
+                                />
+                              </td>
+                              <td className="py-1 pr-3">
+                                <NumberInput
+                                  value={item.sopPercentage}
+                                  onValueChange={(value) =>
+                                    updateItemPercentage(item.id, "sopPercentage", value)
+                                  }
+                                  disabled={!hasUnequalMargins}
+                                  className="h-7 w-20 text-xs"
+                                />
+                              </td>
+                              <td className="py-1 pr-3">
+                                {formatCurrency(item.marginAmount)}
+                              </td>
+                              <td className="py-1 pr-3">
+                                {formatCurrency(item.bankAmount)}
+                              </td>
+                              <td className="py-1 pr-3">
+                                {formatCurrency(item.sopAmount)}
+                              </td>
+                              <td className="py-1">
+                                {formatCurrency(item.sellingAmount)}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                        <tfoot>
+                          <tr className="border-t font-semibold">
+                            <td className="py-1 pr-3" colSpan={hasUnequalMargins ? 2 : 1}>
+                              Total
+                            </td>
+                            <td className="py-1 pr-3">
+                              {formatCurrency(pricingPreview.directCost)}
+                            </td>
+                            <td className="py-1 pr-3" colSpan={3}></td>
+                            <td className="py-1 pr-3">
+                              {formatCurrency(pricingPreview.marginAmount)}
+                            </td>
+                            <td className="py-1 pr-3">
+                              {formatCurrency(pricingPreview.bankAmount)}
+                            </td>
+                            <td className="py-1 pr-3">
+                              {formatCurrency(pricingPreview.sopAmount)}
+                            </td>
+                            <td className="py-1">
+                              {formatCurrency(pricingPreview.sellingAmount)}
+                            </td>
+                          </tr>
+                        </tfoot>
+                      </table>
                     </div>
 
-                    <div className="grid grid-cols-[160px_1fr] items-center gap-2 border-t pt-3">
-                      <Label className="font-semibold">Selling / Total Amount</Label>
-                      <span className="text-base font-semibold">
-                        {formatCurrency(pricingPreview.sellingAmount)}
-                      </span>
-                    </div>
+                    <PricingBreakdown
+                      directCost={pricingPreview.directCost}
+                      marginAmount={pricingPreview.marginAmount}
+                      bankAmount={pricingPreview.bankAmount}
+                      sopAmount={pricingPreview.sopAmount}
+                      sellingAmount={pricingPreview.sellingAmount}
+                    />
 
                     <div className="grid gap-3 sm:grid-cols-2">
                       <div>
@@ -639,47 +1026,18 @@ export function PurchaseOrderDetailsDialog({
                           : formatCurrency(purchaseOrder.cost)}
                       </dd>
                     </div>
-                    <div className="grid grid-cols-[160px_1fr] gap-2">
-                      <dt className="text-muted-foreground">Margin</dt>
-                      <dd>
-                        {formatPercent(purchaseOrder.marginPercentage)}
-                        {purchaseOrder.marginAmount !== null
-                          ? ` · ${formatCurrency(purchaseOrder.marginAmount)}`
-                          : ""}
-                      </dd>
-                    </div>
-                    <div className="grid grid-cols-[160px_1fr] gap-2">
-                      <dt className="text-muted-foreground">Bank</dt>
-                      <dd>
-                        {formatPercent(purchaseOrder.bankPercentage)}
-                        {purchaseOrder.bankAmount !== null
-                          ? ` · ${formatCurrency(purchaseOrder.bankAmount)}`
-                          : ""}
-                      </dd>
-                    </div>
-                    <div className="grid grid-cols-[160px_1fr] gap-2">
-                      <dt className="text-muted-foreground">SOP</dt>
-                      <dd>
-                        {formatPercent(purchaseOrder.sopPercentage)}
-                        {purchaseOrder.sopAmount !== null
-                          ? ` · ${formatCurrency(purchaseOrder.sopAmount)}`
-                          : ""}
-                      </dd>
-                    </div>
-                    <div className="grid grid-cols-[160px_1fr] gap-2">
-                      <dt className="text-muted-foreground">Selling Amount</dt>
-                      <dd>
-                        {purchaseOrder.sellingAmount === null
-                          ? "—"
-                          : formatCurrency(purchaseOrder.sellingAmount)}
-                      </dd>
-                    </div>
-                    <div className="grid grid-cols-[160px_1fr] gap-2">
-                      <dt className="text-muted-foreground">Total Amount</dt>
-                      <dd className="font-semibold">
-                        {formatCurrency(purchaseOrder.poAmount)}
-                      </dd>
-                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      Per-item breakdown is on the Line Items tab.
+                    </p>
+                    <PricingBreakdown
+                      directCost={purchaseOrder.cost ?? 0}
+                      marginAmount={purchaseOrder.marginAmount ?? 0}
+                      bankAmount={purchaseOrder.bankAmount ?? 0}
+                      sopAmount={purchaseOrder.sopAmount ?? 0}
+                      sellingAmount={
+                        purchaseOrder.sellingAmount ?? purchaseOrder.poAmount
+                      }
+                    />
                     <div className="grid grid-cols-[160px_1fr] gap-2">
                       <dt className="text-muted-foreground">Payment Terms</dt>
                       <dd>
@@ -784,6 +1142,18 @@ export function PurchaseOrderDetailsDialog({
                                   ? ` • ${payment.referenceNumber}`
                                   : ""}
                               </p>
+                              {payment.proofPath ? (
+                                <button
+                                  type="button"
+                                  className="mt-1 text-xs text-primary underline disabled:opacity-50"
+                                  disabled={viewingProofPaymentId === payment.id}
+                                  onClick={() => handleViewProof(payment)}
+                                >
+                                  {viewingProofPaymentId === payment.id
+                                    ? "Loading..."
+                                    : "View proof"}
+                                </button>
+                              ) : null}
                             </div>
                             {isOwner ? (
                               <div className="flex shrink-0 gap-1">
@@ -827,15 +1197,38 @@ export function PurchaseOrderDetailsDialog({
         </DialogContent>
       </Dialog>
 
+      <Dialog
+        open={Boolean(proofPreviewUrl)}
+        onOpenChange={(next) => {
+          if (!next) setProofPreviewUrl(null);
+        }}
+      >
+        <DialogContent className="max-h-[90vh] max-w-3xl overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Proof of Payment</DialogTitle>
+          </DialogHeader>
+          {proofPreviewUrl ? (
+            // eslint-disable-next-line @next/next/no-img-element -- short-lived signed URL, not a static asset
+            <img
+              src={proofPreviewUrl}
+              alt="Proof of payment"
+              className="max-h-[75vh] w-full rounded-md border object-contain"
+            />
+          ) : null}
+        </DialogContent>
+      </Dialog>
+
       <RecordCollectionDialog
         open={recordDialogOpen}
         purchaseOrder={purchaseOrder}
+        userId={currentUserId}
         onOpenChange={setRecordDialogOpen}
       />
 
       <RecordCollectionDialog
         open={Boolean(editingPayment)}
         purchaseOrder={purchaseOrder}
+        userId={currentUserId}
         mode="edit"
         payment={editingPayment}
         onOpenChange={(next) => {

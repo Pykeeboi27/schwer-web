@@ -14,6 +14,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { computeLandedUnitCost } from "@/lib/engineering/landed-cost";
 import type { CostingQuotation } from "@/lib/engineering/costing-quotations";
 import { suggestQuotationNumber } from "@/lib/engineering/suggest-quotation-number";
 import { formatCurrency } from "@/lib/utils/number-format";
@@ -88,8 +89,11 @@ export function EditCostingQuotationDialog({
   const totalCost = useMemo(() => {
     if (!quotation) return 0;
     return quotation.items.reduce((sum, item) => {
-      const unitCost = Number(itemCosts[item.id]);
-      return sum + (Number.isFinite(unitCost) ? unitCost * item.quantity : 0);
+      const rawCost = Number(itemCosts[item.id]);
+      if (!Number.isFinite(rawCost)) return sum;
+      // Mirrors what the DB will actually store: landed cost (raw cost + the
+      // fixed +3% OPEX / +1.5% delivery-fee markup) x quantity.
+      return sum + computeLandedUnitCost(rawCost) * item.quantity;
     }, 0);
   }, [quotation, itemCosts]);
 
@@ -110,7 +114,12 @@ export function EditCostingQuotationDialog({
       Object.fromEntries(
         (quotation?.items ?? []).map((item) => [
           item.id,
-          item.unitCost === null ? "" : String(item.unitCost),
+          // Deliberately reads rawCost, not unitCost: legacy items priced
+          // before this field existed have a unitCost (the old, directly-
+          // entered landed cost) but no rawCost. Pre-filling from unitCost
+          // would double-apply the OPEX/delivery-fee markup on next save --
+          // leaving it blank forces an intentional re-entry instead.
+          item.rawCost === null ? "" : String(item.rawCost),
         ]),
       ),
     );
@@ -156,7 +165,7 @@ export function EditCostingQuotationDialog({
       subject: subject.trim().toUpperCase(),
       items: quotation.items.map((item) => ({
         id: item.id,
-        unitCost: itemCosts[item.id] ?? "",
+        rawCost: itemCosts[item.id] ?? "",
       })),
       googleDriveLink: driveLink,
       notes: notes.trim() ? notes.trim().toUpperCase() : null,
@@ -186,7 +195,7 @@ export function EditCostingQuotationDialog({
     >
       <DialogContent className="max-h-[85vh] max-w-2xl overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Set Item Costs</DialogTitle>
+          <DialogTitle>Set Direct Costs</DialogTitle>
         </DialogHeader>
 
         {quotation.costingRejectionReason ? (
@@ -278,26 +287,42 @@ export function EditCostingQuotationDialog({
           </div>
 
           <div>
-            <Label>Line Item Costs</Label>
+            <Label>Line Item Raw Costs</Label>
+            <p className="mt-1 text-xs text-muted-foreground">
+              Enter each item&apos;s raw material + labor cost per unit. A fixed +3% OPEX
+              and +1.5% delivery fee are applied automatically to compute the landed cost,
+              matching the costing worksheet.
+            </p>
             <div className="mt-2 space-y-2 rounded-md border p-3">
-              {quotation.items.map((item) => (
-                <div key={item.id} className="flex items-center gap-3">
-                  <div className="flex-1 text-sm">
-                    <p className="font-medium">{item.description}</p>
-                    <p className="text-xs text-muted-foreground">Qty {item.quantity}</p>
+              {quotation.items.map((item) => {
+                const rawCost = Number(itemCosts[item.id]);
+                const landedUnitCost = Number.isFinite(rawCost)
+                  ? computeLandedUnitCost(rawCost)
+                  : null;
+                return (
+                  <div key={item.id} className="flex items-center gap-3">
+                    <div className="flex-1 text-sm">
+                      <p className="font-medium">{item.description}</p>
+                      <p className="text-xs text-muted-foreground">
+                        Qty {item.quantity}
+                        {landedUnitCost !== null
+                          ? ` → landed ${formatCurrency(landedUnitCost)}/unit`
+                          : ""}
+                      </p>
+                    </div>
+                    <NumberInput
+                      value={itemCosts[item.id] ?? ""}
+                      onValueChange={(raw) =>
+                        setItemCosts((prev) => ({ ...prev, [item.id]: raw }))
+                      }
+                      placeholder="Raw Material + Labor Cost"
+                      className="w-36"
+                    />
                   </div>
-                  <NumberInput
-                    value={itemCosts[item.id] ?? ""}
-                    onValueChange={(raw) =>
-                      setItemCosts((prev) => ({ ...prev, [item.id]: raw }))
-                    }
-                    placeholder="Unit cost"
-                    className="w-36"
-                  />
-                </div>
-              ))}
+                );
+              })}
               <div className="flex items-center justify-between border-t pt-2 text-sm font-semibold">
-                <span>Total Cost</span>
+                <span>Total Direct Cost</span>
                 <span>{formatCurrency(totalCost)}</span>
               </div>
             </div>

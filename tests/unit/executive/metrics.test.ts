@@ -50,17 +50,23 @@ describe("executive KPI metric helpers", () => {
 });
 
 describe("buildPoSummaryFromRows", () => {
-  it("counts rows and totals PO and margin amounts, coercing strings and nulls", () => {
+  it("counts rows and totals PO, margin, and collected amounts, coercing strings and nulls", () => {
     const rows: PurchaseOrderMetricRow[] = [
-      { po_amount: 100, margin_amount: 20, po_date: "2026-01-10" },
-      { po_amount: "250", margin_amount: "30", po_date: "2026-02-10" },
-      { po_amount: null, margin_amount: null, po_date: null },
+      { po_amount: 100, margin_amount: 20, po_date: "2026-01-10", recognized_amount: 60 },
+      {
+        po_amount: "250",
+        margin_amount: "30",
+        po_date: "2026-02-10",
+        recognized_amount: "250",
+      },
+      { po_amount: null, margin_amount: null, po_date: null, recognized_amount: null },
     ];
 
     expect(buildPoSummaryFromRows(rows)).toEqual({
       poCount: 3,
       totalPoValue: 350,
       totalMarginAmount: 50,
+      totalCollectedAmount: 310,
     });
   });
 
@@ -69,6 +75,7 @@ describe("buildPoSummaryFromRows", () => {
       poCount: 0,
       totalPoValue: 0,
       totalMarginAmount: 0,
+      totalCollectedAmount: 0,
     });
   });
 });

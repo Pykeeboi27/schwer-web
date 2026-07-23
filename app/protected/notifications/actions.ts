@@ -5,7 +5,8 @@ import { revalidatePath } from "next/cache";
 import {
   markAllRead,
   markNotificationRead,
-  markSectionSeen,
+  markNotificationsRead,
+  markSectionRead,
 } from "@/lib/notifications/mutations";
 import type { NotificationSection } from "@/lib/notifications/types";
 
@@ -42,6 +43,23 @@ export async function markNotificationReadAction(
   }
 }
 
+export async function markNotificationsReadAction(
+  ids: string[],
+): Promise<ActionResponse<{ ids: string[] }>> {
+  const normalizedIds = ids.map((id) => String(id ?? "").trim()).filter(Boolean);
+
+  try {
+    await markNotificationsRead(normalizedIds);
+    revalidateNotificationSurfaces();
+    return { success: true, data: { ids: normalizedIds } };
+  } catch (error) {
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Failed to update notifications.",
+    };
+  }
+}
+
 export async function markAllReadAction(): Promise<ActionResponse<null>> {
   try {
     await markAllRead();
@@ -51,22 +69,25 @@ export async function markAllReadAction(): Promise<ActionResponse<null>> {
     return {
       success: false,
       error:
-        error instanceof Error ? error.message : "Failed to mark all notifications as read.",
+        error instanceof Error
+          ? error.message
+          : "Failed to mark all notifications as read.",
     };
   }
 }
 
-export async function markSectionSeenAction(
+export async function markSectionReadAction(
   section: NotificationSection,
 ): Promise<ActionResponse<null>> {
   try {
-    await markSectionSeen(section);
+    await markSectionRead(section);
     revalidateNotificationSurfaces();
     return { success: true, data: null };
   } catch (error) {
     return {
       success: false,
-      error: error instanceof Error ? error.message : "Failed to update notification state.",
+      error:
+        error instanceof Error ? error.message : "Failed to update notification state.",
     };
   }
 }

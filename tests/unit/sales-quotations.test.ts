@@ -136,6 +136,12 @@ describe("listSalesQuotations", () => {
     expect(quotation.marginAmount).toBe(100000);
     expect(quotation.leadTimeDays).toBe(14);
     expect(quotation.pendingApprovalRoles).toEqual(["sales_manager"]);
+    // Below the 3M threshold the chain is sales_manager-only, so the
+    // unrelated "owner approved" row above is irrelevant to this quotation's
+    // stages.
+    expect(quotation.approvalStages).toEqual([
+      { role: "sales_manager", state: "current" },
+    ]);
     expect(quotation.convertedPoStatus).toBeNull();
     expect(quotation.preparedByName).toBe("Jane Author");
   });
@@ -233,6 +239,93 @@ describe("listSalesQuotations", () => {
 
     expect(quotation.rejectionReason).toBeNull();
     expect(quotation.rejectedByName).toBeNull();
+  });
+
+  it("recomputes item and record amounts from stored cost/percentages instead of trusting stale stored amounts", async () => {
+    // This item's margin/bank/sop_amount were persisted under the pre-1119d85
+    // flat formula (amount = cost x %, independent of margin/bank). The
+    // correct compounding formula gives a materially different sop_amount
+    // (21375, not 14250) -- listSalesQuotations must recompute it, not echo
+    // the stale stored value.
+    mockClient = createSupabaseMock({
+      tables: {
+        quotations: {
+          data: [
+            {
+              ...baseRow,
+              margin_amount: "85500",
+              bank_amount: "14250",
+              sop_amount: "14250",
+              selling_amount: "399000",
+              quotation_items: [
+                {
+                  id: "i1",
+                  description: "Panel",
+                  quantity: "1",
+                  unit_cost: "285000",
+                  line_total: "285000",
+                  sort_order: 1,
+                  margin_percentage: "30",
+                  margin_amount: "85500",
+                  bank_percentage: "5",
+                  bank_amount: "14250",
+                  sop_percentage: "5",
+                  sop_amount: "14250",
+                  selling_amount: "399000",
+                },
+              ],
+            },
+          ],
+          error: null,
+        },
+      },
+    });
+
+    const [quotation] = await listSalesQuotations();
+
+    expect(quotation.items[0].sopAmount).toBeCloseTo(21375, 2);
+    expect(quotation.sopAmount).toBeCloseTo(21375, 2);
+    expect(quotation.amount).toBeCloseTo(quotation.items[0].sellingAmount!, 2);
+  });
+
+  it("falls back to stored record amounts when no item is priced", async () => {
+    mockClient = createSupabaseMock({
+      tables: {
+        quotations: {
+          data: [
+            {
+              ...baseRow,
+              quotation_items: [
+                {
+                  id: "i1",
+                  description: "Unpriced legacy item",
+                  quantity: "1",
+                  unit_cost: "285000",
+                  line_total: "285000",
+                  sort_order: 1,
+                  margin_percentage: null,
+                  margin_amount: null,
+                  bank_percentage: null,
+                  bank_amount: null,
+                  sop_percentage: null,
+                  sop_amount: null,
+                  selling_amount: null,
+                },
+              ],
+            },
+          ],
+          error: null,
+        },
+      },
+    });
+
+    const [quotation] = await listSalesQuotations();
+
+    expect(quotation.items[0].sopAmount).toBeNull();
+    // Falls back to the stored record-level margin_amount ("100000" on
+    // baseRow) since nothing on the item is priced.
+    expect(quotation.marginAmount).toBe(100000);
+    expect(quotation.amount).toBe(1500000);
   });
 });
 

@@ -1,10 +1,14 @@
+import { computeLandedUnitCost } from "@/lib/engineering/landed-cost";
 import { getCurrentProfile } from "@/lib/profile/get-current-profile";
 import { createClient } from "@/lib/supabase/server";
+
+export { computeLandedUnitCost } from "@/lib/engineering/landed-cost";
 
 export type CostingQuotationItem = {
   id: string;
   description: string;
   quantity: number;
+  rawCost: number | null;
   unitCost: number | null;
   lineTotal: number;
 };
@@ -54,10 +58,10 @@ export function parseCostingAmount(raw: unknown): number {
   return value;
 }
 
-export function parseUnitCost(raw: unknown): number {
+export function parseRawCost(raw: unknown): number {
   const value = Number(raw);
   if (!Number.isFinite(value) || value < 0) {
-    throw new Error("Unit cost must be 0 or greater.");
+    throw new Error("Raw cost must be 0 or greater.");
   }
   return value;
 }
@@ -81,7 +85,7 @@ export async function listCostingQuotations(): Promise<CostingQuotation[]> {
   const { data, error } = await supabase
     .from("quotations")
     .select(
-      "id, quotation_number, client_id, subject, amount, cost, google_drive_link, costing_rejection_reason, notes, status, prepared_by, sales_person_id, created_at, clients:client_id(company_name), sales_person:sales_person_id(full_name, email), quotation_items(id, description, quantity, unit_cost, line_total, sort_order)",
+      "id, quotation_number, client_id, subject, amount, cost, google_drive_link, costing_rejection_reason, notes, status, prepared_by, sales_person_id, created_at, clients:client_id(company_name), sales_person:sales_person_id(full_name, email), quotation_items(id, description, quantity, raw_cost, unit_cost, line_total, sort_order)",
     )
     .eq("phase", "costing")
     .order("created_at", { ascending: false });
@@ -102,6 +106,7 @@ export async function listCostingQuotations(): Promise<CostingQuotation[]> {
         id: item.id,
         description: item.description,
         quantity: Number(item.quantity),
+        rawCost: item.raw_cost === null ? null : Number(item.raw_cost),
         unitCost: item.unit_cost === null ? null : Number(item.unit_cost),
         lineTotal: Number(item.line_total),
       }));
@@ -133,7 +138,7 @@ export async function listCostingApprovedHistory(): Promise<
   const { data, error } = await supabase
     .from("quotations")
     .select(
-      "id, quotation_number, subject, amount, cost, google_drive_link, notes, sales_person_id, created_at, costing_approved_at, clients:client_id(company_name), sales_person:sales_person_id(full_name, email), quotation_items(id, description, quantity, unit_cost, line_total, sort_order)",
+      "id, quotation_number, subject, amount, cost, google_drive_link, notes, sales_person_id, created_at, costing_approved_at, clients:client_id(company_name), sales_person:sales_person_id(full_name, email), quotation_items(id, description, quantity, raw_cost, unit_cost, line_total, sort_order)",
     )
     .not("costing_approved_at", "is", null)
     .order("costing_approved_at", { ascending: false });
@@ -154,6 +159,7 @@ export async function listCostingApprovedHistory(): Promise<
         id: item.id,
         description: item.description,
         quantity: Number(item.quantity),
+        rawCost: item.raw_cost === null ? null : Number(item.raw_cost),
         unitCost: item.unit_cost === null ? null : Number(item.unit_cost),
         lineTotal: Number(item.line_total),
       }));
@@ -176,9 +182,12 @@ export async function listCostingApprovedHistory(): Promise<
 }
 
 /**
- * Engineering sets/updates the per-item unit cost on a Sales-originated
- * request for quotation, plus the Google Drive link and optional metadata
- * corrections. quotations.cost rolls up automatically via the
+ * Engineering sets/updates the per-item raw material+labor cost on a
+ * Sales-originated request for quotation, plus the Google Drive link and
+ * optional metadata corrections. The landed unit_cost (display figure) is
+ * derived here via computeLandedUnitCost; the exact line_total itself is
+ * computed by the DB directly from raw_cost (see migration 0024).
+ * quotations.cost rolls up automatically via the
  * trg_sync_quotation_cost_from_items trigger.
  */
 export async function setQuotationItemCosts(input: {
@@ -186,7 +195,7 @@ export async function setQuotationItemCosts(input: {
   quotationNumber?: string;
   clientId: string;
   subject: string;
-  items: Array<{ id: string; unitCost: number | null }>;
+  items: Array<{ id: string; rawCost: number | null }>;
   googleDriveLink: string;
   notes?: string | null;
   salesPersonId?: string | null;
@@ -252,15 +261,15 @@ export async function setQuotationItemCosts(input: {
   // value actually changed (editing notes/drive-link alone shouldn't notify).
   const { data: existingItems, error: existingItemsError } = await supabase
     .from("quotation_items")
-    .select("id, unit_cost")
+    .select("id, raw_cost")
     .eq("quotation_id", input.quotationId);
 
   if (existingItemsError) {
     throw new Error("Failed to load existing item costs.");
   }
 
-  const previousUnitCostById = new Map(
-    (existingItems ?? []).map((row) => [row.id, row.unit_cost]),
+  const previousRawCostById = new Map(
+    (existingItems ?? []).map((row) => [row.id, row.raw_cost]),
   );
 
   // Sequential, not Promise.all: every quotation_items write fires
@@ -271,9 +280,11 @@ export async function setQuotationItemCosts(input: {
   // (this caused a real `statement timeout` under load).
   let anyCostChanged = false;
   for (const item of input.items) {
+    const unitCost = item.rawCost === null ? null : computeLandedUnitCost(item.rawCost);
+
     const { error: itemError } = await supabase
       .from("quotation_items")
-      .update({ unit_cost: item.unitCost })
+      .update({ raw_cost: item.rawCost, unit_cost: unitCost })
       .eq("id", item.id)
       .eq("quotation_id", input.quotationId);
 
@@ -281,7 +292,7 @@ export async function setQuotationItemCosts(input: {
       throw new Error(itemError.message || "Failed to update an item's unit cost.");
     }
 
-    if ((previousUnitCostById.get(item.id) ?? null) !== item.unitCost) {
+    if ((previousRawCostById.get(item.id) ?? null) !== item.rawCost) {
       anyCostChanged = true;
     }
   }

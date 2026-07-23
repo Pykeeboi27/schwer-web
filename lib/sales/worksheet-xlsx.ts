@@ -1,4 +1,6 @@
+import { computeVatBreakdown } from "@/lib/sales/pricing";
 import type { PurchaseOrderWorksheetData } from "@/lib/sales/worksheet";
+import { formatCurrency } from "@/lib/utils/number-format";
 import JSZip from "jszip";
 import fs from "node:fs/promises";
 import path from "node:path";
@@ -132,14 +134,33 @@ export async function generatePurchaseOrderWorksheetXlsx(
   const sheet = new SheetWriter(await sheetFile.async("string"));
   const quotationOrPoNumber = data.clientPoNumber || "QTN SERVED AS PO";
 
-  // Item rows are totalled up front so the cost total can also fill the
-  // Contract Amount field (the form treats both as the total direct cost;
-  // margin/bank/SOP are surfaced only as percentages in REMARKS).
+  // Item rows are totalled up front so the direct-cost total can also fill
+  // the Contract Amount field. Each item's own selling_amount is already the
+  // final VAT-inclusive price (VAT is resolved within cost and the margin
+  // gross-up -- see computeSalesPricing), so it prints on the line and feeds
+  // the grand total as-is, with nothing added on top.
   const items =
     data.items.length > 0
       ? data.items
-      : [{ description: data.subject, quantity: 1, unitCost: null, lineTotal: 0 }];
+      : [
+          {
+            description: data.subject,
+            quantity: 1,
+            unitCost: null,
+            lineTotal: 0,
+            sellingAmount: 0,
+            marginAmount: 0,
+            bankAmount: 0,
+            sopAmount: 0,
+            marginPercentage: null,
+            bankPercentage: null,
+            sopPercentage: null,
+          },
+        ];
   const totalCost = items.reduce((sum, item) => sum + item.lineTotal, 0);
+  const itemSelling = (item: (typeof items)[number]) =>
+    item.sellingAmount ?? item.lineTotal;
+  const totalSelling = items.reduce((sum, item) => sum + itemSelling(item), 0);
 
   // Title
   sheet.setString("I2", `SALES WORKSHEET No. ${data.poNumber}`);
@@ -172,35 +193,76 @@ export async function generatePurchaseOrderWorksheetXlsx(
   sheet.setString("C15", data.sector ?? ""); // Market Segment
   sheet.setString("D16", data.notes ?? ""); // Special Instructions
 
-  // Item rows (20-41). Columns: D=description, M=qty, P=unit cost, R=line cost.
-  // The Item # (A), Item Code (B), and Unit (O) columns have no source data
-  // and are left blank. The grand total is the sum of every line's cost.
+  // Item rows (20-41). Columns: D=description, M=qty, P=unit cost,
+  // R=VAT-inclusive selling price. The Item # (A), Item Code (B), and Unit
+  // (O) columns have no source data and are left blank. The grand total is
+  // the sum of every line's VAT-inclusive selling price (not just the 22
+  // printed rows), so it stays correct even for POs with more items than fit.
   items.slice(0, ITEM_ROW_COUNT).forEach((item, index) => {
     const row = ITEM_START_ROW + index;
     sheet.setString(`D${row}`, item.description);
     sheet.setNumber(`M${row}`, item.quantity);
     sheet.setNumber(`P${row}`, item.unitCost);
-    sheet.setNumber(`R${row}`, item.lineTotal);
+    sheet.setNumber(`R${row}`, itemSelling(item));
   });
 
-  sheet.setNumber(GRAND_TOTAL_CELL, totalCost);
+  sheet.setNumber(GRAND_TOTAL_CELL, totalSelling);
   sheet.setString(PREPARED_BY_CELL, data.salesPersonName);
 
-  // REMARKS box (M45:T52): margin, bank, and SOP percentages stacked on the
-  // bottom rows (SOP on the bottom-most line), with any item-overflow note at
-  // the top of the box.
-  const percentLines: string[] = [];
-  if (data.marginPercent !== null) {
-    percentLines.push(`Margin: ${data.marginPercent.toFixed(2)}%`);
+  // REMARKS box (M45:T52): the distinct margin/bank/SOP percentages actually
+  // used -- each with the items it applies to, NOT one blended/averaged
+  // percentage -- plus the 12% VAT already embedded in each (decomposed for
+  // BIR-style net/VAT reporting, not an additional charge), stacked on the
+  // bottom rows (last line pushed lands on the bottom-most row), with any
+  // item-overflow note at the top of the box.
+  const vat = computeVatBreakdown({
+    marginAmount: data.marginAmount ?? 0,
+    bankAmount: data.bankAmount ?? 0,
+    sopAmount: data.sopAmount ?? 0,
+    // Unused here -- this box only needs the per-component VAT lines, not
+    // the grand total (that's po_amount, printed separately).
+    sellingAmount: 0,
+  });
+
+  const groupByPercentage = (
+    getPercent: (item: (typeof items)[number]) => number | null,
+  ): Array<{ percent: number; descriptions: string[] }> => {
+    const groups = new Map<number, string[]>();
+    for (const item of items) {
+      const percent = getPercent(item);
+      if (percent === null) continue;
+      const descriptions = groups.get(percent) ?? [];
+      descriptions.push(item.description);
+      groups.set(percent, descriptions);
+    }
+    return Array.from(groups.entries())
+      .sort(([a], [b]) => a - b)
+      .map(([percent, descriptions]) => ({ percent, descriptions }));
+  };
+
+  const remarksLines: string[] = [];
+  for (const [label, groups] of [
+    ["Margin", groupByPercentage((item) => item.marginPercentage)],
+    ["Bank", groupByPercentage((item) => item.bankPercentage)],
+    ["SOP", groupByPercentage((item) => item.sopPercentage)],
+  ] as const) {
+    for (const group of groups) {
+      remarksLines.push(
+        `${label} ${group.percent.toFixed(2)}%: ${group.descriptions.join(", ")}`,
+      );
+    }
   }
-  if (data.bankPercent !== null) {
-    percentLines.push(`Bank: ${data.bankPercent.toFixed(2)}%`);
+  if ((data.marginAmount ?? 0) > 0) {
+    remarksLines.push(`Margin VAT (12%, incl.): ${formatCurrency(vat.marginVat)}`);
   }
-  if (data.sopPercent !== null) {
-    percentLines.push(`SOP: ${data.sopPercent.toFixed(2)}%`);
+  if ((data.bankAmount ?? 0) > 0) {
+    remarksLines.push(`Bank VAT (12%, incl.): ${formatCurrency(vat.bankVat)}`);
   }
-  percentLines.forEach((line, index) => {
-    const row = REMARKS_BOTTOM_ROW - (percentLines.length - 1 - index);
+  if ((data.sopAmount ?? 0) > 0) {
+    remarksLines.push(`SOP VAT (12%, incl.): ${formatCurrency(vat.sopVat)}`);
+  }
+  remarksLines.forEach((line, index) => {
+    const row = REMARKS_BOTTOM_ROW - (remarksLines.length - 1 - index);
     sheet.setString(`N${row}`, line);
   });
 
