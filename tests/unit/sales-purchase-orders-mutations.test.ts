@@ -195,6 +195,7 @@ describe("convertQuotationToPurchaseOrder", () => {
                 {
                   description: "Pump",
                   quantity: 2,
+                  raw_cost: "325000",
                   unit_cost: "350000",
                   sort_order: 0,
                   margin_percentage: "10",
@@ -241,6 +242,8 @@ describe("convertQuotationToPurchaseOrder", () => {
     expect(insertedItems).toEqual([
       expect.objectContaining({
         description: "Pump",
+        raw_cost: "325000",
+        unit_cost: "350000",
         margin_percentage: "10",
         margin_amount: "70000",
         bank_percentage: null,
@@ -472,7 +475,7 @@ describe("updatePurchaseOrderDetails", () => {
     clientPoNumber: "cpo-1",
     quotationReference: "q-1",
   };
-  const onePoItem = [{ id: "i1", line_total: "700000" }];
+  const onePoItem = [{ id: "i1", line_total: "700000", quantity: "1" }];
 
   it("throws when the purchase order is missing", async () => {
     mockClient = createSupabaseMock({ tables: { purchase_orders: fail } });
@@ -537,12 +540,16 @@ describe("updatePurchaseOrderDetails", () => {
     await expect(updatePurchaseOrderDetails(input)).resolves.toBeUndefined();
 
     expect(updatePayload).toMatchObject({
-      margin_percentage: 10,
-      margin_amount: 70000,
-      // 700000 direct cost + 70000 margin, no bank/sop -- selling_amount stays pre-VAT.
-      selling_amount: 770000,
-      // po_amount is the grand total: selling_amount + 8400 VAT (12% of margin).
-      po_amount: 778400,
+      // Margin is gross margin ON the selling price: Selling = 700000 / (1 - 0.10)
+      // = 777777.78, so margin_amount is 77777.78, not 70000, and the blended
+      // margin_percentage (77777.78 / 700000) comes back as 11.11.
+      margin_percentage: 11.11,
+      margin_amount: 77777.78,
+      // The exact total, not rounded up to the nearest 100.
+      selling_amount: 777777.78,
+      // VAT is already resolved within cost/margin (see computeSalesPricing) --
+      // po_amount is just selling_amount, nothing added on top.
+      po_amount: 777777.78,
       client_po_number: "CPO-1",
       quotation_reference: "Q-1",
     });

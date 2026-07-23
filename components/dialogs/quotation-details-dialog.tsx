@@ -21,7 +21,15 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Callout, StatusBadge, textareaClassName } from "@/components/patterns";
+import {
+  Callout,
+  DataCard,
+  DataField,
+  PricingBreakdown,
+  ResponsiveTable,
+  StatusBadge,
+  textareaClassName,
+} from "@/components/patterns";
 import {
   Select,
   SelectContent,
@@ -29,11 +37,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import {
-  computeAggregatePricing,
-  computeSalesPricing,
-  computeVatBreakdown,
-} from "@/lib/sales/pricing";
+import { computeAggregatePricing, computeSalesPricing } from "@/lib/sales/pricing";
 import type {
   SalesQuotation,
   SalesQuotationItemPricingInput,
@@ -87,8 +91,13 @@ type ItemPricingFields = {
   sopPercentage: string;
 };
 
+// Margin defaults to 25% (SPMC's standard MARKUP% across its costing sheets)
+// for new/unpriced items -- still fully editable. Bank% and SOP% have no such
+// standard and stay blank until the sales rep enters them.
+const DEFAULT_MARGIN_PERCENTAGE = "25";
+
 const emptyItemPricing: ItemPricingFields = {
-  marginPercentage: "",
+  marginPercentage: DEFAULT_MARGIN_PERCENTAGE,
   bankPercentage: "",
   sopPercentage: "",
 };
@@ -251,7 +260,9 @@ export function QuotationDetailsDialog({
     quotation.items.forEach((item) => {
       nextItemPricing[item.id] = {
         marginPercentage:
-          item.marginPercentage === null ? "" : String(item.marginPercentage),
+          item.marginPercentage === null
+            ? DEFAULT_MARGIN_PERCENTAGE
+            : String(item.marginPercentage),
         bankPercentage: item.bankPercentage === null ? "" : String(item.bankPercentage),
         sopPercentage: item.sopPercentage === null ? "" : String(item.sopPercentage),
       };
@@ -264,7 +275,7 @@ export function QuotationDetailsDialog({
     setUniformMarginPercentage(
       firstItem && firstItem.marginPercentage !== null
         ? String(firstItem.marginPercentage)
-        : "",
+        : DEFAULT_MARGIN_PERCENTAGE,
     );
     setUniformBankPercentage(
       firstItem && firstItem.bankPercentage !== null
@@ -318,6 +329,7 @@ export function QuotationDetailsDialog({
     const row = itemPricing[item.id] ?? emptyItemPricing;
     const itemPricingResult = computeSalesPricing({
       directCost: item.lineTotal,
+      quantity: item.quantity,
       marginPercentage: Number(row.marginPercentage) || 0,
       bankPercentage: Number(row.bankPercentage) || 0,
       sopPercentage: Number(row.sopPercentage) || 0,
@@ -332,17 +344,6 @@ export function QuotationDetailsDialog({
   });
 
   const pricing = computeAggregatePricing(pricedItems);
-  // VAT applies once, to the rolled-up aggregate -- not per item -- so
-  // pricing.sellingAmount stays pre-VAT and vat.grandTotal is the final amount.
-  const vat = computeVatBreakdown(pricing);
-  // Read-only summary VAT, derived from the quotation's already-persisted
-  // blended amounts (not the live edit-state pricing above).
-  const blendedVat = computeVatBreakdown({
-    marginAmount: quotation.marginAmount ?? 0,
-    bankAmount: quotation.bankAmount ?? 0,
-    sopAmount: quotation.sopAmount ?? 0,
-    sellingAmount: quotation.sellingAmount ?? quotation.amount,
-  });
 
   const paymentTermsResolved =
     paymentTermsSelect === "Other"
@@ -596,7 +597,7 @@ export function QuotationDetailsDialog({
     >
       <DialogContent
         className={cn(
-          "max-h-[90vh] max-w-2xl overflow-y-auto md:max-w-3xl lg:max-w-4xl",
+          "max-h-[90vh] max-w-2xl overflow-y-auto overflow-x-hidden md:max-w-4xl lg:max-w-6xl",
           "data-[state=open]:slide-in-from-left-1/2 data-[state=open]:slide-in-from-top-[48%]",
           "data-[state=closed]:slide-out-to-left-1/2 data-[state=closed]:slide-out-to-top-[48%]",
         )}
@@ -772,130 +773,180 @@ export function QuotationDetailsDialog({
               </div>
             )}
 
-            <div className="overflow-x-auto">
-              <table className="w-full min-w-[720px] whitespace-nowrap text-xs">
-                <thead className="text-left text-muted-foreground">
-                  <tr>
-                    {hasUnequalMargins ? <th className="w-6 py-1"></th> : null}
-                    <th className="py-1 pr-3 font-medium">Item</th>
-                    <th className="py-1 pr-3 font-medium">Direct Cost</th>
-                    <th className="py-1 pr-3 font-medium">Margin %</th>
-                    <th className="py-1 pr-3 font-medium">Bank %</th>
-                    <th className="py-1 pr-3 font-medium">SOP %</th>
-                    <th className="py-1 pr-3 font-medium">Margin Amt</th>
-                    <th className="py-1 pr-3 font-medium">Bank Amt</th>
-                    <th className="py-1 pr-3 font-medium">SOP Amt</th>
-                    <th className="py-1 font-medium">Selling</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {pricedItems.map((item) => (
-                    <tr key={item.id} className="border-t">
-                      {hasUnequalMargins ? (
-                        <td className="py-1">
-                          <Checkbox
-                            checked={selectedItemIds.has(item.id)}
-                            onCheckedChange={(checked) =>
-                              toggleItemSelected(item.id, checked === true)
+            <ResponsiveTable
+              table={
+                <table className="w-full min-w-[720px] whitespace-nowrap text-xs">
+                  <thead className="text-left text-muted-foreground">
+                    <tr>
+                      {hasUnequalMargins ? <th className="w-6 py-1"></th> : null}
+                      <th className="py-1 pr-3 font-medium">Item</th>
+                      <th className="py-1 pr-3 font-medium">Direct Cost</th>
+                      <th className="py-1 pr-3 font-medium">Margin %</th>
+                      <th className="py-1 pr-3 font-medium">Bank %</th>
+                      <th className="py-1 pr-3 font-medium">SOP %</th>
+                      <th className="py-1 pr-3 font-medium">Margin Amt</th>
+                      <th className="py-1 pr-3 font-medium">Bank Amt</th>
+                      <th className="py-1 pr-3 font-medium">SOP Amt</th>
+                      <th className="py-1 font-medium">Selling</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {pricedItems.map((item) => (
+                      <tr key={item.id} className="border-t">
+                        {hasUnequalMargins ? (
+                          <td className="py-1">
+                            <Checkbox
+                              checked={selectedItemIds.has(item.id)}
+                              onCheckedChange={(checked) =>
+                                toggleItemSelected(item.id, checked === true)
+                              }
+                              aria-label={`Select ${item.description}`}
+                            />
+                          </td>
+                        ) : null}
+                        <td className="py-1 pr-3">{item.description}</td>
+                        <td className="py-1 pr-3">{formatCurrency(item.directCost)}</td>
+                        <td className="py-1 pr-3">
+                          <NumberInput
+                            value={item.marginPercentage}
+                            onValueChange={(value) =>
+                              updateItemPercentage(item.id, "marginPercentage", value)
                             }
-                            aria-label={`Select ${item.description}`}
+                            disabled={!hasUnequalMargins}
+                            className="h-7 w-20 text-xs"
                           />
                         </td>
-                      ) : null}
-                      <td className="py-1 pr-3">{item.description}</td>
-                      <td className="py-1 pr-3">{formatCurrency(item.directCost)}</td>
-                      <td className="py-1 pr-3">
-                        <NumberInput
-                          value={item.marginPercentage}
-                          onValueChange={(value) =>
-                            updateItemPercentage(item.id, "marginPercentage", value)
-                          }
-                          disabled={!hasUnequalMargins}
-                          className="h-7 w-20 text-xs"
-                        />
+                        <td className="py-1 pr-3">
+                          <NumberInput
+                            value={item.bankPercentage}
+                            onValueChange={(value) =>
+                              updateItemPercentage(item.id, "bankPercentage", value)
+                            }
+                            disabled={!hasUnequalMargins}
+                            className="h-7 w-20 text-xs"
+                          />
+                        </td>
+                        <td className="py-1 pr-3">
+                          <NumberInput
+                            value={item.sopPercentage}
+                            onValueChange={(value) =>
+                              updateItemPercentage(item.id, "sopPercentage", value)
+                            }
+                            disabled={!hasUnequalMargins}
+                            className="h-7 w-20 text-xs"
+                          />
+                        </td>
+                        <td className="py-1 pr-3">{formatCurrency(item.marginAmount)}</td>
+                        <td className="py-1 pr-3">{formatCurrency(item.bankAmount)}</td>
+                        <td className="py-1 pr-3">{formatCurrency(item.sopAmount)}</td>
+                        <td className="py-1">{formatCurrency(item.sellingAmount)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                  <tfoot>
+                    <tr className="border-t font-semibold">
+                      <td className="py-1 pr-3" colSpan={hasUnequalMargins ? 2 : 1}>
+                        Total
                       </td>
+                      <td className="py-1 pr-3">{formatCurrency(pricing.directCost)}</td>
+                      <td className="py-1 pr-3" colSpan={3}></td>
                       <td className="py-1 pr-3">
-                        <NumberInput
-                          value={item.bankPercentage}
-                          onValueChange={(value) =>
-                            updateItemPercentage(item.id, "bankPercentage", value)
-                          }
-                          disabled={!hasUnequalMargins}
-                          className="h-7 w-20 text-xs"
-                        />
+                        {formatCurrency(pricing.marginAmount)}
                       </td>
-                      <td className="py-1 pr-3">
-                        <NumberInput
-                          value={item.sopPercentage}
-                          onValueChange={(value) =>
-                            updateItemPercentage(item.id, "sopPercentage", value)
-                          }
-                          disabled={!hasUnequalMargins}
-                          className="h-7 w-20 text-xs"
-                        />
-                      </td>
-                      <td className="py-1 pr-3">{formatCurrency(item.marginAmount)}</td>
-                      <td className="py-1 pr-3">{formatCurrency(item.bankAmount)}</td>
-                      <td className="py-1 pr-3">{formatCurrency(item.sopAmount)}</td>
-                      <td className="py-1">{formatCurrency(item.sellingAmount)}</td>
+                      <td className="py-1 pr-3">{formatCurrency(pricing.bankAmount)}</td>
+                      <td className="py-1 pr-3">{formatCurrency(pricing.sopAmount)}</td>
+                      <td className="py-1">{formatCurrency(pricing.sellingAmount)}</td>
                     </tr>
-                  ))}
-                </tbody>
-                <tfoot>
-                  <tr className="border-t font-semibold">
-                    <td className="py-1 pr-3" colSpan={hasUnequalMargins ? 2 : 1}>
-                      Total
-                    </td>
-                    <td className="py-1 pr-3">{formatCurrency(pricing.directCost)}</td>
-                    <td className="py-1 pr-3" colSpan={3}></td>
-                    <td className="py-1 pr-3">{formatCurrency(pricing.marginAmount)}</td>
-                    <td className="py-1 pr-3">{formatCurrency(pricing.bankAmount)}</td>
-                    <td className="py-1 pr-3">{formatCurrency(pricing.sopAmount)}</td>
-                    <td className="py-1">{formatCurrency(pricing.sellingAmount)}</td>
-                  </tr>
-                </tfoot>
-              </table>
-            </div>
+                  </tfoot>
+                </table>
+              }
+              cards={pricedItems.map((item) => (
+                <DataCard
+                  key={item.id}
+                  header={
+                    <div className="flex w-full items-start gap-2">
+                      {hasUnequalMargins ? (
+                        <Checkbox
+                          checked={selectedItemIds.has(item.id)}
+                          onCheckedChange={(checked) =>
+                            toggleItemSelected(item.id, checked === true)
+                          }
+                          aria-label={`Select ${item.description}`}
+                          className="mt-0.5 shrink-0"
+                        />
+                      ) : null}
+                      <p className="min-w-0 flex-1 font-medium">{item.description}</p>
+                    </div>
+                  }
+                >
+                  <DataField
+                    label="Direct Cost"
+                    value={formatCurrency(item.directCost)}
+                  />
+                  <DataField
+                    label="Margin %"
+                    value={
+                      <NumberInput
+                        value={item.marginPercentage}
+                        onValueChange={(value) =>
+                          updateItemPercentage(item.id, "marginPercentage", value)
+                        }
+                        disabled={!hasUnequalMargins}
+                        aria-label={`Margin % for ${item.description}`}
+                        className="ml-auto h-8 w-24 text-right text-xs"
+                      />
+                    }
+                  />
+                  <DataField
+                    label="Bank %"
+                    value={
+                      <NumberInput
+                        value={item.bankPercentage}
+                        onValueChange={(value) =>
+                          updateItemPercentage(item.id, "bankPercentage", value)
+                        }
+                        disabled={!hasUnequalMargins}
+                        aria-label={`Bank % for ${item.description}`}
+                        className="ml-auto h-8 w-24 text-right text-xs"
+                      />
+                    }
+                  />
+                  <DataField
+                    label="SOP %"
+                    value={
+                      <NumberInput
+                        value={item.sopPercentage}
+                        onValueChange={(value) =>
+                          updateItemPercentage(item.id, "sopPercentage", value)
+                        }
+                        disabled={!hasUnequalMargins}
+                        aria-label={`SOP % for ${item.description}`}
+                        className="ml-auto h-8 w-24 text-right text-xs"
+                      />
+                    }
+                  />
+                  <DataField
+                    label="Margin Amt"
+                    value={formatCurrency(item.marginAmount)}
+                  />
+                  <DataField label="Bank Amt" value={formatCurrency(item.bankAmount)} />
+                  <DataField label="SOP Amt" value={formatCurrency(item.sopAmount)} />
+                  <DataField
+                    label="Selling"
+                    value={formatCurrency(item.sellingAmount)}
+                    className="border-t pt-1.5 font-semibold"
+                  />
+                </DataCard>
+              ))}
+            />
 
-            <div className="grid grid-cols-1 sm:grid-cols-[160px_1fr] items-center gap-2 border-t pt-3">
-              <Label className="font-semibold">Selling Amount</Label>
-              <span className="text-base font-semibold">
-                {formatCurrency(pricing.sellingAmount)}
-              </span>
-            </div>
-
-            {pricing.marginAmount > 0 ||
-            pricing.bankAmount > 0 ||
-            pricing.sopAmount > 0 ? (
-              <div className="rounded-md border bg-muted/30 p-3 text-sm space-y-1">
-                <div className="flex justify-between text-muted-foreground">
-                  <span>Selling Amount</span>
-                  <span>{formatCurrency(pricing.sellingAmount)}</span>
-                </div>
-                {pricing.marginAmount > 0 ? (
-                  <div className="flex justify-between text-muted-foreground">
-                    <span>+ Margin VAT (12%)</span>
-                    <span>{formatCurrency(vat.marginVat)}</span>
-                  </div>
-                ) : null}
-                {pricing.bankAmount > 0 ? (
-                  <div className="flex justify-between text-muted-foreground">
-                    <span>+ Bank VAT (12%)</span>
-                    <span>{formatCurrency(vat.bankVat)}</span>
-                  </div>
-                ) : null}
-                {pricing.sopAmount > 0 ? (
-                  <div className="flex justify-between text-muted-foreground">
-                    <span>+ SOP VAT (12%)</span>
-                    <span>{formatCurrency(vat.sopVat)}</span>
-                  </div>
-                ) : null}
-                <div className="flex justify-between border-t pt-1 font-semibold">
-                  <span>Grand Total (incl. VAT)</span>
-                  <span>{formatCurrency(vat.grandTotal)}</span>
-                </div>
-              </div>
-            ) : null}
+            <PricingBreakdown
+              directCost={pricing.directCost}
+              marginAmount={pricing.marginAmount}
+              bankAmount={pricing.bankAmount}
+              sopAmount={pricing.sopAmount}
+              sellingAmount={pricing.sellingAmount}
+            />
 
             <div className="grid gap-3 sm:grid-cols-2">
               <div>
@@ -1043,7 +1094,7 @@ export function QuotationDetailsDialog({
         ) : (
           <>
             {quotation.items.length > 0 ? (
-              <div className="mt-5 overflow-x-auto rounded-md border bg-muted/20 p-4 text-sm">
+              <div className="mt-5 rounded-md border bg-muted/20 p-4 text-sm">
                 <p className="mb-2 flex items-center gap-2 text-sm font-medium text-muted-foreground">
                   Line Items & Pricing
                   {quotation.hasUnequalMargins ? (
@@ -1052,107 +1103,148 @@ export function QuotationDetailsDialog({
                     </span>
                   ) : null}
                 </p>
-                <table className="w-full min-w-[720px] whitespace-nowrap text-xs">
-                  <thead className="text-left text-muted-foreground">
-                    <tr>
-                      <th className="py-1 pr-3 font-medium">Item</th>
-                      <th className="py-1 pr-3 font-medium">Direct Cost</th>
-                      <th className="py-1 pr-3 font-medium">Margin %</th>
-                      <th className="py-1 pr-3 font-medium">Bank %</th>
-                      <th className="py-1 pr-3 font-medium">SOP %</th>
-                      <th className="py-1 pr-3 font-medium">Margin Amt</th>
-                      <th className="py-1 pr-3 font-medium">Bank Amt</th>
-                      <th className="py-1 pr-3 font-medium">SOP Amt</th>
-                      <th className="py-1 font-medium">Selling</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {quotation.items.map((item) => (
-                      <tr key={item.id} className="border-t">
-                        <td className="py-1 pr-3">{item.description}</td>
-                        <td className="py-1 pr-3">{formatCurrency(item.lineTotal)}</td>
-                        <td className="py-1 pr-3">
-                          {formatPercent(item.marginPercentage)}
-                        </td>
-                        <td className="py-1 pr-3">
-                          {formatPercent(item.bankPercentage)}
-                        </td>
-                        <td className="py-1 pr-3">{formatPercent(item.sopPercentage)}</td>
-                        <td className="py-1 pr-3">
-                          {item.marginAmount === null
+                <ResponsiveTable
+                  table={
+                    <table className="w-full min-w-[720px] whitespace-nowrap text-xs">
+                      <thead className="text-left text-muted-foreground">
+                        <tr>
+                          <th className="py-1 pr-3 font-medium">Item</th>
+                          <th className="py-1 pr-3 font-medium">Direct Cost</th>
+                          <th className="py-1 pr-3 font-medium">Margin %</th>
+                          <th className="py-1 pr-3 font-medium">Bank %</th>
+                          <th className="py-1 pr-3 font-medium">SOP %</th>
+                          <th className="py-1 pr-3 font-medium">Margin Amt</th>
+                          <th className="py-1 pr-3 font-medium">Bank Amt</th>
+                          <th className="py-1 pr-3 font-medium">SOP Amt</th>
+                          <th className="py-1 font-medium">Selling</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {quotation.items.map((item) => (
+                          <tr key={item.id} className="border-t">
+                            <td className="py-1 pr-3">{item.description}</td>
+                            <td className="py-1 pr-3">
+                              {formatCurrency(item.lineTotal)}
+                            </td>
+                            <td className="py-1 pr-3">
+                              {formatPercent(item.marginPercentage)}
+                            </td>
+                            <td className="py-1 pr-3">
+                              {formatPercent(item.bankPercentage)}
+                            </td>
+                            <td className="py-1 pr-3">
+                              {formatPercent(item.sopPercentage)}
+                            </td>
+                            <td className="py-1 pr-3">
+                              {item.marginAmount === null
+                                ? "—"
+                                : formatCurrency(item.marginAmount)}
+                            </td>
+                            <td className="py-1 pr-3">
+                              {item.bankAmount === null
+                                ? "—"
+                                : formatCurrency(item.bankAmount)}
+                            </td>
+                            <td className="py-1 pr-3">
+                              {item.sopAmount === null
+                                ? "—"
+                                : formatCurrency(item.sopAmount)}
+                            </td>
+                            <td className="py-1">
+                              {item.sellingAmount === null
+                                ? "—"
+                                : formatCurrency(item.sellingAmount)}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                      <tfoot>
+                        <tr className="border-t font-semibold">
+                          <td className="py-1 pr-3">Total</td>
+                          <td className="py-1 pr-3">
+                            {formatCurrency(quotation.cost ?? 0)}
+                          </td>
+                          <td className="py-1 pr-3" colSpan={3}></td>
+                          <td className="py-1 pr-3">
+                            {formatCurrency(quotation.marginAmount ?? 0)}
+                          </td>
+                          <td className="py-1 pr-3">
+                            {formatCurrency(quotation.bankAmount ?? 0)}
+                          </td>
+                          <td className="py-1 pr-3">
+                            {formatCurrency(quotation.sopAmount ?? 0)}
+                          </td>
+                          <td className="py-1">
+                            {formatCurrency(quotation.sellingAmount ?? quotation.amount)}
+                          </td>
+                        </tr>
+                      </tfoot>
+                    </table>
+                  }
+                  cards={quotation.items.map((item) => (
+                    <DataCard
+                      key={item.id}
+                      header={<p className="font-medium">{item.description}</p>}
+                    >
+                      <DataField
+                        label="Direct Cost"
+                        value={formatCurrency(item.lineTotal)}
+                      />
+                      <DataField
+                        label="Margin %"
+                        value={formatPercent(item.marginPercentage)}
+                      />
+                      <DataField
+                        label="Bank %"
+                        value={formatPercent(item.bankPercentage)}
+                      />
+                      <DataField
+                        label="SOP %"
+                        value={formatPercent(item.sopPercentage)}
+                      />
+                      <DataField
+                        label="Margin Amt"
+                        value={
+                          item.marginAmount === null
                             ? "—"
-                            : formatCurrency(item.marginAmount)}
-                        </td>
-                        <td className="py-1 pr-3">
-                          {item.bankAmount === null
+                            : formatCurrency(item.marginAmount)
+                        }
+                      />
+                      <DataField
+                        label="Bank Amt"
+                        value={
+                          item.bankAmount === null ? "—" : formatCurrency(item.bankAmount)
+                        }
+                      />
+                      <DataField
+                        label="SOP Amt"
+                        value={
+                          item.sopAmount === null ? "—" : formatCurrency(item.sopAmount)
+                        }
+                      />
+                      <DataField
+                        label="Selling"
+                        value={
+                          item.sellingAmount === null
                             ? "—"
-                            : formatCurrency(item.bankAmount)}
-                        </td>
-                        <td className="py-1 pr-3">
-                          {item.sopAmount === null ? "—" : formatCurrency(item.sopAmount)}
-                        </td>
-                        <td className="py-1">
-                          {item.sellingAmount === null
-                            ? "—"
-                            : formatCurrency(item.sellingAmount)}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                  <tfoot>
-                    <tr className="border-t font-semibold">
-                      <td className="py-1 pr-3">Total</td>
-                      <td className="py-1 pr-3">{formatCurrency(quotation.cost ?? 0)}</td>
-                      <td className="py-1 pr-3" colSpan={3}></td>
-                      <td className="py-1 pr-3">
-                        {formatCurrency(quotation.marginAmount ?? 0)}
-                      </td>
-                      <td className="py-1 pr-3">
-                        {formatCurrency(quotation.bankAmount ?? 0)}
-                      </td>
-                      <td className="py-1 pr-3">
-                        {formatCurrency(quotation.sopAmount ?? 0)}
-                      </td>
-                      <td className="py-1">
-                        {formatCurrency(quotation.sellingAmount ?? quotation.amount)}
-                      </td>
-                    </tr>
-                  </tfoot>
-                </table>
+                            : formatCurrency(item.sellingAmount)
+                        }
+                        className="border-t pt-1.5 font-semibold"
+                      />
+                    </DataCard>
+                  ))}
+                />
               </div>
             ) : null}
 
             <dl className="mt-5 grid gap-3 rounded-md border bg-muted/20 p-4 text-sm">
-              <div className="rounded-md border bg-muted/30 p-3 text-sm space-y-1">
-                <div className="flex justify-between text-muted-foreground">
-                  <span>Selling Amount</span>
-                  <span>
-                    {formatCurrency(quotation.sellingAmount ?? quotation.amount)}
-                  </span>
-                </div>
-                {blendedVat.marginVat > 0 ? (
-                  <div className="flex justify-between text-muted-foreground">
-                    <span>+ Margin VAT (12%)</span>
-                    <span>{formatCurrency(blendedVat.marginVat)}</span>
-                  </div>
-                ) : null}
-                {blendedVat.bankVat > 0 ? (
-                  <div className="flex justify-between text-muted-foreground">
-                    <span>+ Bank VAT (12%)</span>
-                    <span>{formatCurrency(blendedVat.bankVat)}</span>
-                  </div>
-                ) : null}
-                {blendedVat.sopVat > 0 ? (
-                  <div className="flex justify-between text-muted-foreground">
-                    <span>+ SOP VAT (12%)</span>
-                    <span>{formatCurrency(blendedVat.sopVat)}</span>
-                  </div>
-                ) : null}
-                <div className="flex justify-between border-t pt-1 font-bold">
-                  <span>Grand Total</span>
-                  <span>{formatCurrency(blendedVat.grandTotal)}</span>
-                </div>
-              </div>
+              <PricingBreakdown
+                directCost={quotation.cost ?? 0}
+                marginAmount={quotation.marginAmount ?? 0}
+                bankAmount={quotation.bankAmount ?? 0}
+                sopAmount={quotation.sopAmount ?? 0}
+                sellingAmount={quotation.sellingAmount ?? quotation.amount}
+              />
               <div className="grid grid-cols-1 sm:grid-cols-[160px_1fr] gap-2">
                 <dt className="text-muted-foreground">Payment Terms</dt>
                 <dd>

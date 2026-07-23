@@ -2,7 +2,7 @@ import { getCurrentProfile } from "@/lib/profile/get-current-profile";
 import {
   computeAggregatePricing,
   computeSalesPricing,
-  computeVatBreakdown,
+  repriceStoredItems,
 } from "@/lib/sales/pricing";
 import { createClient } from "@/lib/supabase/server";
 
@@ -492,7 +492,7 @@ export async function listSalesQuotations(): Promise<SalesQuotation[]> {
         : rejectedApproval.approver
       : null;
 
-    const items = (Array.isArray(row.quotation_items) ? row.quotation_items : [])
+    const storedItems = (Array.isArray(row.quotation_items) ? row.quotation_items : [])
       .slice()
       .sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0))
       .map((item) => ({
@@ -502,13 +502,31 @@ export async function listSalesQuotations(): Promise<SalesQuotation[]> {
         unitCost: item.unit_cost === null ? null : Number(item.unit_cost),
         lineTotal: Number(item.line_total),
         marginPercentage: numberOrNull(item.margin_percentage),
-        marginAmount: numberOrNull(item.margin_amount),
         bankPercentage: numberOrNull(item.bank_percentage),
-        bankAmount: numberOrNull(item.bank_amount),
         sopPercentage: numberOrNull(item.sop_percentage),
-        sopAmount: numberOrNull(item.sop_amount),
-        sellingAmount: numberOrNull(item.selling_amount),
       }));
+
+    // Recomputed from stored cost + percentages rather than trusting the
+    // persisted *_amount columns -- see repriceStoredItems for why (amounts
+    // saved under an older pricing formula never get corrected in place).
+    // This also drives the displayed headline `amount` below so the
+    // breakdown always foots to the total; the stored `row.amount` used for
+    // approvalStages above is left alone since that reflects the amount the
+    // approval chain actually ran against historically.
+    const repriced = repriceStoredItems(
+      storedItems.map((item) => ({
+        directCost: item.lineTotal,
+        quantity: item.quantity,
+        marginPercentage: item.marginPercentage,
+        bankPercentage: item.bankPercentage,
+        sopPercentage: item.sopPercentage,
+      })),
+    );
+
+    const items = storedItems.map((item, index) => ({
+      ...item,
+      ...repriced.items[index],
+    }));
 
     return {
       id: row.id,
@@ -516,7 +534,7 @@ export async function listSalesQuotations(): Promise<SalesQuotation[]> {
       clientId: row.client_id,
       clientName: client?.company_name ?? "Unknown client",
       subject: row.subject,
-      amount: Number(row.amount),
+      amount: repriced.aggregate ? repriced.aggregate.sellingAmount : Number(row.amount),
       cost: row.cost === null ? null : Number(row.cost),
       items,
       googleDriveLink: row.google_drive_link,
@@ -537,12 +555,20 @@ export async function listSalesQuotations(): Promise<SalesQuotation[]> {
           ? null
           : Number(row.sales_margin_percent),
       marginPercentage: numberOrNull(row.margin_percentage),
-      marginAmount: numberOrNull(row.margin_amount),
+      marginAmount: repriced.aggregate
+        ? repriced.aggregate.marginAmount
+        : numberOrNull(row.margin_amount),
       bankPercentage: numberOrNull(row.bank_percentage),
-      bankAmount: numberOrNull(row.bank_amount),
+      bankAmount: repriced.aggregate
+        ? repriced.aggregate.bankAmount
+        : numberOrNull(row.bank_amount),
       sopPercentage: numberOrNull(row.sop_percentage),
-      sopAmount: numberOrNull(row.sop_amount),
-      sellingAmount: numberOrNull(row.selling_amount),
+      sopAmount: repriced.aggregate
+        ? repriced.aggregate.sopAmount
+        : numberOrNull(row.sop_amount),
+      sellingAmount: repriced.aggregate
+        ? repriced.aggregate.sellingAmount
+        : numberOrNull(row.selling_amount),
       hasUnequalMargins: Boolean(row.has_unequal_margins),
       paymentTerms: row.payment_terms ?? null,
       paymentTermsCustom: row.payment_terms_custom ?? null,
@@ -591,7 +617,7 @@ export async function updateSalesQuotationDetails(input: {
   const { data: quotationRow, error: quotationError } = await supabase
     .from("quotations")
     .select(
-      "id, status, phase, client_confirmed_at, converted_po_id, quotation_items(id, line_total)",
+      "id, status, phase, client_confirmed_at, converted_po_id, quotation_items(id, line_total, quantity)",
     )
     .eq("id", input.quotationId)
     .single();
@@ -624,9 +650,12 @@ export async function updateSalesQuotationDetails(input: {
     : [];
   // Direct cost per item is read fresh from the DB rather than trusted from
   // the client, same as the aggregate `cost` was read before this change.
+  // Quantity comes along so computeSalesPricing can recover the per-unit
+  // price it rounds against.
   const lineTotalById = new Map(
     itemRows.map((item) => [item.id, Number(item.line_total)]),
   );
+  const quantityById = new Map(itemRows.map((item) => [item.id, Number(item.quantity)]));
 
   if (input.items.length === 0 || input.items.length !== itemRows.length) {
     throw new Error("Every line item on this quotation needs pricing.");
@@ -640,6 +669,7 @@ export async function updateSalesQuotationDetails(input: {
 
     const pricing = computeSalesPricing({
       directCost,
+      quantity: quantityById.get(item.id),
       marginPercentage: item.marginPercentage ?? 0,
       bankPercentage: item.bankPercentage ?? 0,
       sopPercentage: item.sopPercentage ?? 0,
@@ -682,11 +712,10 @@ export async function updateSalesQuotationDetails(input: {
   // Blended weighted-average percentages + summed amounts, written back to
   // the record-level columns so every existing reader (executive dashboard,
   // worksheet exports, the >=3M approval threshold via `amount`) keeps
-  // working unchanged. VAT is applied once here, on the rolled-up aggregate --
-  // not per item -- so `selling_amount` stays the pre-VAT figure and `amount`
-  // becomes the VAT-inclusive grand total.
+  // working unchanged. VAT is already resolved within cost and the margin
+  // gross-up (see computeSalesPricing) -- `amount` is just the aggregate
+  // sellingAmount, not sellingAmount plus additional VAT.
   const aggregate = computeAggregatePricing(pricedItems);
-  const vat = computeVatBreakdown(aggregate);
 
   const { error: updateError } = await supabase
     .from("quotations")
@@ -701,7 +730,7 @@ export async function updateSalesQuotationDetails(input: {
       sop_percentage: aggregate.sopPercentage,
       sop_amount: aggregate.sopAmount,
       selling_amount: aggregate.sellingAmount,
-      amount: vat.grandTotal,
+      amount: aggregate.sellingAmount,
       has_unequal_margins: input.hasUnequalMargins,
       google_drive_link: input.googleDriveLink,
       payment_terms: input.paymentTerms,

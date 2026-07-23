@@ -47,7 +47,7 @@ const detailsInput = {
   notes: null,
 };
 
-const oneQuotationItem = [{ id: "i1", line_total: "1000000" }];
+const oneQuotationItem = [{ id: "i1", line_total: "1000000", quantity: "1" }];
 
 describe("updateSalesQuotationDetails", () => {
   it("requires an authenticated user", async () => {

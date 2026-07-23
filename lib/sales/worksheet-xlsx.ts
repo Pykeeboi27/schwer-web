@@ -135,11 +135,10 @@ export async function generatePurchaseOrderWorksheetXlsx(
   const quotationOrPoNumber = data.clientPoNumber || "QTN SERVED AS PO";
 
   // Item rows are totalled up front so the direct-cost total can also fill
-  // the Contract Amount field. Separately, each item's own VAT-inclusive
-  // selling price (its pre-VAT selling_amount plus 12% VAT on its own
-  // margin/bank/sop) is what actually prints on the line and feeds the grand
-  // total -- summing those equals the aggregate selling price + tax exactly,
-  // since VAT is linear (12% of a sum == sum of 12% of each addend).
+  // the Contract Amount field. Each item's own selling_amount is already the
+  // final VAT-inclusive price (VAT is resolved within cost and the margin
+  // gross-up -- see computeSalesPricing), so it prints on the line and feeds
+  // the grand total as-is, with nothing added on top.
   const items =
     data.items.length > 0
       ? data.items
@@ -159,17 +158,9 @@ export async function generatePurchaseOrderWorksheetXlsx(
           },
         ];
   const totalCost = items.reduce((sum, item) => sum + item.lineTotal, 0);
-  const itemSellingWithTax = (item: (typeof items)[number]) =>
-    computeVatBreakdown({
-      marginAmount: item.marginAmount ?? 0,
-      bankAmount: item.bankAmount ?? 0,
-      sopAmount: item.sopAmount ?? 0,
-      sellingAmount: item.sellingAmount ?? item.lineTotal,
-    }).grandTotal;
-  const totalSellingWithTax = items.reduce(
-    (sum, item) => sum + itemSellingWithTax(item),
-    0,
-  );
+  const itemSelling = (item: (typeof items)[number]) =>
+    item.sellingAmount ?? item.lineTotal;
+  const totalSelling = items.reduce((sum, item) => sum + itemSelling(item), 0);
 
   // Title
   sheet.setString("I2", `SALES WORKSHEET No. ${data.poNumber}`);
@@ -212,23 +203,24 @@ export async function generatePurchaseOrderWorksheetXlsx(
     sheet.setString(`D${row}`, item.description);
     sheet.setNumber(`M${row}`, item.quantity);
     sheet.setNumber(`P${row}`, item.unitCost);
-    sheet.setNumber(`R${row}`, itemSellingWithTax(item));
+    sheet.setNumber(`R${row}`, itemSelling(item));
   });
 
-  sheet.setNumber(GRAND_TOTAL_CELL, totalSellingWithTax);
+  sheet.setNumber(GRAND_TOTAL_CELL, totalSelling);
   sheet.setString(PREPARED_BY_CELL, data.salesPersonName);
 
   // REMARKS box (M45:T52): the distinct margin/bank/SOP percentages actually
   // used -- each with the items it applies to, NOT one blended/averaged
-  // percentage -- plus their aggregate 12% VAT, stacked on the bottom rows
-  // (last line pushed lands on the bottom-most row), with any item-overflow
-  // note at the top of the box.
+  // percentage -- plus the 12% VAT already embedded in each (decomposed for
+  // BIR-style net/VAT reporting, not an additional charge), stacked on the
+  // bottom rows (last line pushed lands on the bottom-most row), with any
+  // item-overflow note at the top of the box.
   const vat = computeVatBreakdown({
     marginAmount: data.marginAmount ?? 0,
     bankAmount: data.bankAmount ?? 0,
     sopAmount: data.sopAmount ?? 0,
     // Unused here -- this box only needs the per-component VAT lines, not
-    // the VAT-inclusive grand total (that's po_amount, printed separately).
+    // the grand total (that's po_amount, printed separately).
     sellingAmount: 0,
   });
 
@@ -261,13 +253,13 @@ export async function generatePurchaseOrderWorksheetXlsx(
     }
   }
   if ((data.marginAmount ?? 0) > 0) {
-    remarksLines.push(`+ Margin VAT (12%): ${formatCurrency(vat.marginVat)}`);
+    remarksLines.push(`Margin VAT (12%, incl.): ${formatCurrency(vat.marginVat)}`);
   }
   if ((data.bankAmount ?? 0) > 0) {
-    remarksLines.push(`+ Bank VAT (12%): ${formatCurrency(vat.bankVat)}`);
+    remarksLines.push(`Bank VAT (12%, incl.): ${formatCurrency(vat.bankVat)}`);
   }
   if ((data.sopAmount ?? 0) > 0) {
-    remarksLines.push(`+ SOP VAT (12%): ${formatCurrency(vat.sopVat)}`);
+    remarksLines.push(`SOP VAT (12%, incl.): ${formatCurrency(vat.sopVat)}`);
   }
   remarksLines.forEach((line, index) => {
     const row = REMARKS_BOTTOM_ROW - (remarksLines.length - 1 - index);
