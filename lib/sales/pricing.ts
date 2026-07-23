@@ -11,7 +11,7 @@
  * digits first matches that and keeps our numbers aligned with the same
  * formula computed in Excel.
  */
-const round2 = (n: number) => Math.round(Number(n.toPrecision(12)) * 100) / 100;
+export const round2 = (n: number) => Math.round(Number(n.toPrecision(12)) * 100) / 100;
 const VAT_RATE = 0.12;
 
 export type SalesPricing = {
@@ -129,6 +129,79 @@ export function computeAggregatePricing(
     bankPercentage: blendedPercent(totals.bankAmount),
     sopPercentage: blendedPercent(totals.sopAmount),
   };
+}
+
+export type RepricedItem = {
+  marginAmount: number | null;
+  bankAmount: number | null;
+  sopAmount: number | null;
+  sellingAmount: number | null;
+};
+
+export type RepriceResult = {
+  items: RepricedItem[];
+  /** null when none of the input items are priced (nothing to roll up). */
+  aggregate: AggregateSalesPricing | null;
+};
+
+/**
+ * Recomputes display pricing from each item's stored direct cost, quantity,
+ * and percentages -- rather than trusting the `*_amount` columns persisted at
+ * save time. Those columns only get overwritten the next time a quotation/PO
+ * is edited and saved, so a record priced under an older version of
+ * `computeSalesPricing` (e.g. before margin/bank/SOP compounded the way the
+ * source costing worksheet does) keeps showing stale, wrong amounts forever
+ * on read-only views unless something re-derives them on the way out.
+ * Read loaders (quotations, purchase orders, the printed worksheet) call this
+ * so every display path stays correct without a data migration -- the
+ * `*_amount` columns themselves are left untouched in the database.
+ *
+ * An item counts as "priced" if any of its three percentages is non-null,
+ * matching the null semantics `computeSalesPricing`'s callers already rely on
+ * (unpriced legacy items show "--" rather than a computed zero). Unpriced
+ * items are excluded from the aggregate; if none are priced, `aggregate` is
+ * null so callers can leave record-level fields at their stored values.
+ */
+export function repriceStoredItems(
+  items: Array<{
+    directCost: number;
+    quantity: number;
+    marginPercentage: number | null;
+    bankPercentage: number | null;
+    sopPercentage: number | null;
+  }>,
+): RepriceResult {
+  const repriced: RepricedItem[] = items.map((item) => {
+    const isPriced =
+      item.marginPercentage !== null ||
+      item.bankPercentage !== null ||
+      item.sopPercentage !== null;
+    if (!isPriced) {
+      return { marginAmount: null, bankAmount: null, sopAmount: null, sellingAmount: null };
+    }
+    return computeSalesPricing({
+      directCost: item.directCost,
+      quantity: item.quantity,
+      marginPercentage: item.marginPercentage ?? 0,
+      bankPercentage: item.bankPercentage ?? 0,
+      sopPercentage: item.sopPercentage ?? 0,
+    });
+  });
+
+  const pricedForAggregate = items
+    .map((item, index) => ({ item, pricing: repriced[index] }))
+    .filter(
+      (
+        entry,
+      ): entry is { item: (typeof items)[number]; pricing: SalesPricing } =>
+        entry.pricing.marginAmount !== null,
+    )
+    .map(({ item, pricing }) => ({ directCost: item.directCost, ...pricing }));
+
+  const aggregate =
+    pricedForAggregate.length > 0 ? computeAggregatePricing(pricedForAggregate) : null;
+
+  return { items: repriced, aggregate };
 }
 
 export type VatBreakdown = {

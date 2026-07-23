@@ -195,6 +195,7 @@ describe("convertQuotationToPurchaseOrder", () => {
                 {
                   description: "Pump",
                   quantity: 2,
+                  raw_cost: "325000",
                   unit_cost: "350000",
                   sort_order: 0,
                   margin_percentage: "10",
@@ -241,6 +242,8 @@ describe("convertQuotationToPurchaseOrder", () => {
     expect(insertedItems).toEqual([
       expect.objectContaining({
         description: "Pump",
+        raw_cost: "325000",
+        unit_cost: "350000",
         margin_percentage: "10",
         margin_amount: "70000",
         bank_percentage: null,

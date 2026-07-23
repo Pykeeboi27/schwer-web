@@ -85,10 +85,13 @@ export type SupabaseMockConfig = {
   claims?: { sub: string; email?: string } | null;
   /** Error returned from `auth.getClaims()` (null = success). */
   claimsError?: unknown;
+  /** Error returned from `rpc()` calls (null = success). */
+  rpcError?: unknown;
 };
 
 export type SupabaseMock = {
   from: ReturnType<typeof vi.fn>;
+  rpc: ReturnType<typeof vi.fn>;
   auth: {
     getUser: ReturnType<typeof vi.fn>;
     getClaims: ReturnType<typeof vi.fn>;
@@ -141,5 +144,7 @@ export function createSupabaseMock(config: SupabaseMockConfig = {}): SupabaseMoc
     error: config.signInError ?? null,
   }));
 
-  return { from, auth: { getUser, getClaims, signUp, signInWithPassword } };
+  const rpc = vi.fn(async () => ({ data: null, error: config.rpcError ?? null }));
+
+  return { from, rpc, auth: { getUser, getClaims, signUp, signInWithPassword } };
 }

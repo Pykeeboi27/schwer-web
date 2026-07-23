@@ -492,6 +492,43 @@ ALTER TABLE public.purchase_order_items
   ADD COLUMN IF NOT EXISTS sop_amount        NUMERIC(15, 2),
   ADD COLUMN IF NOT EXISTS selling_amount    NUMERIC(15, 2);
 
+-- Exact-decimal landed unit cost (migration 0024). The source Excel costing
+-- template never has Engineering type the final per-unit cost directly: they
+-- type a clean 2-decimal raw material+labor figure, and the sheet
+-- automatically applies a fixed +3% OPEX loading then a fixed +1.5% delivery
+-- fee (Q = P*1.03, R = Q*1.015), carrying that full-precision result into the
+-- line total and rounding only once, for display. raw_cost is that new input
+-- column; line_total is redefined to compute straight from
+-- raw_cost * 1.03 * 1.015 * quantity (Postgres NUMERIC arithmetic is exact
+-- decimal, reproducing Excel's total to the centavo) when raw_cost is set,
+-- falling back to the pre-existing quantity * unit_cost behavior otherwise --
+-- every row from before this migration has raw_cost NULL, so nothing about
+-- their stored total changes. unit_cost remains a plain column: for new
+-- items it's now the *display* landed cost (computed app-side by
+-- lib/engineering/costing-quotations.ts::computeLandedUnitCost) but no
+-- longer participates in computing line_total once raw_cost is present.
+ALTER TABLE public.quotation_items
+  ADD COLUMN IF NOT EXISTS raw_cost NUMERIC(15, 2) CHECK (raw_cost IS NULL OR raw_cost >= 0);
+ALTER TABLE public.quotation_items DROP COLUMN IF EXISTS line_total;
+ALTER TABLE public.quotation_items ADD COLUMN IF NOT EXISTS line_total NUMERIC(15, 2)
+  GENERATED ALWAYS AS (
+    quantity * CASE
+      WHEN raw_cost IS NOT NULL THEN raw_cost * 1.03 * 1.015
+      ELSE COALESCE(unit_cost, 0)
+    END
+  ) STORED;
+
+ALTER TABLE public.purchase_order_items
+  ADD COLUMN IF NOT EXISTS raw_cost NUMERIC(15, 2) CHECK (raw_cost IS NULL OR raw_cost >= 0);
+ALTER TABLE public.purchase_order_items DROP COLUMN IF EXISTS line_total;
+ALTER TABLE public.purchase_order_items ADD COLUMN IF NOT EXISTS line_total NUMERIC(15, 2)
+  GENERATED ALWAYS AS (
+    quantity * CASE
+      WHEN raw_cost IS NOT NULL THEN raw_cost * 1.03 * 1.015
+      ELSE COALESCE(unit_cost, 0)
+    END
+  ) STORED;
+
 
 -- ============================================================
 -- SECTION 5: EXECUTIVE DASHBOARD — TARGETS

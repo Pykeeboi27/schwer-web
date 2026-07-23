@@ -4,6 +4,7 @@ import {
   computeAggregatePricing,
   computeSalesPricing,
   computeVatBreakdown,
+  repriceStoredItems,
   type SalesPricing,
 } from "@/lib/sales/pricing";
 
@@ -206,6 +207,96 @@ describe("computeAggregatePricing", () => {
       bankPercentage: 1,
       sopPercentage: 0.5,
     });
+  });
+});
+
+describe("repriceStoredItems", () => {
+  it("recomputes amounts from stored cost/percentages, ignoring stale persisted amounts", () => {
+    // Real-world example: this item's amounts were persisted under the
+    // pre-1119d85 flat formula (amount = cost x %, independent of margin and
+    // bank), so the "stored amount" a caller might otherwise trust is wrong.
+    // repriceStoredItems only looks at directCost/quantity/percentages.
+    const { items, aggregate } = repriceStoredItems([
+      {
+        directCost: 285000,
+        quantity: 1,
+        marginPercentage: 30,
+        bankPercentage: 5,
+        sopPercentage: 5,
+      },
+    ]);
+
+    // afterMargin = 285000 / 0.7 = 407142.857..; bank = afterMargin * 0.05;
+    // afterBank = afterMargin + bank; sop = afterBank * 0.05 = 21375 (not the
+    // old flat-formula 14250 = 285000 * 0.05).
+    expect(items[0].sopAmount).toBeCloseTo(21375, 2);
+    expect(aggregate).not.toBeNull();
+    expect(aggregate!.sopAmount).toBeCloseTo(21375, 2);
+    expect(aggregate!.sellingAmount).toBeCloseTo(items[0].sellingAmount!, 2);
+  });
+
+  it("leaves an item's amounts null and excludes it from the aggregate when none of its percentages are set", () => {
+    const { items, aggregate } = repriceStoredItems([
+      {
+        directCost: 285000,
+        quantity: 1,
+        marginPercentage: null,
+        bankPercentage: null,
+        sopPercentage: null,
+      },
+    ]);
+
+    expect(items[0]).toEqual({
+      marginAmount: null,
+      bankAmount: null,
+      sopAmount: null,
+      sellingAmount: null,
+    });
+    expect(aggregate).toBeNull();
+  });
+
+  it("treats a null bank/sop percentage as zero once margin is set, still producing an aggregate", () => {
+    const { items, aggregate } = repriceStoredItems([
+      {
+        directCost: 1000,
+        quantity: 1,
+        marginPercentage: 10,
+        bankPercentage: null,
+        sopPercentage: null,
+      },
+    ]);
+
+    expect(items[0].marginAmount).toBeCloseTo(111.11, 2);
+    expect(items[0].bankAmount).toBe(0);
+    expect(items[0].sopAmount).toBe(0);
+    expect(aggregate).not.toBeNull();
+  });
+
+  it("aggregates only the priced items when mixed with unpriced ones", () => {
+    const { items, aggregate } = repriceStoredItems([
+      {
+        directCost: 1000,
+        quantity: 1,
+        marginPercentage: 10,
+        bankPercentage: 0,
+        sopPercentage: 0,
+      },
+      {
+        directCost: 500,
+        quantity: 1,
+        marginPercentage: null,
+        bankPercentage: null,
+        sopPercentage: null,
+      },
+    ]);
+
+    expect(items[1].sellingAmount).toBeNull();
+    // Only the priced 1000-cost item feeds the aggregate's directCost.
+    expect(aggregate!.directCost).toBe(1000);
+  });
+
+  it("returns a null aggregate for an empty item list", () => {
+    expect(repriceStoredItems([])).toEqual({ items: [], aggregate: null });
   });
 });
 

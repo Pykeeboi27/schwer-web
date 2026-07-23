@@ -1,5 +1,9 @@
 import { getCurrentProfile } from "@/lib/profile/get-current-profile";
-import { computeAggregatePricing, computeSalesPricing } from "@/lib/sales/pricing";
+import {
+  computeAggregatePricing,
+  computeSalesPricing,
+  repriceStoredItems,
+} from "@/lib/sales/pricing";
 import { createClient } from "@/lib/supabase/server";
 
 export type RequiredApproverRole = "sales_manager" | "owner" | "executive";
@@ -488,7 +492,7 @@ export async function listSalesQuotations(): Promise<SalesQuotation[]> {
         : rejectedApproval.approver
       : null;
 
-    const items = (Array.isArray(row.quotation_items) ? row.quotation_items : [])
+    const storedItems = (Array.isArray(row.quotation_items) ? row.quotation_items : [])
       .slice()
       .sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0))
       .map((item) => ({
@@ -498,13 +502,31 @@ export async function listSalesQuotations(): Promise<SalesQuotation[]> {
         unitCost: item.unit_cost === null ? null : Number(item.unit_cost),
         lineTotal: Number(item.line_total),
         marginPercentage: numberOrNull(item.margin_percentage),
-        marginAmount: numberOrNull(item.margin_amount),
         bankPercentage: numberOrNull(item.bank_percentage),
-        bankAmount: numberOrNull(item.bank_amount),
         sopPercentage: numberOrNull(item.sop_percentage),
-        sopAmount: numberOrNull(item.sop_amount),
-        sellingAmount: numberOrNull(item.selling_amount),
       }));
+
+    // Recomputed from stored cost + percentages rather than trusting the
+    // persisted *_amount columns -- see repriceStoredItems for why (amounts
+    // saved under an older pricing formula never get corrected in place).
+    // This also drives the displayed headline `amount` below so the
+    // breakdown always foots to the total; the stored `row.amount` used for
+    // approvalStages above is left alone since that reflects the amount the
+    // approval chain actually ran against historically.
+    const repriced = repriceStoredItems(
+      storedItems.map((item) => ({
+        directCost: item.lineTotal,
+        quantity: item.quantity,
+        marginPercentage: item.marginPercentage,
+        bankPercentage: item.bankPercentage,
+        sopPercentage: item.sopPercentage,
+      })),
+    );
+
+    const items = storedItems.map((item, index) => ({
+      ...item,
+      ...repriced.items[index],
+    }));
 
     return {
       id: row.id,
@@ -512,7 +534,7 @@ export async function listSalesQuotations(): Promise<SalesQuotation[]> {
       clientId: row.client_id,
       clientName: client?.company_name ?? "Unknown client",
       subject: row.subject,
-      amount: Number(row.amount),
+      amount: repriced.aggregate ? repriced.aggregate.sellingAmount : Number(row.amount),
       cost: row.cost === null ? null : Number(row.cost),
       items,
       googleDriveLink: row.google_drive_link,
@@ -533,12 +555,20 @@ export async function listSalesQuotations(): Promise<SalesQuotation[]> {
           ? null
           : Number(row.sales_margin_percent),
       marginPercentage: numberOrNull(row.margin_percentage),
-      marginAmount: numberOrNull(row.margin_amount),
+      marginAmount: repriced.aggregate
+        ? repriced.aggregate.marginAmount
+        : numberOrNull(row.margin_amount),
       bankPercentage: numberOrNull(row.bank_percentage),
-      bankAmount: numberOrNull(row.bank_amount),
+      bankAmount: repriced.aggregate
+        ? repriced.aggregate.bankAmount
+        : numberOrNull(row.bank_amount),
       sopPercentage: numberOrNull(row.sop_percentage),
-      sopAmount: numberOrNull(row.sop_amount),
-      sellingAmount: numberOrNull(row.selling_amount),
+      sopAmount: repriced.aggregate
+        ? repriced.aggregate.sopAmount
+        : numberOrNull(row.sop_amount),
+      sellingAmount: repriced.aggregate
+        ? repriced.aggregate.sellingAmount
+        : numberOrNull(row.selling_amount),
       hasUnequalMargins: Boolean(row.has_unequal_margins),
       paymentTerms: row.payment_terms ?? null,
       paymentTermsCustom: row.payment_terms_custom ?? null,

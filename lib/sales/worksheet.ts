@@ -1,4 +1,5 @@
 import { parseClientContactNotes } from "@/lib/sales/clients";
+import { repriceStoredItems } from "@/lib/sales/pricing";
 import { createClient } from "@/lib/supabase/server";
 
 /**
@@ -121,7 +122,9 @@ export async function getPurchaseOrderWorksheetData(
   const paymentTerms =
     po.payment_terms === "Other" ? po.payment_terms_custom : po.payment_terms;
 
-  const items = (Array.isArray(po.purchase_order_items) ? po.purchase_order_items : [])
+  const storedItems = (
+    Array.isArray(po.purchase_order_items) ? po.purchase_order_items : []
+  )
     .slice()
     .sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0))
     .map((item) => ({
@@ -129,14 +132,28 @@ export async function getPurchaseOrderWorksheetData(
       quantity: Number(item.quantity),
       unitCost: item.unit_cost === null ? null : Number(item.unit_cost),
       lineTotal: Number(item.line_total),
-      sellingAmount: toNullableNumber(item.selling_amount),
-      marginAmount: toNullableNumber(item.margin_amount),
-      bankAmount: toNullableNumber(item.bank_amount),
-      sopAmount: toNullableNumber(item.sop_amount),
       marginPercentage: toNullableNumber(item.margin_percentage),
       bankPercentage: toNullableNumber(item.bank_percentage),
       sopPercentage: toNullableNumber(item.sop_percentage),
     }));
+
+  // Recomputed from stored cost + percentages rather than trusting the
+  // persisted *_amount columns -- see repriceStoredItems for why. Feeds both
+  // the printed line prices/grand total and the REMARKS box's VAT lines.
+  const repriced = repriceStoredItems(
+    storedItems.map((item) => ({
+      directCost: item.lineTotal,
+      quantity: item.quantity,
+      marginPercentage: item.marginPercentage,
+      bankPercentage: item.bankPercentage,
+      sopPercentage: item.sopPercentage,
+    })),
+  );
+
+  const items = storedItems.map((item, index) => ({
+    ...item,
+    ...repriced.items[index],
+  }));
 
   return {
     id: po.id,
@@ -147,10 +164,16 @@ export async function getPurchaseOrderWorksheetData(
       quotation?.quotation_number ??
       null,
     subject: po.subject,
-    poAmount: Number(po.po_amount),
-    marginAmount: toNullableNumber(po.margin_amount),
-    bankAmount: toNullableNumber(po.bank_amount),
-    sopAmount: toNullableNumber(po.sop_amount),
+    poAmount: repriced.aggregate ? repriced.aggregate.sellingAmount : Number(po.po_amount),
+    marginAmount: repriced.aggregate
+      ? repriced.aggregate.marginAmount
+      : toNullableNumber(po.margin_amount),
+    bankAmount: repriced.aggregate
+      ? repriced.aggregate.bankAmount
+      : toNullableNumber(po.bank_amount),
+    sopAmount: repriced.aggregate
+      ? repriced.aggregate.sopAmount
+      : toNullableNumber(po.sop_amount),
     items,
     paymentTerms: paymentTerms ?? null,
     leadTimeDays: po.lead_time_days ?? null,

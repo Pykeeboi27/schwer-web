@@ -3,7 +3,7 @@
 import {
   deleteCostingQuotation,
   isHttpUrl,
-  parseUnitCost,
+  parseRawCost,
   setQuotationItemCosts,
   submitCostingForApproval,
 } from "@/lib/engineering/costing-quotations";
@@ -31,7 +31,7 @@ export type SetQuotationItemCostsInput = {
   quotationNumber?: string;
   clientId: string;
   subject: string;
-  items: Array<{ id: string; unitCost: string | number | null }>;
+  items: Array<{ id: string; rawCost: string | number | null }>;
   googleDriveLink: string;
   notes?: string | null;
   salesPersonId?: string | null;
@@ -44,10 +44,10 @@ export async function setQuotationItemCostsAction(
     const googleDriveLink = ensureValidDriveLink(input.googleDriveLink);
     const items = input.items.map((item) => ({
       id: item.id,
-      unitCost:
-        item.unitCost === null || item.unitCost === ""
+      rawCost:
+        item.rawCost === null || item.rawCost === ""
           ? null
-          : parseUnitCost(item.unitCost),
+          : parseRawCost(item.rawCost),
     }));
 
     await setQuotationItemCosts({
