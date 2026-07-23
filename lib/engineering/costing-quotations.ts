@@ -280,8 +280,7 @@ export async function setQuotationItemCosts(input: {
   // (this caused a real `statement timeout` under load).
   let anyCostChanged = false;
   for (const item of input.items) {
-    const unitCost =
-      item.rawCost === null ? null : computeLandedUnitCost(item.rawCost);
+    const unitCost = item.rawCost === null ? null : computeLandedUnitCost(item.rawCost);
 
     const { error: itemError } = await supabase
       .from("quotation_items")

@@ -164,7 +164,9 @@ export async function getPurchaseOrderWorksheetData(
       quotation?.quotation_number ??
       null,
     subject: po.subject,
-    poAmount: repriced.aggregate ? repriced.aggregate.sellingAmount : Number(po.po_amount),
+    poAmount: repriced.aggregate
+      ? repriced.aggregate.sellingAmount
+      : Number(po.po_amount),
     marginAmount: repriced.aggregate
       ? repriced.aggregate.marginAmount
       : toNullableNumber(po.margin_amount),

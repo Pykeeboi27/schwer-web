@@ -177,7 +177,12 @@ export function repriceStoredItems(
       item.bankPercentage !== null ||
       item.sopPercentage !== null;
     if (!isPriced) {
-      return { marginAmount: null, bankAmount: null, sopAmount: null, sellingAmount: null };
+      return {
+        marginAmount: null,
+        bankAmount: null,
+        sopAmount: null,
+        sellingAmount: null,
+      };
     }
     return computeSalesPricing({
       directCost: item.directCost,
@@ -191,9 +196,7 @@ export function repriceStoredItems(
   const pricedForAggregate = items
     .map((item, index) => ({ item, pricing: repriced[index] }))
     .filter(
-      (
-        entry,
-      ): entry is { item: (typeof items)[number]; pricing: SalesPricing } =>
+      (entry): entry is { item: (typeof items)[number]; pricing: SalesPricing } =>
         entry.pricing.marginAmount !== null,
     )
     .map(({ item, pricing }) => ({ directCost: item.directCost, ...pricing }));

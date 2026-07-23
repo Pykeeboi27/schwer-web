@@ -45,9 +45,7 @@ export async function setQuotationItemCostsAction(
     const items = input.items.map((item) => ({
       id: item.id,
       rawCost:
-        item.rawCost === null || item.rawCost === ""
-          ? null
-          : parseRawCost(item.rawCost),
+        item.rawCost === null || item.rawCost === "" ? null : parseRawCost(item.rawCost),
     }));
 
     await setQuotationItemCosts({

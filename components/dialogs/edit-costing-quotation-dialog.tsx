@@ -289,9 +289,9 @@ export function EditCostingQuotationDialog({
           <div>
             <Label>Line Item Raw Costs</Label>
             <p className="mt-1 text-xs text-muted-foreground">
-              Enter each item&apos;s raw material + labor cost per unit. A fixed +3%
-              OPEX and +1.5% delivery fee are applied automatically to compute the
-              landed cost, matching the costing worksheet.
+              Enter each item&apos;s raw material + labor cost per unit. A fixed +3% OPEX
+              and +1.5% delivery fee are applied automatically to compute the landed cost,
+              matching the costing worksheet.
             </p>
             <div className="mt-2 space-y-2 rounded-md border p-3">
               {quotation.items.map((item) => {
