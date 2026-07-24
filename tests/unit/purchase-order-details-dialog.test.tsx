@@ -19,6 +19,7 @@ vi.mock("@/app/protected/sales/purchase-orders/actions", () => ({
   approvePurchaseOrderAction: vi.fn(),
   createProofOfPaymentSignedUrlAction: vi.fn(),
   deleteCollectionAction: vi.fn(),
+  deleteEncodedPurchaseOrderAction: vi.fn(),
   rejectPurchaseOrderAction: vi.fn(),
   resubmitPurchaseOrderAction: vi.fn(),
   updatePurchaseOrderDetailsAction: vi.fn(),
@@ -86,6 +87,7 @@ function buildPurchaseOrder(
     createdBy: CURRENT_USER_ID,
     createdByName: "Meccah Torregoza",
     itemCount: 1,
+    isManuallyEncoded: false,
     ...overrides,
   };
 }

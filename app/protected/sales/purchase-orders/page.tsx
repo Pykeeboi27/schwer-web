@@ -1,10 +1,12 @@
 import { fetchPurchaseOrdersAction } from "@/app/protected/sales/purchase-orders/actions";
+import { EncodeExistingPoDialog } from "@/components/dialogs/encode-existing-po-dialog";
 import { PurchaseOrdersTable } from "@/components/tables/purchase-orders-table";
 import { RealtimeRefresh } from "@/components/realtime/realtime-refresh";
 import { MarkSectionRead } from "@/components/notifications/mark-section-read";
 import { PageHeader, Panel, StatCard } from "@/components/patterns";
 import { getCurrentProfile } from "@/lib/profile/get-current-profile";
 import { getSalesAccessRedirect } from "@/lib/sales/access";
+import { listClients } from "@/lib/sales/clients";
 import { listPoPayments } from "@/lib/sales/purchase-orders";
 import { redirect } from "next/navigation";
 
@@ -27,12 +29,16 @@ export default async function SalesPurchaseOrdersPage() {
     redirect(redirectPath);
   }
 
-  const [response, payments] = await Promise.all([
+  const [response, payments, clients] = await Promise.all([
     fetchPurchaseOrdersAction(profile?.department ?? undefined),
     listPoPayments(),
+    listClients(),
   ]);
 
   const purchaseOrders = response.success ? (response.data ?? []) : [];
+  const clientOptions = clients
+    .filter((client) => client.isActive)
+    .map((client) => ({ id: client.id, companyName: client.companyName }));
 
   // Closed/recognized sales reflect fully-approved POs only.
   const totals = purchaseOrders.reduce(
@@ -66,6 +72,11 @@ export default async function SalesPurchaseOrdersPage() {
       <PageHeader
         title="Purchase Orders"
         description="Purchase orders converted from approved quotations. Pending POs await approval; once approved, track collections here as payments come in."
+        actions={
+          isSalesDepartment ? (
+            <EncodeExistingPoDialog clients={clientOptions} userId={profile?.id ?? ""} />
+          ) : undefined
+        }
       />
 
       <div className="grid gap-4 sm:grid-cols-2">

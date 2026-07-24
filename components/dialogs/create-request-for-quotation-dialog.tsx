@@ -166,7 +166,7 @@ export function CreateRequestForQuotationDialog({
           Request for Quotation
         </Button>
       </DialogTrigger>
-      <DialogContent className="max-h-[85vh] max-w-2xl overflow-y-auto">
+      <DialogContent className="max-h-[85vh] max-w-2xl overflow-y-auto overflow-x-hidden">
         <DialogHeader>
           <DialogTitle>Request for Quotation</DialogTitle>
           <DialogDescription>
@@ -246,13 +246,13 @@ export function CreateRequestForQuotationDialog({
                     value={row.description}
                     onChange={(e) => updateItem(index, { description: e.target.value })}
                     placeholder={`Item ${index + 1} description`}
-                    className="flex-1"
+                    className="min-w-0 flex-1"
                   />
                   <NumberInput
                     value={row.quantity}
                     onValueChange={(raw) => updateItem(index, { quantity: raw })}
                     placeholder="Qty"
-                    className="w-24"
+                    className="w-16 shrink-0 sm:w-24"
                   />
                   <Button
                     type="button"
@@ -261,6 +261,7 @@ export function CreateRequestForQuotationDialog({
                     disabled={items.length <= 1}
                     onClick={() => removeItem(index)}
                     aria-label={`Remove item ${index + 1}`}
+                    className="shrink-0"
                   >
                     <Trash2 className="h-4 w-4" />
                   </Button>

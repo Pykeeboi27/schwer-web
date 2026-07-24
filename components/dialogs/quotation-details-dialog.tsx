@@ -627,19 +627,23 @@ export function QuotationDetailsDialog({
         <dl className="grid gap-3 text-sm">
           <div className="grid grid-cols-1 sm:grid-cols-[160px_1fr] gap-2">
             <dt className="text-muted-foreground">Quotation ID</dt>
-            <dd className="font-medium">{quotation.quotationNumber}</dd>
+            <dd className="min-w-0 break-words font-medium">
+              {quotation.quotationNumber}
+            </dd>
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-[160px_1fr] gap-2">
             <dt className="text-muted-foreground">Client</dt>
-            <dd>{quotation.clientName}</dd>
+            <dd className="min-w-0 break-words">{quotation.clientName}</dd>
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-[160px_1fr] gap-2">
             <dt className="text-muted-foreground">Authored By</dt>
-            <dd>{quotation.salesPersonName ?? "Unassigned"}</dd>
+            <dd className="min-w-0 break-words">
+              {quotation.salesPersonName ?? "Unassigned"}
+            </dd>
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-[160px_1fr] gap-2">
             <dt className="text-muted-foreground">Subject</dt>
-            <dd>{quotation.subject}</dd>
+            <dd className="min-w-0 break-words">{quotation.subject}</dd>
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-[160px_1fr] gap-2">
             <dt className="text-muted-foreground">Direct Cost</dt>
@@ -664,7 +668,7 @@ export function QuotationDetailsDialog({
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-[160px_1fr] gap-2">
             <dt className="text-muted-foreground">Approval Chain</dt>
-            <dd>{approvalChainText}</dd>
+            <dd className="min-w-0 break-words">{approvalChainText}</dd>
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-[160px_1fr] gap-2">
             <dt className="text-muted-foreground">Created</dt>
@@ -1050,7 +1054,7 @@ export function QuotationDetailsDialog({
                     <p className="text-xs text-muted-foreground">Uploading…</p>
                   ) : null}
                   {driveUploadedName && googleDriveLink ? (
-                    <p className="text-xs">
+                    <p className="break-all text-xs">
                       Uploaded:{" "}
                       <a
                         href={googleDriveLink}
@@ -1247,7 +1251,7 @@ export function QuotationDetailsDialog({
               />
               <div className="grid grid-cols-1 sm:grid-cols-[160px_1fr] gap-2">
                 <dt className="text-muted-foreground">Payment Terms</dt>
-                <dd>
+                <dd className="min-w-0 break-words">
                   {quotation.paymentTerms === "Other"
                     ? (quotation.paymentTermsCustom ?? "Other")
                     : (quotation.paymentTerms ?? "—")}
@@ -1275,7 +1279,7 @@ export function QuotationDetailsDialog({
               {quotation.notes ? (
                 <div className="grid grid-cols-1 sm:grid-cols-[160px_1fr] gap-2">
                   <dt className="text-muted-foreground">Comments</dt>
-                  <dd>{quotation.notes}</dd>
+                  <dd className="min-w-0 break-words">{quotation.notes}</dd>
                 </div>
               ) : null}
             </dl>

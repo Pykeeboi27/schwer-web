@@ -16,17 +16,20 @@ type ConfirmDialogProps = {
   title: string;
   description: string;
   confirmLabel?: string;
+  /** Label shown on the confirm button while isBusy. Defaults to "Deleting..." to match this component's original delete-only usage. */
+  busyLabel?: string;
   isBusy?: boolean;
   onConfirm: () => void;
 };
 
-/** Generic "are you sure?" dialog for destructive actions, built on the shared Dialog primitive. */
+/** Generic "are you sure?" dialog for destructive/hard-to-reverse actions, built on the shared Dialog primitive. */
 export function ConfirmDialog({
   open,
   onOpenChange,
   title,
   description,
   confirmLabel = "Delete",
+  busyLabel = "Deleting...",
   isBusy = false,
   onConfirm,
 }: ConfirmDialogProps) {
@@ -53,7 +56,7 @@ export function ConfirmDialog({
             onClick={onConfirm}
             disabled={isBusy}
           >
-            {isBusy ? "Deleting..." : confirmLabel}
+            {isBusy ? busyLabel : confirmLabel}
           </Button>
         </DialogFooter>
       </DialogContent>

@@ -84,7 +84,7 @@ export async function listPendingCostingApprovals(): Promise<CostingApprovalItem
 // round-trip to the auth server) instead of a fresh auth.getUser() + profile
 // SELECT — see the comment on ensureCurrentProfile() for why getUser() is
 // avoided on hot paths.
-async function assertExecutiveActor(): Promise<void> {
+async function assertExecutiveActor(): Promise<{ id: string }> {
   const profile = await getCurrentProfile();
 
   if (
@@ -95,6 +95,8 @@ async function assertExecutiveActor(): Promise<void> {
   ) {
     throw new Error("Only the Executive role can act on costing approvals.");
   }
+
+  return { id: profile.id };
 }
 
 export async function approveCostingQuotation(quotationId: string): Promise<void> {
@@ -110,6 +112,7 @@ export async function approveCostingQuotation(quotationId: string): Promise<void
       phase: "sales",
       status: "draft",
       costing_rejection_reason: null,
+      costing_rejected_by: null,
       costing_approved_at: new Date().toISOString(),
     })
     .eq("id", quotationId)
@@ -135,7 +138,7 @@ export async function rejectCostingQuotation(input: {
     throw new Error("Rejection reason is required.");
   }
 
-  await assertExecutiveActor();
+  const actor = await assertExecutiveActor();
   const supabase = await createClient();
 
   const { data, error: updateError } = await supabase
@@ -143,6 +146,7 @@ export async function rejectCostingQuotation(input: {
     .update({
       status: "draft",
       costing_rejection_reason: input.reason.trim(),
+      costing_rejected_by: actor.id,
     })
     .eq("id", input.quotationId)
     .eq("phase", "costing")
