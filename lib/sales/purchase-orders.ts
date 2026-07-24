@@ -654,7 +654,7 @@ export async function resubmitPurchaseOrderForApproval(poId: string): Promise<vo
 
   const { data: po, error: fetchError } = await supabase
     .from("purchase_orders")
-    .select("id, status, po_amount")
+    .select("id, status")
     .eq("id", poId)
     .single();
 
@@ -666,40 +666,18 @@ export async function resubmitPurchaseOrderForApproval(poId: string): Promise<vo
     throw new Error("Only rejected purchase orders can be resubmitted.");
   }
 
-  const { error: poError } = await supabase
-    .from("purchase_orders")
-    .update({ status: "pending", submitted_at: new Date().toISOString() })
-    .eq("id", poId);
+  // Deletes the stale approval row(s), seeds the stage-one (sales_manager)
+  // approval, and flips status back to pending, all inside one transaction
+  // (fn_resubmit_po_for_approval, migrations/0025). Doing this as separate
+  // client calls previously left POs stuck at status "pending" with no
+  // approval row for anyone to see whenever the last step failed -- see that
+  // migration for the full story (same bug as the quotation resubmit flow).
+  const { error: rpcError } = await supabase.rpc("fn_resubmit_po_for_approval", {
+    p_po_id: poId,
+  });
 
-  if (poError) {
-    throw new Error(poError.message || "Failed to resubmit purchase order.");
-  }
-
-  // Clear previous approval rows and restart the sequential chain at stage
-  // one; approving it opens the next stage (see convertQuotationToPurchaseOrder).
-  await supabase.from("po_approvals").delete().eq("po_id", poId);
-
-  const [firstRole] = approvalChainForAmount(Number(po.po_amount));
-  const firstStageApprovers = await findApproversForRole(firstRole);
-  const rows: Array<{
-    po_id: string;
-    approver_id: string;
-    approver_role: RequiredApproverRole;
-    status: "pending";
-  }> = firstStageApprovers.map((approver) => ({
-    po_id: poId,
-    approver_id: approver.id,
-    approver_role: firstRole,
-    status: "pending",
-  }));
-
-  if (rows.length > 0) {
-    const { error: approvalError } = await supabase.from("po_approvals").insert(rows);
-    if (approvalError) {
-      throw new Error(
-        approvalError.message || "Failed to create PO approval assignments.",
-      );
-    }
+  if (rpcError) {
+    throw new Error(rpcError.message || "Failed to resubmit purchase order.");
   }
 }
 

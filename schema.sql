@@ -885,6 +885,101 @@ CREATE TRIGGER trg_sync_po_status_from_approvals
 AFTER INSERT OR UPDATE OR DELETE ON public.po_approvals
 FOR EACH ROW EXECUTE FUNCTION public.fn_sync_po_status_from_approvals();
 
+-- Atomically resubmits a rejected quotation/PO: deletes the stale approval
+-- row(s), seeds a fresh pending stage-one (sales_manager) approval, and flips
+-- status back to 'pending' -- all in one transaction. Called via
+-- supabase.rpc from lib/sales/quotations.ts resubmitQuotationForApproval /
+-- lib/sales/purchase-orders.ts resubmitPurchaseOrderForApproval instead of
+-- doing these as separate client calls, which could leave the record stuck
+-- at status 'pending' with zero approval rows (invisible to any approver's
+-- queue) if the insert step failed after the status flip and delete had
+-- already committed. SECURITY DEFINER also sidesteps
+-- sales_quotation_approvals_sales_delete_pending, whose USING clause only
+-- covers a still-'pending'/still-'draft' row and can never match a rejected
+-- one being resubmitted -- the same reason the sync triggers above run as
+-- SECURITY DEFINER. See migrations/0025_atomic_quotation_po_resubmit.sql.
+CREATE OR REPLACE FUNCTION public.fn_resubmit_quotation_for_approval(p_quotation_id UUID)
+RETURNS VOID
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  v_status approval_status_enum;
+BEGIN
+  SELECT status INTO v_status
+  FROM public.quotations
+  WHERE id = p_quotation_id
+  FOR UPDATE;
+
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'Quotation not found.';
+  END IF;
+
+  IF v_status <> 'rejected' THEN
+    RAISE EXCEPTION 'Only rejected quotations can be resubmitted.';
+  END IF;
+
+  DELETE FROM public.quotation_approvals WHERE quotation_id = p_quotation_id;
+
+  INSERT INTO public.quotation_approvals (quotation_id, approver_id, approver_role, status)
+  SELECT p_quotation_id, p.id, 'sales_manager', 'pending'
+  FROM public.profiles p
+  WHERE p.role = 'sales_manager' AND p.department = 'sales' AND p.is_active = TRUE;
+
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'No active approver for role sales_manager on quotation %', p_quotation_id;
+  END IF;
+
+  UPDATE public.quotations
+  SET status = 'pending', rejection_reason = NULL, submitted_at = NOW()
+  WHERE id = p_quotation_id;
+END;
+$$;
+
+GRANT EXECUTE ON FUNCTION public.fn_resubmit_quotation_for_approval(UUID) TO authenticated;
+
+-- Mirrors fn_resubmit_quotation_for_approval for purchase orders.
+CREATE OR REPLACE FUNCTION public.fn_resubmit_po_for_approval(p_po_id UUID)
+RETURNS VOID
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  v_status approval_status_enum;
+BEGIN
+  SELECT status INTO v_status
+  FROM public.purchase_orders
+  WHERE id = p_po_id
+  FOR UPDATE;
+
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'Purchase order not found.';
+  END IF;
+
+  IF v_status <> 'rejected' THEN
+    RAISE EXCEPTION 'Only rejected purchase orders can be resubmitted.';
+  END IF;
+
+  DELETE FROM public.po_approvals WHERE po_id = p_po_id;
+
+  INSERT INTO public.po_approvals (po_id, approver_id, approver_role, status)
+  SELECT p_po_id, p.id, 'sales_manager', 'pending'
+  FROM public.profiles p
+  WHERE p.role = 'sales_manager' AND p.department = 'sales' AND p.is_active = TRUE;
+
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'No active approver for role sales_manager on purchase order %', p_po_id;
+  END IF;
+
+  UPDATE public.purchase_orders
+  SET status = 'pending', submitted_at = NOW()
+  WHERE id = p_po_id;
+END;
+$$;
+
+GRANT EXECUTE ON FUNCTION public.fn_resubmit_po_for_approval(UUID) TO authenticated;
 
 -- ============================================================
 -- SECTION 9: AUTH TRIGGER
