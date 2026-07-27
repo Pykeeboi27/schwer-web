@@ -20,6 +20,7 @@ CREATE TYPE user_role_enum AS ENUM (
   'executive',
   'sales_manager',
   'sales_staff',
+  'coordinator',
   'hr_staff',
   'hr_manager',
   'accountant',
@@ -303,6 +304,7 @@ CREATE TABLE public.quotations (
   phase               quotation_phase_enum NOT NULL DEFAULT 'sales',
   google_drive_link   TEXT,
   costing_rejection_reason TEXT,
+  costing_rejected_by UUID REFERENCES public.profiles(id),
   costing_approved_at TIMESTAMPTZ,
   sales_person_id     UUID REFERENCES public.profiles(id),
   sales_margin_percent NUMERIC(6, 2),
@@ -358,7 +360,10 @@ CREATE TABLE public.quotation_approvals (
 
 CREATE TABLE public.po_payments (
   id               UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  po_id            UUID NOT NULL REFERENCES public.quotations(id) ON DELETE CASCADE,
+  -- Nullable as of migration 0027: a manually-encoded standalone PO has no
+  -- quotation_id, so a backfilled historical payment against it has nothing
+  -- to put here. All runtime logic keys on purchase_order_id instead.
+  po_id            UUID REFERENCES public.quotations(id) ON DELETE CASCADE,
   amount_collected NUMERIC(15, 2) NOT NULL,
   payment_date     DATE NOT NULL DEFAULT CURRENT_DATE,
   payment_method   TEXT,
@@ -433,7 +438,14 @@ CREATE TABLE IF NOT EXISTS public.purchase_orders (
   lead_time_days       INTEGER,
   approved_at          TIMESTAMPTZ,
   submitted_at         TIMESTAMPTZ,
-  requires_executive_approval BOOLEAN GENERATED ALWAYS AS (po_amount >= 3000000) STORED
+  requires_executive_approval BOOLEAN GENERATED ALWAYS AS (po_amount >= 3000000) STORED,
+  -- Existing Purchase Order Encoding (migration 0027): a standalone PO
+  -- backfilled by Sales for record-keeping, with no approval workflow. Flagged
+  -- explicitly rather than seeding synthetic po_approvals rows, since nobody
+  -- actually approved it.
+  is_manually_encoded BOOLEAN NOT NULL DEFAULT FALSE,
+  encoded_by           UUID REFERENCES public.profiles(id),
+  encoded_at           TIMESTAMPTZ
 );
 
 CREATE TABLE IF NOT EXISTS public.po_approvals (
@@ -885,6 +897,293 @@ CREATE TRIGGER trg_sync_po_status_from_approvals
 AFTER INSERT OR UPDATE OR DELETE ON public.po_approvals
 FOR EACH ROW EXECUTE FUNCTION public.fn_sync_po_status_from_approvals();
 
+-- Atomically resubmits a rejected quotation/PO: deletes the stale approval
+-- row(s), seeds a fresh pending stage-one (sales_manager) approval, and flips
+-- status back to 'pending' -- all in one transaction. Called via
+-- supabase.rpc from lib/sales/quotations.ts resubmitQuotationForApproval /
+-- lib/sales/purchase-orders.ts resubmitPurchaseOrderForApproval instead of
+-- doing these as separate client calls, which could leave the record stuck
+-- at status 'pending' with zero approval rows (invisible to any approver's
+-- queue) if the insert step failed after the status flip and delete had
+-- already committed. SECURITY DEFINER also sidesteps
+-- sales_quotation_approvals_sales_delete_pending, whose USING clause only
+-- covers a still-'pending'/still-'draft' row and can never match a rejected
+-- one being resubmitted -- the same reason the sync triggers above run as
+-- SECURITY DEFINER. See migrations/0025_atomic_quotation_po_resubmit.sql.
+CREATE OR REPLACE FUNCTION public.fn_resubmit_quotation_for_approval(p_quotation_id UUID)
+RETURNS VOID
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  v_status approval_status_enum;
+BEGIN
+  SELECT status INTO v_status
+  FROM public.quotations
+  WHERE id = p_quotation_id
+  FOR UPDATE;
+
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'Quotation not found.';
+  END IF;
+
+  IF v_status <> 'rejected' THEN
+    RAISE EXCEPTION 'Only rejected quotations can be resubmitted.';
+  END IF;
+
+  DELETE FROM public.quotation_approvals WHERE quotation_id = p_quotation_id;
+
+  INSERT INTO public.quotation_approvals (quotation_id, approver_id, approver_role, status)
+  SELECT p_quotation_id, p.id, 'sales_manager', 'pending'
+  FROM public.profiles p
+  WHERE p.role = 'sales_manager' AND p.department = 'sales' AND p.is_active = TRUE;
+
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'No active approver for role sales_manager on quotation %', p_quotation_id;
+  END IF;
+
+  UPDATE public.quotations
+  SET status = 'pending', rejection_reason = NULL, submitted_at = NOW()
+  WHERE id = p_quotation_id;
+END;
+$$;
+
+GRANT EXECUTE ON FUNCTION public.fn_resubmit_quotation_for_approval(UUID) TO authenticated;
+
+-- Mirrors fn_resubmit_quotation_for_approval for purchase orders.
+CREATE OR REPLACE FUNCTION public.fn_resubmit_po_for_approval(p_po_id UUID)
+RETURNS VOID
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  v_status approval_status_enum;
+BEGIN
+  SELECT status INTO v_status
+  FROM public.purchase_orders
+  WHERE id = p_po_id
+  FOR UPDATE;
+
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'Purchase order not found.';
+  END IF;
+
+  IF v_status <> 'rejected' THEN
+    RAISE EXCEPTION 'Only rejected purchase orders can be resubmitted.';
+  END IF;
+
+  DELETE FROM public.po_approvals WHERE po_id = p_po_id;
+
+  INSERT INTO public.po_approvals (po_id, approver_id, approver_role, status)
+  SELECT p_po_id, p.id, 'sales_manager', 'pending'
+  FROM public.profiles p
+  WHERE p.role = 'sales_manager' AND p.department = 'sales' AND p.is_active = TRUE;
+
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'No active approver for role sales_manager on purchase order %', p_po_id;
+  END IF;
+
+  UPDATE public.purchase_orders
+  SET status = 'pending', submitted_at = NOW()
+  WHERE id = p_po_id;
+END;
+$$;
+
+GRANT EXECUTE ON FUNCTION public.fn_resubmit_po_for_approval(UUID) TO authenticated;
+
+-- Existing Purchase Order Encoding (migration 0027): inserts one standalone
+-- purchase order + its line items + (optionally) its historical payments in a
+-- single transaction. Pricing is computed entirely in TypeScript before
+-- calling this (computeLandedUnitCost, computeSalesPricing,
+-- computeAggregatePricing); this function only writes the already-priced rows
+-- it's given. po_number uniqueness is enforced by the table's existing UNIQUE
+-- constraint -- a duplicate raises a normal 23505 for the caller to catch.
+CREATE OR REPLACE FUNCTION public.fn_encode_existing_po(
+  p_po JSONB,
+  p_items JSONB,
+  p_payments JSONB
+)
+RETURNS UUID
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  v_user_id UUID := auth.uid();
+  v_po_id UUID;
+  v_po_date DATE;
+  v_selling_amount NUMERIC(15, 2);
+  v_item JSONB;
+  v_payment JSONB;
+  v_recognized_amount NUMERIC(15, 2) := 0;
+  v_payment_status payment_status_enum;
+BEGIN
+  -- SECURITY DEFINER bypasses RLS, so authorization is asserted here
+  -- explicitly: only an active coordinator in the sales department may
+  -- encode a backfilled purchase order.
+  IF NOT EXISTS (
+    SELECT 1 FROM public.profiles
+    WHERE id = v_user_id
+      AND department = 'sales'
+      AND role = 'coordinator'
+      AND is_active = TRUE
+  ) THEN
+    RAISE EXCEPTION 'Only the coordinator can encode existing purchase orders.';
+  END IF;
+
+  IF jsonb_array_length(p_items) = 0 THEN
+    RAISE EXCEPTION 'At least one line item is required.';
+  END IF;
+
+  v_po_date := COALESCE((p_po->>'po_date')::DATE, CURRENT_DATE);
+  v_selling_amount := (p_po->>'selling_amount')::NUMERIC;
+
+  INSERT INTO public.purchase_orders (
+    po_number, client_id, sector, subject, po_amount, cost,
+    margin_percentage, margin_amount, bank_percentage, bank_amount,
+    sop_percentage, sop_amount, selling_amount, has_unequal_margins,
+    payment_terms, payment_terms_custom, lead_time_days, client_po_number,
+    quotation_reference, status, po_date, approved_at, submitted_at,
+    created_by, is_manually_encoded, encoded_by, encoded_at
+  ) VALUES (
+    p_po->>'po_number',
+    (p_po->>'client_id')::UUID,
+    (p_po->>'sector')::sector_enum,
+    p_po->>'subject',
+    v_selling_amount,
+    (p_po->>'cost')::NUMERIC,
+    (p_po->>'margin_percentage')::NUMERIC,
+    (p_po->>'margin_amount')::NUMERIC,
+    (p_po->>'bank_percentage')::NUMERIC,
+    (p_po->>'bank_amount')::NUMERIC,
+    (p_po->>'sop_percentage')::NUMERIC,
+    (p_po->>'sop_amount')::NUMERIC,
+    v_selling_amount,
+    COALESCE((p_po->>'has_unequal_margins')::BOOLEAN, FALSE),
+    p_po->>'payment_terms',
+    p_po->>'payment_terms_custom',
+    (p_po->>'lead_time_days')::INTEGER,
+    p_po->>'client_po_number',
+    p_po->>'quotation_reference',
+    'approved',
+    v_po_date,
+    v_po_date::TIMESTAMPTZ,
+    v_po_date::TIMESTAMPTZ,
+    v_user_id,
+    TRUE,
+    v_user_id,
+    NOW()
+  )
+  RETURNING id INTO v_po_id;
+
+  FOR v_item IN SELECT * FROM jsonb_array_elements(p_items)
+  LOOP
+    INSERT INTO public.purchase_order_items (
+      purchase_order_id, description, quantity, raw_cost, unit_cost, sort_order,
+      margin_percentage, margin_amount, bank_percentage, bank_amount,
+      sop_percentage, sop_amount, selling_amount
+    ) VALUES (
+      v_po_id,
+      v_item->>'description',
+      (v_item->>'quantity')::NUMERIC,
+      (v_item->>'raw_cost')::NUMERIC,
+      (v_item->>'unit_cost')::NUMERIC,
+      COALESCE((v_item->>'sort_order')::INTEGER, 0),
+      (v_item->>'margin_percentage')::NUMERIC,
+      (v_item->>'margin_amount')::NUMERIC,
+      (v_item->>'bank_percentage')::NUMERIC,
+      (v_item->>'bank_amount')::NUMERIC,
+      (v_item->>'sop_percentage')::NUMERIC,
+      (v_item->>'sop_amount')::NUMERIC,
+      (v_item->>'selling_amount')::NUMERIC
+    );
+  END LOOP;
+
+  IF p_payments IS NOT NULL AND jsonb_array_length(p_payments) > 0 THEN
+    FOR v_payment IN SELECT * FROM jsonb_array_elements(p_payments)
+    LOOP
+      INSERT INTO public.po_payments (
+        purchase_order_id, po_id, amount_collected, payment_date,
+        payment_method, reference_number, notes, recorded_by, proof_path
+      ) VALUES (
+        v_po_id,
+        NULL, -- no source quotation to attribute the legacy po_id FK to.
+        (v_payment->>'amount_collected')::NUMERIC,
+        COALESCE((v_payment->>'payment_date')::DATE, CURRENT_DATE),
+        v_payment->>'payment_method',
+        v_payment->>'reference_number',
+        v_payment->>'notes',
+        v_user_id,
+        v_payment->>'proof_path'
+      );
+      v_recognized_amount := v_recognized_amount + (v_payment->>'amount_collected')::NUMERIC;
+    END LOOP;
+
+    v_payment_status := CASE
+      WHEN v_recognized_amount <= 0 THEN 'unpaid'
+      WHEN v_recognized_amount < v_selling_amount THEN 'partial'
+      ELSE 'paid'
+    END;
+
+    UPDATE public.purchase_orders
+    SET recognized_amount = v_recognized_amount,
+        payment_status = v_payment_status
+    WHERE id = v_po_id;
+  END IF;
+
+  RETURN v_po_id;
+END;
+$$;
+
+GRANT EXECUTE ON FUNCTION public.fn_encode_existing_po(JSONB, JSONB, JSONB) TO authenticated;
+
+-- Deletes a manually-encoded PO (and its items/payments, via ON DELETE
+-- CASCADE) so a mis-encoded record can be cleanly removed and re-entered.
+-- Guards is_manually_encoded = TRUE itself, rather than trusting the caller,
+-- so this can never be used to delete a real workflow PO -- those have no
+-- delete path anywhere else in the app.
+CREATE OR REPLACE FUNCTION public.fn_delete_encoded_po(p_po_id UUID)
+RETURNS VOID
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  v_user_id UUID := auth.uid();
+  v_is_encoded BOOLEAN;
+BEGIN
+  -- Only an active coordinator in the sales department may delete a
+  -- backfilled purchase order.
+  IF NOT EXISTS (
+    SELECT 1 FROM public.profiles
+    WHERE id = v_user_id
+      AND department = 'sales'
+      AND role = 'coordinator'
+      AND is_active = TRUE
+  ) THEN
+    RAISE EXCEPTION 'Only the coordinator can delete an encoded purchase order.';
+  END IF;
+
+  SELECT is_manually_encoded INTO v_is_encoded
+  FROM public.purchase_orders
+  WHERE id = p_po_id
+  FOR UPDATE;
+
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'Purchase order not found.';
+  END IF;
+
+  IF NOT v_is_encoded THEN
+    RAISE EXCEPTION 'Only manually-encoded purchase orders can be deleted this way.';
+  END IF;
+
+  DELETE FROM public.purchase_orders WHERE id = p_po_id;
+END;
+$$;
+
+GRANT EXECUTE ON FUNCTION public.fn_delete_encoded_po(UUID) TO authenticated;
 
 -- ============================================================
 -- SECTION 9: AUTH TRIGGER

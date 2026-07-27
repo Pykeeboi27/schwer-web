@@ -6,13 +6,25 @@ import {
   type RequiredApproverRole,
 } from "@/lib/sales/quotations";
 import { getCurrentProfile } from "@/lib/profile/get-current-profile";
+import { canEncodeExistingPurchaseOrders } from "@/lib/sales/access";
+import { computeLandedUnitCost } from "@/lib/engineering/landed-cost";
 import {
   computeAggregatePricing,
   computeSalesPricing,
   repriceStoredItems,
+  round2,
 } from "@/lib/sales/pricing";
+import { PROOF_OF_PAYMENT_BUCKET } from "@/lib/sales/proof-of-payment";
 import { createClient } from "@/lib/supabase/server";
 import { validatePoTotalAmount } from "@/lib/utils/form-validation";
+
+// Re-exported for callers that already import from this module; defined in
+// lib/sales/po-labels.ts (a client-safe module with no server-only imports)
+// -- see that file's comment for why. Applied at the data layer below so
+// every UI surface inherits it uniformly; created_by/encoded_by still hold
+// the real user id for audit and are never mutated.
+import { ENCODED_PO_AUTHOR_LABEL } from "@/lib/sales/po-labels";
+export { ENCODED_PO_AUTHOR_LABEL };
 
 export type PurchaseOrderStatus =
   "draft" | "pending" | "approved" | "rejected" | "cancelled";
@@ -68,6 +80,8 @@ export type SalesPurchaseOrder = {
   createdBy: string;
   createdByName: string;
   itemCount: number;
+  /** True for standalone POs backfilled via Existing Purchase Order Encoding. */
+  isManuallyEncoded: boolean;
 };
 
 export type SalesPoPayment = {
@@ -186,7 +200,7 @@ export async function listPurchaseOrders(): Promise<SalesPurchaseOrder[]> {
   const { data, error } = await supabase
     .from("purchase_orders")
     .select(
-      "id, quotation_id, po_number, client_po_number, quotation_reference, client_id, subject, po_amount, cost, margin_percentage, margin_amount, bank_percentage, bank_amount, sop_percentage, sop_amount, selling_amount, has_unequal_margins, recognized_amount, payment_status, payment_terms, payment_terms_custom, lead_time_days, status, approved_at, created_at, created_by, clients:client_id(company_name), po_approvals(approver_role, status, rejection_reason, updated_at, approver:approver_id(full_name, email)), creator:created_by(full_name, email), purchase_order_items(id, description, quantity, unit_cost, line_total, margin_percentage, margin_amount, bank_percentage, bank_amount, sop_percentage, sop_amount, selling_amount, sort_order)",
+      "id, quotation_id, po_number, client_po_number, quotation_reference, client_id, subject, po_amount, cost, margin_percentage, margin_amount, bank_percentage, bank_amount, sop_percentage, sop_amount, selling_amount, has_unequal_margins, recognized_amount, payment_status, payment_terms, payment_terms_custom, lead_time_days, status, approved_at, created_at, created_by, is_manually_encoded, clients:client_id(company_name), po_approvals(approver_role, status, rejection_reason, updated_at, approver:approver_id(full_name, email)), creator:created_by(full_name, email), purchase_order_items(id, description, quantity, unit_cost, line_total, margin_percentage, margin_amount, bank_percentage, bank_amount, sop_percentage, sop_amount, selling_amount, sort_order)",
     )
     .order("created_at", { ascending: false });
 
@@ -309,8 +323,11 @@ export async function listPurchaseOrders(): Promise<SalesPurchaseOrder[]> {
       approvedAt: row.approved_at ?? null,
       createdAt: row.created_at,
       createdBy: row.created_by,
-      createdByName: resolveDisplayName(creator) ?? "Unknown",
+      createdByName: row.is_manually_encoded
+        ? ENCODED_PO_AUTHOR_LABEL
+        : (resolveDisplayName(creator) ?? "Unknown"),
       itemCount: items.length,
+      isManuallyEncoded: Boolean(row.is_manually_encoded),
     };
   });
 }
@@ -654,7 +671,7 @@ export async function resubmitPurchaseOrderForApproval(poId: string): Promise<vo
 
   const { data: po, error: fetchError } = await supabase
     .from("purchase_orders")
-    .select("id, status, po_amount")
+    .select("id, status")
     .eq("id", poId)
     .single();
 
@@ -666,40 +683,18 @@ export async function resubmitPurchaseOrderForApproval(poId: string): Promise<vo
     throw new Error("Only rejected purchase orders can be resubmitted.");
   }
 
-  const { error: poError } = await supabase
-    .from("purchase_orders")
-    .update({ status: "pending", submitted_at: new Date().toISOString() })
-    .eq("id", poId);
+  // Deletes the stale approval row(s), seeds the stage-one (sales_manager)
+  // approval, and flips status back to pending, all inside one transaction
+  // (fn_resubmit_po_for_approval, migrations/0025). Doing this as separate
+  // client calls previously left POs stuck at status "pending" with no
+  // approval row for anyone to see whenever the last step failed -- see that
+  // migration for the full story (same bug as the quotation resubmit flow).
+  const { error: rpcError } = await supabase.rpc("fn_resubmit_po_for_approval", {
+    p_po_id: poId,
+  });
 
-  if (poError) {
-    throw new Error(poError.message || "Failed to resubmit purchase order.");
-  }
-
-  // Clear previous approval rows and restart the sequential chain at stage
-  // one; approving it opens the next stage (see convertQuotationToPurchaseOrder).
-  await supabase.from("po_approvals").delete().eq("po_id", poId);
-
-  const [firstRole] = approvalChainForAmount(Number(po.po_amount));
-  const firstStageApprovers = await findApproversForRole(firstRole);
-  const rows: Array<{
-    po_id: string;
-    approver_id: string;
-    approver_role: RequiredApproverRole;
-    status: "pending";
-  }> = firstStageApprovers.map((approver) => ({
-    po_id: poId,
-    approver_id: approver.id,
-    approver_role: firstRole,
-    status: "pending",
-  }));
-
-  if (rows.length > 0) {
-    const { error: approvalError } = await supabase.from("po_approvals").insert(rows);
-    if (approvalError) {
-      throw new Error(
-        approvalError.message || "Failed to create PO approval assignments.",
-      );
-    }
+  if (rpcError) {
+    throw new Error(rpcError.message || "Failed to resubmit purchase order.");
   }
 }
 
@@ -1077,4 +1072,209 @@ export async function deletePoPayment(input: {
   }
 
   await recomputeAndSyncPoTotals(supabase, po.id, Number(po.po_amount));
+}
+
+export type EncodeExistingPoItemInput = {
+  description: string;
+  quantity: number;
+  rawCost: number;
+  marginPercentage: number;
+  bankPercentage: number;
+  sopPercentage: number;
+};
+
+export type EncodeExistingPoPaymentInput = {
+  amountCollected: number;
+  /** Real historical payment date (YYYY-MM-DD), not the encoding date. */
+  paymentDate: string;
+  paymentMethod: string | null;
+  referenceNumber: string | null;
+  notes: string | null;
+  /** Storage path of the already-uploaded proof-of-payment image. */
+  proofPath: string;
+};
+
+export type EncodeExistingPurchaseOrderInput = {
+  poNumber: string;
+  clientId: string;
+  subject: string;
+  clientPoNumber: string | null;
+  quotationReference: string | null;
+  /** Real historical PO date (YYYY-MM-DD) -- becomes po_date/approved_at/submitted_at. */
+  poDate: string;
+  paymentTerms: string | null;
+  paymentTermsCustom: string | null;
+  leadTimeDays: number;
+  hasUnequalMargins: boolean;
+  items: EncodeExistingPoItemInput[];
+  payments: EncodeExistingPoPaymentInput[];
+};
+
+/**
+ * Existing Purchase Order Encoding: backfills an already-existing, already-won
+ * PO for record-keeping. No approval workflow, no engineering costing handoff
+ * -- sales enters both raw cost and margins themselves, mirroring what
+ * setQuotationItemCosts (raw cost) and updatePurchaseOrderDetails (margins)
+ * do separately for the live workflow, but computed here in one pass since
+ * there's no existing DB row to read a fresh line_total back from between
+ * steps. The per-item directCost used for margin math is therefore an
+ * estimate (quantity x computeLandedUnitCost(rawCost)) rather than a value
+ * read from the DB's GENERATED line_total column -- harmless, because every
+ * read path (listPurchaseOrders -> repriceStoredItems) re-derives displayed
+ * pricing from the DB's actual line_total plus the stored percentages on
+ * every load, so this estimate is only ever the initial stored snapshot.
+ *
+ * Writes happen in a single transaction via fn_encode_existing_po
+ * (migrations/0027) -- see that migration's header comment for why (same
+ * "no partial/stuck record" rationale as the resubmit RPCs).
+ */
+export async function encodeExistingPurchaseOrder(
+  input: EncodeExistingPurchaseOrderInput,
+): Promise<{ purchaseOrderId: string }> {
+  const profile = await getCurrentProfile();
+  if (!profile) {
+    throw new Error("You must be signed in.");
+  }
+
+  if (!canEncodeExistingPurchaseOrders(profile)) {
+    throw new Error("Only the coordinator can record existing purchase orders.");
+  }
+
+  if (input.items.length === 0) {
+    throw new Error("Add at least one line item.");
+  }
+
+  const supabase = await createClient();
+
+  const { data: clientRow, error: clientError } = await supabase
+    .from("clients")
+    .select("sector")
+    .eq("id", input.clientId)
+    .single();
+
+  if (clientError || !clientRow) {
+    throw new Error("Selected client was not found.");
+  }
+
+  const pricedItems = input.items.map((item) => {
+    const unitCost = computeLandedUnitCost(item.rawCost);
+    const directCost = round2(unitCost * item.quantity);
+    const pricing = computeSalesPricing({
+      directCost,
+      quantity: item.quantity,
+      marginPercentage: item.marginPercentage,
+      bankPercentage: item.bankPercentage,
+      sopPercentage: item.sopPercentage,
+    });
+
+    return {
+      description: item.description,
+      quantity: item.quantity,
+      rawCost: item.rawCost,
+      unitCost,
+      directCost,
+      marginPercentage: item.marginPercentage,
+      bankPercentage: item.bankPercentage,
+      sopPercentage: item.sopPercentage,
+      ...pricing,
+    };
+  });
+
+  const aggregate = computeAggregatePricing(pricedItems);
+
+  const { data: poId, error: rpcError } = await supabase.rpc("fn_encode_existing_po", {
+    p_po: {
+      po_number: input.poNumber,
+      client_id: input.clientId,
+      sector: clientRow.sector,
+      subject: input.subject,
+      cost: aggregate.directCost,
+      margin_percentage: aggregate.marginPercentage,
+      margin_amount: aggregate.marginAmount,
+      bank_percentage: aggregate.bankPercentage,
+      bank_amount: aggregate.bankAmount,
+      sop_percentage: aggregate.sopPercentage,
+      sop_amount: aggregate.sopAmount,
+      selling_amount: aggregate.sellingAmount,
+      has_unequal_margins: input.hasUnequalMargins,
+      payment_terms: input.paymentTerms,
+      payment_terms_custom: input.paymentTermsCustom,
+      lead_time_days: input.leadTimeDays,
+      client_po_number: input.clientPoNumber,
+      quotation_reference: input.quotationReference,
+      po_date: input.poDate,
+    },
+    p_items: pricedItems.map((item, index) => ({
+      description: item.description,
+      quantity: item.quantity,
+      raw_cost: item.rawCost,
+      unit_cost: item.unitCost,
+      sort_order: index,
+      margin_percentage: item.marginPercentage,
+      margin_amount: item.marginAmount,
+      bank_percentage: item.bankPercentage,
+      bank_amount: item.bankAmount,
+      sop_percentage: item.sopPercentage,
+      sop_amount: item.sopAmount,
+      selling_amount: item.sellingAmount,
+    })),
+    p_payments: input.payments.map((payment) => ({
+      amount_collected: payment.amountCollected,
+      payment_date: payment.paymentDate,
+      payment_method: payment.paymentMethod,
+      reference_number: payment.referenceNumber,
+      notes: payment.notes,
+      proof_path: payment.proofPath,
+    })),
+  });
+
+  if (rpcError || !poId) {
+    if (rpcError?.code === "23505") {
+      throw new Error("A purchase order with that PO number already exists.");
+    }
+    throw new Error(rpcError?.message || "Failed to record the purchase order.");
+  }
+
+  return { purchaseOrderId: poId as unknown as string };
+}
+
+/**
+ * Deletes a manually-encoded PO so a mistaken entry can be re-encoded
+ * cleanly. fn_delete_encoded_po (migrations/0027) guards is_manually_encoded
+ * itself, so this can never remove a real workflow PO. Any proof-of-payment
+ * images are best-effort removed from Storage first, since po_payments rows
+ * (and their proof_path values) cease to exist once the PO cascade-deletes.
+ */
+export async function deleteEncodedPurchaseOrder(purchaseOrderId: string): Promise<void> {
+  const profile = await getCurrentProfile();
+  if (!profile) {
+    throw new Error("You must be signed in.");
+  }
+
+  if (!canEncodeExistingPurchaseOrders(profile)) {
+    throw new Error("Only the coordinator can delete a recorded purchase order.");
+  }
+
+  const supabase = await createClient();
+
+  const { data: paymentRows } = await supabase
+    .from("po_payments")
+    .select("proof_path")
+    .eq("purchase_order_id", purchaseOrderId);
+
+  const { error } = await supabase.rpc("fn_delete_encoded_po", {
+    p_po_id: purchaseOrderId,
+  });
+
+  if (error) {
+    throw new Error(error.message || "Failed to delete the purchase order.");
+  }
+
+  const proofPaths = (paymentRows ?? [])
+    .map((row) => row.proof_path)
+    .filter((path): path is string => Boolean(path));
+
+  if (proofPaths.length > 0) {
+    void supabase.storage.from(PROOF_OF_PAYMENT_BUCKET).remove(proofPaths);
+  }
 }

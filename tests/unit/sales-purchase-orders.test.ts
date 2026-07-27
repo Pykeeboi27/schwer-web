@@ -9,6 +9,7 @@ vi.mock("@/lib/supabase/server", () => ({
 }));
 
 import {
+  ENCODED_PO_AUTHOR_LABEL,
   listPendingPoApprovalsForCurrentUser,
   listPoPayments,
   listPurchaseOrders,
@@ -75,6 +76,28 @@ describe("listPurchaseOrders", () => {
     expect(po.status).toBe("approved");
     expect(po.pendingApprovalRoles).toEqual(["owner"]);
     expect(po.createdByName).toBe("Jane Author");
+  });
+
+  it("attributes a manually-encoded PO to the generic Coordinator label, not the individual", async () => {
+    mockClient = createSupabaseMock({
+      tables: {
+        purchase_orders: {
+          data: [
+            {
+              ...baseRow,
+              is_manually_encoded: true,
+              creator: { full_name: "Jane Author", email: "jane@example.com" },
+            },
+          ],
+          error: null,
+        },
+      },
+    });
+
+    const [po] = await listPurchaseOrders();
+
+    expect(po.isManuallyEncoded).toBe(true);
+    expect(po.createdByName).toBe(ENCODED_PO_AUTHOR_LABEL);
   });
 
   it("falls back to the email username when the creator has no full name", async () => {

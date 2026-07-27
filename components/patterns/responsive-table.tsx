@@ -87,7 +87,7 @@ type DataFieldProps = {
 
 export function DataField({ label, value, className }: DataFieldProps) {
   return (
-    <div className={cn("flex items-baseline justify-between gap-4", className)}>
+    <div className={cn("flex items-center justify-between gap-4", className)}>
       <dt className="shrink-0 text-xs font-medium text-muted-foreground">{label}</dt>
       <dd className="min-w-0 break-words text-right font-medium text-foreground">
         {value}

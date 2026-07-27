@@ -997,43 +997,17 @@ export async function resubmitQuotationForApproval(quotationId: string): Promise
 
   assertQuotationReadyForApproval(row);
 
-  const { error: updateError } = await supabase
-    .from("quotations")
-    .update({
-      status: "pending",
-      rejection_reason: null,
-      submitted_at: new Date().toISOString(),
-    })
-    .eq("id", quotationId);
+  // Deletes the stale approval row(s), seeds the stage-one (sales_manager)
+  // approval, and flips status back to pending, all inside one transaction
+  // (fn_resubmit_quotation_for_approval, migrations/0025). Doing this as
+  // separate client calls previously left quotations stuck at status
+  // "pending" with no approval row for anyone to see whenever the last step
+  // failed -- see that migration for the full story.
+  const { error: rpcError } = await supabase.rpc("fn_resubmit_quotation_for_approval", {
+    p_quotation_id: quotationId,
+  });
 
-  if (updateError) {
-    throw new Error(updateError.message || "Failed to resubmit quotation.");
-  }
-
-  // Clear previous approval rows and restart the sequential chain at stage
-  // one; approving it opens the next stage (see submitQuotationForApproval).
-  await supabase.from("quotation_approvals").delete().eq("quotation_id", quotationId);
-
-  const [firstRole] = approvalChainForAmount(Number(row.amount));
-  const firstStageApprovers = await findApproversForRole(firstRole);
-  const rows: Array<{
-    quotation_id: string;
-    approver_id: string;
-    approver_role: RequiredApproverRole;
-    status: "pending";
-  }> = firstStageApprovers.map((approver) => ({
-    quotation_id: quotationId,
-    approver_id: approver.id,
-    approver_role: firstRole,
-    status: "pending",
-  }));
-
-  if (rows.length > 0) {
-    const { error: insertError } = await supabase
-      .from("quotation_approvals")
-      .insert(rows);
-    if (insertError) {
-      throw new Error(insertError.message || "Failed to create approval assignments.");
-    }
+  if (rpcError) {
+    throw new Error(rpcError.message || "Failed to resubmit quotation.");
   }
 }

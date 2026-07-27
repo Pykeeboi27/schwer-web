@@ -4,6 +4,7 @@ import {
   approvePurchaseOrderAction,
   createProofOfPaymentSignedUrlAction,
   deleteCollectionAction,
+  deleteEncodedPurchaseOrderAction,
   rejectPurchaseOrderAction,
   resubmitPurchaseOrderAction,
   updatePurchaseOrderDetailsAction,
@@ -151,6 +152,8 @@ export function PurchaseOrderDetailsDialog({
   const [editingPayment, setEditingPayment] = useState<SalesPoPayment | null>(null);
   const [deletingPayment, setDeletingPayment] = useState<SalesPoPayment | null>(null);
   const [isDeletingPayment, setIsDeletingPayment] = useState(false);
+  const [deletePoDialogOpen, setDeletePoDialogOpen] = useState(false);
+  const [isDeletingPo, setIsDeletingPo] = useState(false);
   const [viewingProofPaymentId, setViewingProofPaymentId] = useState<string | null>(null);
   const [proofPreviewUrl, setProofPreviewUrl] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -190,8 +193,26 @@ export function PurchaseOrderDetailsDialog({
     setRecordDialogOpen(false);
     setEditingPayment(null);
     setDeletingPayment(null);
+    setDeletePoDialogOpen(false);
     setRejectionReason("");
     onOpenChange(false);
+  };
+
+  const handleDeletePo = async () => {
+    if (!purchaseOrder) {
+      return;
+    }
+    setIsDeletingPo(true);
+    const response = await deleteEncodedPurchaseOrderAction(purchaseOrder.id);
+    if (!response.success) {
+      error(response.error ?? "Failed to delete the purchase order.");
+      setIsDeletingPo(false);
+      return;
+    }
+    success(`Deleted ${purchaseOrder.poNumber}.`);
+    setIsDeletingPo(false);
+    handleClose();
+    router.refresh();
   };
 
   const handleDeletePayment = async () => {
@@ -515,13 +536,22 @@ export function PurchaseOrderDetailsDialog({
           )}
         >
           <DialogHeader>
-            <DialogTitle>Purchase Order Details</DialogTitle>
+            <DialogTitle className="flex items-center gap-2">
+              Purchase Order Details
+              {purchaseOrder.isManuallyEncoded ? (
+                <span className="rounded-full border px-2 py-0.5 text-[10px] font-normal text-muted-foreground">
+                  Manually Encoded
+                </span>
+              ) : null}
+            </DialogTitle>
             <DialogDescription>
-              {!isOwner && !canApproveReject
-                ? "This purchase order belongs to another sales person and is read-only."
-                : isRejected
-                  ? "This purchase order was rejected. Update the pricing, then resubmit for approval."
-                  : "Review details and process approval actions."}
+              {purchaseOrder.isManuallyEncoded
+                ? "Backfilled record with no approval workflow. It can't be edited, only deleted and re-encoded."
+                : !isOwner && !canApproveReject
+                  ? "This purchase order belongs to another sales person and is read-only."
+                  : isRejected
+                    ? "This purchase order was rejected. Update the pricing, then resubmit for approval."
+                    : "Review details and process approval actions."}
             </DialogDescription>
           </DialogHeader>
 
@@ -618,7 +648,11 @@ export function PurchaseOrderDetailsDialog({
                   </div>
                   <div className="grid grid-cols-[160px_1fr] gap-2">
                     <dt className="text-muted-foreground">Approval Chain</dt>
-                    <dd>{formatApprovalStages(purchaseOrder.approvalStages)}</dd>
+                    <dd>
+                      {purchaseOrder.isManuallyEncoded
+                        ? "No approval workflow (manually encoded)"
+                        : formatApprovalStages(purchaseOrder.approvalStages)}
+                    </dd>
                   </div>
                   <div className="grid grid-cols-[160px_1fr] gap-2">
                     <dt className="text-muted-foreground">Approved At</dt>
@@ -626,6 +660,19 @@ export function PurchaseOrderDetailsDialog({
                   </div>
                 </dl>
               </div>
+
+              {purchaseOrder.isManuallyEncoded && normalizedRole === "coordinator" ? (
+                <div className="flex justify-end">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="text-destructive hover:text-destructive"
+                    onClick={() => setDeletePoDialogOpen(true)}
+                  >
+                    Delete Purchase Order
+                  </Button>
+                </div>
+              ) : null}
 
               {canApproveReject ? (
                 <div className="space-y-3 rounded-md border bg-muted/20 p-4">
@@ -1250,6 +1297,16 @@ export function PurchaseOrderDetailsDialog({
         confirmLabel="Delete"
         isBusy={isDeletingPayment}
         onConfirm={handleDeletePayment}
+      />
+
+      <ConfirmDialog
+        open={deletePoDialogOpen}
+        onOpenChange={setDeletePoDialogOpen}
+        title="Delete this purchase order?"
+        description={`This permanently deletes ${purchaseOrder.poNumber} and any payments recorded against it. This cannot be undone -- you'll need to re-encode it from scratch if this was a mistake.`}
+        confirmLabel="Delete"
+        isBusy={isDeletingPo}
+        onConfirm={handleDeletePo}
       />
     </>
   );
