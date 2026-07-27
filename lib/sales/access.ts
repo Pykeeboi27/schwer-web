@@ -19,9 +19,9 @@ export function canAccessSalesQuotations(profile: CurrentProfile | null): boolea
 export function canEncodeExistingPurchaseOrders(profile: CurrentProfile | null): boolean {
   return Boolean(
     profile &&
-      profile.isActive &&
-      profile.department === "sales" &&
-      profile.role === "coordinator",
+    profile.isActive &&
+    profile.department === "sales" &&
+    profile.role === "coordinator",
   );
 }
 

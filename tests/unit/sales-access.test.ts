@@ -59,19 +59,26 @@ describe("sales access helpers", () => {
   });
 
   it("only allows an active coordinator in sales to encode existing purchase orders", () => {
-    const coordinatorProfile = { ...salesProfile, id: "u-coord", role: "coordinator" } as const;
+    const coordinatorProfile = {
+      ...salesProfile,
+      id: "u-coord",
+      role: "coordinator",
+    } as const;
 
     expect(canEncodeExistingPurchaseOrders(coordinatorProfile)).toBe(true);
-    expect(canEncodeExistingPurchaseOrders({ ...coordinatorProfile, isActive: false })).toBe(
-      false,
-    );
     expect(
-      canEncodeExistingPurchaseOrders({ ...coordinatorProfile, department: "accounting" }),
+      canEncodeExistingPurchaseOrders({ ...coordinatorProfile, isActive: false }),
+    ).toBe(false);
+    expect(
+      canEncodeExistingPurchaseOrders({
+        ...coordinatorProfile,
+        department: "accounting",
+      }),
     ).toBe(false);
     expect(canEncodeExistingPurchaseOrders(salesProfile)).toBe(false);
-    expect(canEncodeExistingPurchaseOrders({ ...salesProfile, role: "sales_manager" })).toBe(
-      false,
-    );
+    expect(
+      canEncodeExistingPurchaseOrders({ ...salesProfile, role: "sales_manager" }),
+    ).toBe(false);
     expect(canEncodeExistingPurchaseOrders(ownerProfile)).toBe(false);
     expect(canEncodeExistingPurchaseOrders(null)).toBe(false);
   });

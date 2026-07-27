@@ -652,7 +652,9 @@ describe("deleteEncodedPurchaseOrder", () => {
   it("rejects a non-coordinator sales user without reaching the RPC", async () => {
     mockClient = createSupabaseMock({ user, tables: { profiles: profileRow } });
     const rpcSpy = mockClient.rpc;
-    await expect(deleteEncodedPurchaseOrder("p1")).rejects.toThrow(/Only the coordinator/);
+    await expect(deleteEncodedPurchaseOrder("p1")).rejects.toThrow(
+      /Only the coordinator/,
+    );
     expect(rpcSpy).not.toHaveBeenCalled();
   });
 

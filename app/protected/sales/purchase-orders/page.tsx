@@ -5,7 +5,10 @@ import { RealtimeRefresh } from "@/components/realtime/realtime-refresh";
 import { MarkSectionRead } from "@/components/notifications/mark-section-read";
 import { PageHeader, Panel, StatCard } from "@/components/patterns";
 import { getCurrentProfile } from "@/lib/profile/get-current-profile";
-import { canEncodeExistingPurchaseOrders, getSalesAccessRedirect } from "@/lib/sales/access";
+import {
+  canEncodeExistingPurchaseOrders,
+  getSalesAccessRedirect,
+} from "@/lib/sales/access";
 import { listClients } from "@/lib/sales/clients";
 import { listPoPayments } from "@/lib/sales/purchase-orders";
 import { redirect } from "next/navigation";
