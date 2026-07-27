@@ -193,13 +193,16 @@ export function EditCostingQuotationDialog({
         if (!next) onOpenChange(false);
       }}
     >
-      <DialogContent className="max-h-[85vh] max-w-2xl overflow-y-auto">
+      <DialogContent className="max-h-[85vh] max-w-2xl overflow-y-auto overflow-x-hidden">
         <DialogHeader>
           <DialogTitle>Set Direct Costs</DialogTitle>
         </DialogHeader>
 
         {quotation.costingRejectionReason ? (
-          <Callout tone="destructive" title="Rejected by executive">
+          <Callout
+            tone="destructive"
+            title={`Rejected by ${quotation.costingRejectedByName ?? "Unknown"}`}
+          >
             <p className="text-foreground">{quotation.costingRejectionReason}</p>
           </Callout>
         ) : null}
@@ -301,7 +304,7 @@ export function EditCostingQuotationDialog({
                   : null;
                 return (
                   <div key={item.id} className="flex items-center gap-3">
-                    <div className="flex-1 text-sm">
+                    <div className="min-w-0 flex-1 break-words text-sm">
                       <p className="font-medium">{item.description}</p>
                       <p className="text-xs text-muted-foreground">
                         Qty {item.quantity}
@@ -316,7 +319,7 @@ export function EditCostingQuotationDialog({
                         setItemCosts((prev) => ({ ...prev, [item.id]: raw }))
                       }
                       placeholder="Raw Material + Labor Cost"
-                      className="w-36"
+                      className="w-28 shrink-0 sm:w-36"
                     />
                   </div>
                 );

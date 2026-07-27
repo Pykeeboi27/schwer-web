@@ -3,7 +3,9 @@
 import {
   addPoPayment,
   approvePoApproval,
+  deleteEncodedPurchaseOrder,
   deletePoPayment,
+  encodeExistingPurchaseOrder,
   fetchPurchaseOrders,
   findPendingPoApprovalForRole,
   parsePoAmount,
@@ -358,6 +360,197 @@ export async function updatePurchaseOrderDetailsAction(
         error instanceof Error
           ? error.message
           : "Failed to update purchase order details.",
+    };
+  }
+}
+
+export type EncodeExistingPoItemFormInput = {
+  description: string;
+  quantity: string;
+  rawCost: string;
+  marginPercentage: string;
+  bankPercentage: string;
+  sopPercentage: string;
+};
+
+export type EncodeExistingPoPaymentFormInput = {
+  amountCollected: string;
+  paymentDate: string;
+  paymentMethod: string;
+  referenceNumber: string;
+  notes: string;
+  /** Storage path of the already-uploaded proof-of-payment image. */
+  proofPath: string;
+};
+
+export type EncodeExistingPurchaseOrderFormInput = {
+  poNumber: string;
+  clientId: string;
+  subject: string;
+  clientPoNumber: string;
+  quotationReference: string;
+  poDate: string;
+  paymentTerms: string;
+  paymentTermsCustom: string;
+  leadTimeDays: string;
+  hasUnequalMargins: boolean;
+  items: EncodeExistingPoItemFormInput[];
+  payments: EncodeExistingPoPaymentFormInput[];
+};
+
+/**
+ * Existing Purchase Order Encoding: records an already-existing, already-won
+ * PO for record-keeping, with no approval workflow. See
+ * lib/sales/purchase-orders.ts encodeExistingPurchaseOrder for the pricing
+ * and write-transaction details.
+ */
+export async function encodeExistingPurchaseOrderAction(
+  input: EncodeExistingPurchaseOrderFormInput,
+): Promise<ActionResponse<{ purchaseOrderId: string }>> {
+  try {
+    const poNumber = String(input.poNumber ?? "")
+      .trim()
+      .toUpperCase();
+    if (!poNumber) {
+      throw new Error("PO number is required.");
+    }
+
+    const clientId = String(input.clientId ?? "").trim();
+    if (!clientId) {
+      throw new Error("Client is required.");
+    }
+
+    const subject = String(input.subject ?? "").trim();
+    if (!subject) {
+      throw new Error("Subject is required.");
+    }
+
+    const poDate = String(input.poDate ?? "").trim();
+    if (!poDate) {
+      throw new Error("PO date is required.");
+    }
+
+    if (!Array.isArray(input.items) || input.items.length === 0) {
+      throw new Error("Add at least one line item.");
+    }
+
+    const items = input.items.map((item, index) => {
+      const description = String(item.description ?? "")
+        .trim()
+        .toUpperCase();
+      if (!description) {
+        throw new Error(`Item ${index + 1} needs a description.`);
+      }
+
+      const quantity = Number(item.quantity);
+      if (!Number.isFinite(quantity) || quantity <= 0) {
+        throw new Error(`Item ${index + 1} needs a quantity greater than 0.`);
+      }
+
+      const rawCost = Number(item.rawCost);
+      if (!Number.isFinite(rawCost) || rawCost <= 0) {
+        throw new Error(`Item ${index + 1} needs a raw cost greater than 0.`);
+      }
+
+      const marginRaw = String(item.marginPercentage ?? "").trim();
+      if (!marginRaw) {
+        throw new Error(`Item ${index + 1} needs a margin percentage.`);
+      }
+
+      return {
+        description,
+        quantity,
+        rawCost,
+        marginPercentage: parsePercentInput(marginRaw, "Margin percentage"),
+        bankPercentage: parsePercentInput(item.bankPercentage || "0", "Bank percentage"),
+        sopPercentage: parsePercentInput(item.sopPercentage || "0", "SOP percentage"),
+      };
+    });
+
+    const leadTimeDays = parseLeadTimeDays(input.leadTimeDays);
+
+    const paymentTerms = asOptionalString(input.paymentTerms);
+    if (!paymentTerms) {
+      throw new Error("Payment terms are required.");
+    }
+    const paymentTermsCustom =
+      paymentTerms === "Other"
+        ? (asOptionalString(input.paymentTermsCustom)?.toUpperCase() ?? null)
+        : null;
+
+    const payments = (Array.isArray(input.payments) ? input.payments : []).map(
+      (payment, index) => {
+        const amountCollected = Number(payment.amountCollected);
+        if (!Number.isFinite(amountCollected) || amountCollected <= 0) {
+          throw new Error(`Payment ${index + 1} needs an amount greater than 0.`);
+        }
+
+        const paymentDate = String(payment.paymentDate ?? "").trim();
+        if (!paymentDate) {
+          throw new Error(`Payment ${index + 1} needs a date.`);
+        }
+
+        const proofPath = String(payment.proofPath ?? "").trim();
+        if (!proofPath) {
+          throw new Error(`Payment ${index + 1} needs a proof-of-payment photo.`);
+        }
+
+        return {
+          amountCollected,
+          paymentDate,
+          paymentMethod: asOptionalString(payment.paymentMethod),
+          referenceNumber: asOptionalString(payment.referenceNumber),
+          notes: asOptionalString(payment.notes)?.toUpperCase() ?? null,
+          proofPath,
+        };
+      },
+    );
+
+    const result = await encodeExistingPurchaseOrder({
+      poNumber,
+      clientId,
+      subject: subject.toUpperCase(),
+      clientPoNumber: asOptionalString(input.clientPoNumber),
+      quotationReference:
+        asOptionalString(input.quotationReference)?.toUpperCase() ?? null,
+      poDate,
+      paymentTerms,
+      paymentTermsCustom,
+      leadTimeDays,
+      hasUnequalMargins: Boolean(input.hasUnequalMargins),
+      items,
+      payments,
+    });
+
+    revalidatePath("/protected/sales/purchase-orders");
+    return { success: true, data: result };
+  } catch (error) {
+    return {
+      success: false,
+      error:
+        error instanceof Error ? error.message : "Failed to record the purchase order.",
+    };
+  }
+}
+
+/** Deletes a manually-encoded PO so it can be re-entered after a mistake. */
+export async function deleteEncodedPurchaseOrderAction(
+  purchaseOrderId: string,
+): Promise<ActionResponse<{ poId: string }>> {
+  const normalizedId = String(purchaseOrderId ?? "").trim();
+  if (!normalizedId) {
+    return { success: false, error: "Purchase order id is required." };
+  }
+
+  try {
+    await deleteEncodedPurchaseOrder(normalizedId);
+    revalidatePath("/protected/sales/purchase-orders");
+    return { success: true, data: { poId: normalizedId } };
+  } catch (error) {
+    return {
+      success: false,
+      error:
+        error instanceof Error ? error.message : "Failed to delete the purchase order.",
     };
   }
 }

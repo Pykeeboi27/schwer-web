@@ -7,7 +7,13 @@ import {
 import { EditCostingQuotationDialog } from "@/components/dialogs/edit-costing-quotation-dialog";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Callout, StatusBadge } from "@/components/patterns";
+import {
+  Callout,
+  DataCard,
+  DataField,
+  ResponsiveTable,
+  StatusBadge,
+} from "@/components/patterns";
 import type { CostingQuotation } from "@/lib/engineering/costing-quotations";
 import { formatCurrency } from "@/lib/utils/number-format";
 import { useToast } from "@/lib/utils/toast-notification";
@@ -109,7 +115,7 @@ export function CostingQuotationDetailsDialog({
           if (!next) onOpenChange(false);
         }}
       >
-        <DialogContent className="max-h-[85vh] max-w-xl overflow-y-auto">
+        <DialogContent className="max-h-[85vh] max-w-xl overflow-y-auto overflow-x-hidden">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <span className="font-mono">{quotation.quotationNumber}</span>
@@ -118,7 +124,10 @@ export function CostingQuotationDetailsDialog({
           </DialogHeader>
 
           {quotation.costingRejectionReason ? (
-            <Callout tone="destructive" title="Returned by executive">
+            <Callout
+              tone="destructive"
+              title={`Returned by ${quotation.costingRejectedByName ?? "Unknown"}`}
+            >
               <p className="text-foreground">{quotation.costingRejectionReason}</p>
             </Callout>
           ) : null}
@@ -164,38 +173,75 @@ export function CostingQuotationDetailsDialog({
 
           <div>
             <p className="mb-2 text-sm font-medium text-muted-foreground">Line Items</p>
-            <table className="w-full text-xs">
-              <thead className="text-left text-muted-foreground">
-                <tr>
-                  <th className="py-1 pr-3 font-medium">Item</th>
-                  <th className="py-1 pr-3 font-medium">Qty</th>
-                  <th className="py-1 pr-3 font-medium">Unit Direct Cost</th>
-                  <th className="py-1 font-medium">Line Total</th>
-                </tr>
-              </thead>
-              <tbody>
-                {quotation.items.map((item) => (
-                  <tr key={item.id} className="border-t">
-                    <td className="py-1 pr-3">{item.description}</td>
-                    <td className="py-1 pr-3">{item.quantity}</td>
-                    <td className="py-1 pr-3">
-                      {item.unitCost === null ? (
+            <ResponsiveTable
+              table={
+                <table className="w-full min-w-[480px] text-xs">
+                  <thead className="text-left text-muted-foreground">
+                    <tr>
+                      <th className="py-1 pr-3 font-medium">Item</th>
+                      <th className="py-1 pr-3 font-medium">Qty</th>
+                      <th className="py-1 pr-3 font-medium">Unit Direct Cost</th>
+                      <th className="py-1 font-medium">Line Total</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {quotation.items.map((item) => (
+                      <tr key={item.id} className="border-t">
+                        <td className="py-1 pr-3">{item.description}</td>
+                        <td className="py-1 pr-3">{item.quantity}</td>
+                        <td className="py-1 pr-3">
+                          {item.unitCost === null ? (
+                            <span className="text-muted-foreground">Not costed yet</span>
+                          ) : (
+                            formatCurrency(item.unitCost)
+                          )}
+                        </td>
+                        <td className="py-1">{formatCurrency(item.lineTotal)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                  <tfoot>
+                    <tr className="border-t font-semibold">
+                      <td className="py-1 pr-3" colSpan={3}>
+                        Total Direct Cost
+                      </td>
+                      <td className="py-1">{formatCurrency(quotation.cost)}</td>
+                    </tr>
+                  </tfoot>
+                </table>
+              }
+              cards={quotation.items.map((item) => (
+                <DataCard
+                  key={item.id}
+                  header={
+                    <p className="min-w-0 flex-1 font-medium">{item.description}</p>
+                  }
+                >
+                  <DataField label="Qty" value={item.quantity} />
+                  <DataField
+                    label="Unit Direct Cost"
+                    value={
+                      item.unitCost === null ? (
                         <span className="text-muted-foreground">Not costed yet</span>
                       ) : (
                         formatCurrency(item.unitCost)
-                      )}
-                    </td>
-                    <td className="py-1">{formatCurrency(item.lineTotal)}</td>
-                  </tr>
-                ))}
-                <tr className="border-t font-semibold">
-                  <td className="py-1 pr-3" colSpan={3}>
-                    Total Direct Cost
-                  </td>
-                  <td className="py-1">{formatCurrency(quotation.cost)}</td>
-                </tr>
-              </tbody>
-            </table>
+                      )
+                    }
+                  />
+                  <DataField
+                    label="Line Total"
+                    value={formatCurrency(item.lineTotal)}
+                    className="border-t pt-1.5 font-semibold"
+                  />
+                </DataCard>
+              ))}
+            />
+            {/* The table's tfoot total is invisible in the md:hidden card view below,
+                so this mirrors it for phones. */}
+            <div className="mt-2 flex items-center justify-between rounded-md border bg-muted/20 px-3 py-2 text-sm font-semibold md:hidden">
+              <span>Total Direct Cost</span>
+              <span>{formatCurrency(quotation.cost)}</span>
+            </div>
           </div>
 
           <div className="flex flex-col-reverse gap-2 pt-2 sm:flex-row sm:justify-end">

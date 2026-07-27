@@ -16,6 +16,15 @@ export function canAccessSalesQuotations(profile: CurrentProfile | null): boolea
   return profile.role === "owner" || profile.role === "executive";
 }
 
+export function canEncodeExistingPurchaseOrders(profile: CurrentProfile | null): boolean {
+  return Boolean(
+    profile &&
+    profile.isActive &&
+    profile.department === "sales" &&
+    profile.role === "coordinator",
+  );
+}
+
 export function getSalesFallbackPath(profile: CurrentProfile | null): string {
   if (!profile) {
     return "/auth/login";

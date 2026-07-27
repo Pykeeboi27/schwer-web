@@ -224,20 +224,25 @@ export async function generatePurchaseOrderWorksheetXlsx(
     sellingAmount: 0,
   });
 
+  // Grouped by the item's printed row number (matching column A's static
+  // 1-22 labels on the template) rather than its description -- descriptions
+  // can be long and repeat across margin/bank/SOP groups, cluttering the
+  // small REMARKS box, whereas the row number is exactly what's already
+  // printed beside each line so it reads as a direct cross-reference.
   const groupByPercentage = (
     getPercent: (item: (typeof items)[number]) => number | null,
-  ): Array<{ percent: number; descriptions: string[] }> => {
-    const groups = new Map<number, string[]>();
-    for (const item of items) {
+  ): Array<{ percent: number; itemNumbers: number[] }> => {
+    const groups = new Map<number, number[]>();
+    items.forEach((item, index) => {
       const percent = getPercent(item);
-      if (percent === null) continue;
-      const descriptions = groups.get(percent) ?? [];
-      descriptions.push(item.description);
-      groups.set(percent, descriptions);
-    }
+      if (percent === null) return;
+      const itemNumbers = groups.get(percent) ?? [];
+      itemNumbers.push(index + 1);
+      groups.set(percent, itemNumbers);
+    });
     return Array.from(groups.entries())
       .sort(([a], [b]) => a - b)
-      .map(([percent, descriptions]) => ({ percent, descriptions }));
+      .map(([percent, itemNumbers]) => ({ percent, itemNumbers }));
   };
 
   const remarksLines: string[] = [];
@@ -248,7 +253,7 @@ export async function generatePurchaseOrderWorksheetXlsx(
   ] as const) {
     for (const group of groups) {
       remarksLines.push(
-        `${label} ${group.percent.toFixed(2)}%: ${group.descriptions.join(", ")}`,
+        `${label} ${group.percent.toFixed(2)}%: ${group.itemNumbers.map((n) => `#${n}`).join(", ")}`,
       );
     }
   }

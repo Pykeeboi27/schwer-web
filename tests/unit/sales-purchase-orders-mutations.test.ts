@@ -12,6 +12,8 @@ import {
   addPoPayment,
   approvePoApproval,
   convertQuotationToPurchaseOrder,
+  deleteEncodedPurchaseOrder,
+  encodeExistingPurchaseOrder,
   findPendingPoApprovalForRole,
   markClientPoReceived,
   rejectPoApproval,
@@ -569,6 +571,102 @@ describe("updatePurchaseOrderDetails", () => {
       },
     });
     await expect(updatePurchaseOrderDetails(input)).rejects.toThrow("boom");
+  });
+});
+
+const coordinatorProfileRow = {
+  data: {
+    id: "u1",
+    email: "u1@example.com",
+    department: "sales",
+    is_active: true,
+    role: "coordinator",
+    is_executive_viewer: false,
+  },
+  error: null,
+};
+
+describe("encodeExistingPurchaseOrder", () => {
+  const encodeInput = {
+    poNumber: "PO-1",
+    clientId: "c1",
+    subject: "Test subject",
+    clientPoNumber: null,
+    quotationReference: null,
+    poDate: "2026-01-01",
+    paymentTerms: null,
+    paymentTermsCustom: null,
+    leadTimeDays: 14,
+    hasUnequalMargins: false,
+    items: [
+      {
+        description: "Item",
+        quantity: 1,
+        rawCost: 100,
+        marginPercentage: 10,
+        bankPercentage: 0,
+        sopPercentage: 0,
+      },
+    ],
+    payments: [],
+  };
+
+  it("requires an authenticated user", async () => {
+    mockClient = createSupabaseMock({ user: null });
+    await expect(encodeExistingPurchaseOrder(encodeInput)).rejects.toThrow(
+      /must be signed in/,
+    );
+  });
+
+  it("rejects a non-coordinator sales user without reaching the RPC", async () => {
+    mockClient = createSupabaseMock({ user, tables: { profiles: profileRow } });
+    const rpcSpy = mockClient.rpc;
+    await expect(encodeExistingPurchaseOrder(encodeInput)).rejects.toThrow(
+      /Only the coordinator/,
+    );
+    expect(rpcSpy).not.toHaveBeenCalled();
+  });
+
+  it("allows a coordinator to encode an existing purchase order", async () => {
+    mockClient = createSupabaseMock({
+      user,
+      tables: {
+        profiles: coordinatorProfileRow,
+        clients: { data: { sector: "commercial" }, error: null },
+      },
+    });
+    mockClient.rpc = vi.fn(async () => ({ data: "po1", error: null }));
+
+    await expect(encodeExistingPurchaseOrder(encodeInput)).resolves.toEqual({
+      purchaseOrderId: "po1",
+    });
+  });
+});
+
+describe("deleteEncodedPurchaseOrder", () => {
+  it("requires an authenticated user", async () => {
+    mockClient = createSupabaseMock({ user: null });
+    await expect(deleteEncodedPurchaseOrder("p1")).rejects.toThrow(/must be signed in/);
+  });
+
+  it("rejects a non-coordinator sales user without reaching the RPC", async () => {
+    mockClient = createSupabaseMock({ user, tables: { profiles: profileRow } });
+    const rpcSpy = mockClient.rpc;
+    await expect(deleteEncodedPurchaseOrder("p1")).rejects.toThrow(
+      /Only the coordinator/,
+    );
+    expect(rpcSpy).not.toHaveBeenCalled();
+  });
+
+  it("allows a coordinator to delete an encoded purchase order", async () => {
+    mockClient = createSupabaseMock({
+      user,
+      tables: {
+        profiles: coordinatorProfileRow,
+        po_payments: { data: [], error: null },
+      },
+    });
+    await expect(deleteEncodedPurchaseOrder("p1")).resolves.toBeUndefined();
   });
 });
 

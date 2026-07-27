@@ -42,6 +42,7 @@ export type CostingQuotation = {
   notes: string | null;
   status: "draft" | "pending" | "approved" | "rejected" | "cancelled";
   costingRejectionReason: string | null;
+  costingRejectedByName: string | null;
   preparedBy: string;
   salesPersonId: string | null;
   salesPersonName: string | null;
@@ -85,7 +86,7 @@ export async function listCostingQuotations(): Promise<CostingQuotation[]> {
   const { data, error } = await supabase
     .from("quotations")
     .select(
-      "id, quotation_number, client_id, subject, amount, cost, google_drive_link, costing_rejection_reason, notes, status, prepared_by, sales_person_id, created_at, clients:client_id(company_name), sales_person:sales_person_id(full_name, email), quotation_items(id, description, quantity, raw_cost, unit_cost, line_total, sort_order)",
+      "id, quotation_number, client_id, subject, amount, cost, google_drive_link, costing_rejection_reason, costing_rejected_by, notes, status, prepared_by, sales_person_id, created_at, clients:client_id(company_name), sales_person:sales_person_id(full_name, email), rejected_by:costing_rejected_by(full_name, email), quotation_items(id, description, quantity, raw_cost, unit_cost, line_total, sort_order)",
     )
     .eq("phase", "costing")
     .order("created_at", { ascending: false });
@@ -99,6 +100,9 @@ export async function listCostingQuotations(): Promise<CostingQuotation[]> {
     const salesPerson = Array.isArray(row.sales_person)
       ? row.sales_person[0]
       : row.sales_person;
+    const rejectedBy = Array.isArray(row.rejected_by)
+      ? row.rejected_by[0]
+      : row.rejected_by;
     const items = (Array.isArray(row.quotation_items) ? row.quotation_items : [])
       .slice()
       .sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0))
@@ -123,6 +127,7 @@ export async function listCostingQuotations(): Promise<CostingQuotation[]> {
       notes: row.notes,
       status: row.status,
       costingRejectionReason: row.costing_rejection_reason,
+      costingRejectedByName: rejectedBy?.full_name || rejectedBy?.email || null,
       preparedBy: row.prepared_by,
       salesPersonId: row.sales_person_id,
       salesPersonName: salesPerson?.full_name || salesPerson?.email || null,
@@ -228,6 +233,7 @@ export async function setQuotationItemCosts(input: {
     notes: input.notes ? input.notes.toUpperCase() : null,
     sales_person_id: input.salesPersonId ?? null,
     costing_rejection_reason: null,
+    costing_rejected_by: null,
   };
 
   if (input.quotationNumber) {
@@ -395,7 +401,11 @@ export async function submitCostingForApproval(quotationId: string): Promise<voi
 
   const { data: updatedRow, error: updateError } = await supabase
     .from("quotations")
-    .update({ status: "pending", costing_rejection_reason: null })
+    .update({
+      status: "pending",
+      costing_rejection_reason: null,
+      costing_rejected_by: null,
+    })
     .eq("id", quotationId)
     .eq("phase", "costing")
     .eq("status", "draft")
