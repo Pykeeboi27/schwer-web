@@ -4,6 +4,7 @@ import {
   canAccessSalesDashboard,
   canAccessSalesQuotations,
   canAccessSalesRoute,
+  canEncodeExistingPurchaseOrders,
   getSalesAccessRedirect,
   getSalesFallbackPath,
 } from "@/lib/sales/access";
@@ -55,6 +56,24 @@ describe("sales access helpers", () => {
         role: "staff",
       }),
     ).toBe(false);
+  });
+
+  it("only allows an active coordinator in sales to encode existing purchase orders", () => {
+    const coordinatorProfile = { ...salesProfile, id: "u-coord", role: "coordinator" } as const;
+
+    expect(canEncodeExistingPurchaseOrders(coordinatorProfile)).toBe(true);
+    expect(canEncodeExistingPurchaseOrders({ ...coordinatorProfile, isActive: false })).toBe(
+      false,
+    );
+    expect(
+      canEncodeExistingPurchaseOrders({ ...coordinatorProfile, department: "accounting" }),
+    ).toBe(false);
+    expect(canEncodeExistingPurchaseOrders(salesProfile)).toBe(false);
+    expect(canEncodeExistingPurchaseOrders({ ...salesProfile, role: "sales_manager" })).toBe(
+      false,
+    );
+    expect(canEncodeExistingPurchaseOrders(ownerProfile)).toBe(false);
+    expect(canEncodeExistingPurchaseOrders(null)).toBe(false);
   });
 
   it("resolves the correct fallback path for each profile state", () => {

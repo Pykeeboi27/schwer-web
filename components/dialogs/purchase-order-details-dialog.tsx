@@ -661,7 +661,7 @@ export function PurchaseOrderDetailsDialog({
                 </dl>
               </div>
 
-              {purchaseOrder.isManuallyEncoded ? (
+              {purchaseOrder.isManuallyEncoded && normalizedRole === "coordinator" ? (
                 <div className="flex justify-end">
                   <Button
                     type="button"

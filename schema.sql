@@ -20,6 +20,7 @@ CREATE TYPE user_role_enum AS ENUM (
   'executive',
   'sales_manager',
   'sales_staff',
+  'coordinator',
   'hr_staff',
   'hr_manager',
   'accountant',
@@ -1019,14 +1020,17 @@ DECLARE
   v_recognized_amount NUMERIC(15, 2) := 0;
   v_payment_status payment_status_enum;
 BEGIN
-  -- SECURITY DEFINER bypasses RLS, so the department/active check that
-  -- sales_purchase_orders_sales_all would normally enforce on a plain INSERT
-  -- has to be re-asserted here explicitly.
+  -- SECURITY DEFINER bypasses RLS, so authorization is asserted here
+  -- explicitly: only an active coordinator in the sales department may
+  -- encode a backfilled purchase order.
   IF NOT EXISTS (
     SELECT 1 FROM public.profiles
-    WHERE id = v_user_id AND department = 'sales' AND is_active = TRUE
+    WHERE id = v_user_id
+      AND department = 'sales'
+      AND role = 'coordinator'
+      AND is_active = TRUE
   ) THEN
-    RAISE EXCEPTION 'Only active sales department users can encode purchase orders.';
+    RAISE EXCEPTION 'Only the coordinator can encode existing purchase orders.';
   END IF;
 
   IF jsonb_array_length(p_items) = 0 THEN
@@ -1150,11 +1154,16 @@ DECLARE
   v_user_id UUID := auth.uid();
   v_is_encoded BOOLEAN;
 BEGIN
+  -- Only an active coordinator in the sales department may delete a
+  -- backfilled purchase order.
   IF NOT EXISTS (
     SELECT 1 FROM public.profiles
-    WHERE id = v_user_id AND department = 'sales' AND is_active = TRUE
+    WHERE id = v_user_id
+      AND department = 'sales'
+      AND role = 'coordinator'
+      AND is_active = TRUE
   ) THEN
-    RAISE EXCEPTION 'Only active sales department users can delete an encoded purchase order.';
+    RAISE EXCEPTION 'Only the coordinator can delete an encoded purchase order.';
   END IF;
 
   SELECT is_manually_encoded INTO v_is_encoded

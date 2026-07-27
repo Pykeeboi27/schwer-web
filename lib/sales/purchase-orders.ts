@@ -6,6 +6,7 @@ import {
   type RequiredApproverRole,
 } from "@/lib/sales/quotations";
 import { getCurrentProfile } from "@/lib/profile/get-current-profile";
+import { canEncodeExistingPurchaseOrders } from "@/lib/sales/access";
 import { computeLandedUnitCost } from "@/lib/engineering/landed-cost";
 import {
   computeAggregatePricing,
@@ -16,6 +17,14 @@ import {
 import { PROOF_OF_PAYMENT_BUCKET } from "@/lib/sales/proof-of-payment";
 import { createClient } from "@/lib/supabase/server";
 import { validatePoTotalAmount } from "@/lib/utils/form-validation";
+
+// Re-exported for callers that already import from this module; defined in
+// lib/sales/po-labels.ts (a client-safe module with no server-only imports)
+// -- see that file's comment for why. Applied at the data layer below so
+// every UI surface inherits it uniformly; created_by/encoded_by still hold
+// the real user id for audit and are never mutated.
+import { ENCODED_PO_AUTHOR_LABEL } from "@/lib/sales/po-labels";
+export { ENCODED_PO_AUTHOR_LABEL };
 
 export type PurchaseOrderStatus =
   "draft" | "pending" | "approved" | "rejected" | "cancelled";
@@ -314,7 +323,9 @@ export async function listPurchaseOrders(): Promise<SalesPurchaseOrder[]> {
       approvedAt: row.approved_at ?? null,
       createdAt: row.created_at,
       createdBy: row.created_by,
-      createdByName: resolveDisplayName(creator) ?? "Unknown",
+      createdByName: row.is_manually_encoded
+        ? ENCODED_PO_AUTHOR_LABEL
+        : (resolveDisplayName(creator) ?? "Unknown"),
       itemCount: items.length,
       isManuallyEncoded: Boolean(row.is_manually_encoded),
     };
@@ -1125,6 +1136,10 @@ export async function encodeExistingPurchaseOrder(
     throw new Error("You must be signed in.");
   }
 
+  if (!canEncodeExistingPurchaseOrders(profile)) {
+    throw new Error("Only the coordinator can record existing purchase orders.");
+  }
+
   if (input.items.length === 0) {
     throw new Error("Add at least one line item.");
   }
@@ -1234,6 +1249,10 @@ export async function deleteEncodedPurchaseOrder(purchaseOrderId: string): Promi
   const profile = await getCurrentProfile();
   if (!profile) {
     throw new Error("You must be signed in.");
+  }
+
+  if (!canEncodeExistingPurchaseOrders(profile)) {
+    throw new Error("Only the coordinator can delete a recorded purchase order.");
   }
 
   const supabase = await createClient();

@@ -150,3 +150,43 @@ describe("PurchaseOrderDetailsDialog sales pricing defaults", () => {
     expect((screen.getByLabelText("SOP %") as HTMLInputElement).value).toBe("2");
   });
 });
+
+describe("PurchaseOrderDetailsDialog encoded PO delete gating", () => {
+  it("shows Delete Purchase Order for a coordinator viewing an encoded PO", () => {
+    const purchaseOrder = buildPurchaseOrder({ isManuallyEncoded: true });
+
+    render(
+      <PurchaseOrderDetailsDialog
+        open={true}
+        onOpenChange={vi.fn()}
+        purchaseOrder={purchaseOrder}
+        payments={[]}
+        currentUserId={CURRENT_USER_ID}
+        currentUserRole="coordinator"
+      />,
+    );
+
+    expect(
+      screen.getByRole("button", { name: "Delete Purchase Order" }),
+    ).toBeInTheDocument();
+  });
+
+  it("hides Delete Purchase Order for a non-coordinator viewing an encoded PO", () => {
+    const purchaseOrder = buildPurchaseOrder({ isManuallyEncoded: true });
+
+    render(
+      <PurchaseOrderDetailsDialog
+        open={true}
+        onOpenChange={vi.fn()}
+        purchaseOrder={purchaseOrder}
+        payments={[]}
+        currentUserId={CURRENT_USER_ID}
+        currentUserRole="sales_staff"
+      />,
+    );
+
+    expect(
+      screen.queryByRole("button", { name: "Delete Purchase Order" }),
+    ).not.toBeInTheDocument();
+  });
+});
