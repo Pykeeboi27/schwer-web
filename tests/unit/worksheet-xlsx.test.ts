@@ -147,7 +147,7 @@ describe("generatePurchaseOrderWorksheetXlsx", () => {
     const cell = (addr: string) =>
       sheet.match(new RegExp(`<c r="${addr}"[^>]*>([\\s\\S]*?)</c>`))?.[1] ?? "";
     // Both items share the same 10% margin, so there's exactly one group.
-    expect(cell("N49")).toContain("Margin 10.00%: Fire pump unit, Control panel");
+    expect(cell("N49")).toContain("Margin 10.00%: #1, #2");
     expect(cell("N50")).toContain("Margin VAT (12%, incl.)");
     expect(cell("N51")).toContain("Bank VAT (12%, incl.)");
     expect(cell("N52")).toContain("SOP VAT (12%, incl.)"); // bottom-most line
@@ -165,8 +165,8 @@ describe("generatePurchaseOrderWorksheetXlsx", () => {
       sheet.match(new RegExp(`<c r="${addr}"[^>]*>([\\s\\S]*?)</c>`))?.[1] ?? "";
     // Two distinct groups (sorted ascending), each naming only its own item(s) --
     // never a blended/averaged 15%.
-    expect(cell("N48")).toContain("Margin 10.00%: Fire pump unit");
-    expect(cell("N49")).toContain("Margin 20.00%: Control panel");
+    expect(cell("N48")).toContain("Margin 10.00%: #1");
+    expect(cell("N49")).toContain("Margin 20.00%: #2");
     expect(sheet).not.toContain("Margin 15.00%");
   });
 
@@ -190,7 +190,7 @@ describe("generatePurchaseOrderWorksheetXlsx", () => {
     });
     const cell = (addr: string) =>
       sheet.match(new RegExp(`<c r="${addr}"[^>]*?(?:/>|>([\\s\\S]*?)</c>)`))?.[1] ?? "";
-    expect(cell("N51")).toContain("Margin 10.00%: Fire pump unit, Control panel");
+    expect(cell("N51")).toContain("Margin 10.00%: #1, #2");
     expect(cell("N52")).toContain("Margin VAT (12%, incl.)"); // bottom-most line
     expect(cell("N50")).not.toContain("Margin");
     expect(cell("N49")).not.toContain("Margin");
