@@ -38,7 +38,14 @@ const DialogContent = React.forwardRef<
     <DialogPrimitive.Content
       ref={ref}
       className={cn(
-        "fixed left-1/2 top-1/2 z-50 grid w-[calc(100%-2rem)] max-w-lg -translate-x-1/2 -translate-y-1/2 gap-4 rounded-lg border bg-background p-6 shadow-lg duration-200 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95",
+        // [&>*]:min-w-0 strips the default `min-width: auto` every direct
+        // child gets as a grid item (this container is `grid`). Without it, a
+        // whitespace-nowrap table nested many levels down -- e.g. a long item
+        // description in a pricing table -- forces its whole grid-item
+        // ancestor to grow to fit instead of letting the table's own
+        // overflow-x-auto wrapper (ResponsiveTable) scroll internally; the
+        // excess then just gets clipped by this element's overflow-x-hidden.
+        "fixed left-1/2 top-1/2 z-50 grid w-[calc(100%-2rem)] max-w-lg -translate-x-1/2 -translate-y-1/2 gap-4 rounded-lg border bg-background p-6 shadow-lg duration-200 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 [&>*]:min-w-0",
         className,
       )}
       {...props}

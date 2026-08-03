@@ -386,6 +386,7 @@ export type EncodeExistingPoPaymentFormInput = {
 export type EncodeExistingPurchaseOrderFormInput = {
   poNumber: string;
   clientId: string;
+  salesPersonId: string;
   subject: string;
   clientPoNumber: string;
   quotationReference: string;
@@ -418,6 +419,11 @@ export async function encodeExistingPurchaseOrderAction(
     const clientId = String(input.clientId ?? "").trim();
     if (!clientId) {
       throw new Error("Client is required.");
+    }
+
+    const salesPersonId = String(input.salesPersonId ?? "").trim();
+    if (!salesPersonId) {
+      throw new Error("Sales person is required.");
     }
 
     const subject = String(input.subject ?? "").trim();
@@ -509,6 +515,7 @@ export async function encodeExistingPurchaseOrderAction(
     const result = await encodeExistingPurchaseOrder({
       poNumber,
       clientId,
+      salesPersonId,
       subject: subject.toUpperCase(),
       clientPoNumber: asOptionalString(input.clientPoNumber),
       quotationReference:

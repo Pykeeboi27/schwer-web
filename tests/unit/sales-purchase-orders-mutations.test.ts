@@ -590,6 +590,7 @@ describe("encodeExistingPurchaseOrder", () => {
   const encodeInput = {
     poNumber: "PO-1",
     clientId: "c1",
+    salesPersonId: "sp1",
     subject: "Test subject",
     clientPoNumber: null,
     quotationReference: null,

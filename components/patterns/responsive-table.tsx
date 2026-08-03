@@ -95,3 +95,24 @@ export function DataField({ label, value, className }: DataFieldProps) {
     </div>
   );
 }
+
+type TruncatedTextProps = {
+  children: string;
+  className?: string;
+};
+
+/**
+ * Caps long text (item descriptions, etc.) at one line with an ellipsis,
+ * exposing the full value as a native tooltip on hover/focus instead of
+ * blowing out the table -- an alternative to just letting it scroll.
+ */
+export function TruncatedText({ children, className }: TruncatedTextProps) {
+  return (
+    <span
+      title={children}
+      className={cn("block max-w-[220px] truncate align-bottom", className)}
+    >
+      {children}
+    </span>
+  );
+}

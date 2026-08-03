@@ -11,6 +11,7 @@ import {
 } from "@/lib/sales/access";
 import { listClients } from "@/lib/sales/clients";
 import { listPoPayments } from "@/lib/sales/purchase-orders";
+import { listSalesDepartmentProfiles } from "@/lib/sales/sales-people";
 import { redirect } from "next/navigation";
 
 function formatCurrency(amount: number): string {
@@ -32,10 +33,11 @@ export default async function SalesPurchaseOrdersPage() {
     redirect(redirectPath);
   }
 
-  const [response, payments, clients] = await Promise.all([
+  const [response, payments, clients, salesPeople] = await Promise.all([
     fetchPurchaseOrdersAction(profile?.department ?? undefined),
     listPoPayments(),
     listClients(),
+    listSalesDepartmentProfiles(),
   ]);
 
   const purchaseOrders = response.success ? (response.data ?? []) : [];
@@ -78,7 +80,11 @@ export default async function SalesPurchaseOrdersPage() {
         description="Purchase orders converted from approved quotations. Pending POs await approval; once approved, track collections here as payments come in."
         actions={
           canEncodeExistingPurchaseOrders(profile) ? (
-            <EncodeExistingPoDialog clients={clientOptions} userId={profile?.id ?? ""} />
+            <EncodeExistingPoDialog
+              clients={clientOptions}
+              salesPeople={salesPeople}
+              userId={profile?.id ?? ""}
+            />
           ) : undefined
         }
       />

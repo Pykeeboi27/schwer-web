@@ -13,6 +13,7 @@ import {
   DataField,
   ResponsiveTable,
   StatusBadge,
+  TruncatedText,
 } from "@/components/patterns";
 import type { CostingQuotation } from "@/lib/engineering/costing-quotations";
 import { formatCurrency } from "@/lib/utils/number-format";
@@ -187,7 +188,9 @@ export function CostingQuotationDetailsDialog({
                   <tbody>
                     {quotation.items.map((item) => (
                       <tr key={item.id} className="border-t">
-                        <td className="py-1 pr-3">{item.description}</td>
+                        <td className="py-1 pr-3">
+                          <TruncatedText>{item.description}</TruncatedText>
+                        </td>
                         <td className="py-1 pr-3">{item.quantity}</td>
                         <td className="py-1 pr-3">
                           {item.unitCost === null ? (
@@ -214,7 +217,9 @@ export function CostingQuotationDetailsDialog({
                 <DataCard
                   key={item.id}
                   header={
-                    <p className="min-w-0 flex-1 font-medium">{item.description}</p>
+                    <TruncatedText className="min-w-0 max-w-none flex-1 font-medium">
+                      {item.description}
+                    </TruncatedText>
                   }
                 >
                   <DataField label="Qty" value={item.quantity} />

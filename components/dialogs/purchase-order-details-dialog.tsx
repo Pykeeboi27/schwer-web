@@ -35,6 +35,7 @@ import {
   ConfirmDialog,
   PricingBreakdown,
   StatusBadge,
+  TruncatedText,
 } from "@/components/patterns";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { computeAggregatePricing, computeSalesPricing } from "@/lib/sales/pricing";
@@ -316,7 +317,12 @@ export function PurchaseOrderDetailsDialog({
 
   const isRejected = purchaseOrder.status === "rejected";
   const isApproved = purchaseOrder.status === "approved";
-  const isEditable = isRejected && isOwner;
+  // Manually-encoded POs stay permanently approved with no rejection/resubmit
+  // cycle, so their edit access is gated on the coordinator role instead of
+  // ownership + rejected status.
+  const isEncodedEditable =
+    purchaseOrder.isManuallyEncoded && normalizedRole === "coordinator";
+  const isEditable = (isRejected && isOwner) || isEncodedEditable;
   const canApproveReject =
     purchaseOrder.status === "pending" &&
     purchaseOrder.pendingApprovalRoles.includes(
@@ -546,7 +552,9 @@ export function PurchaseOrderDetailsDialog({
             </DialogTitle>
             <DialogDescription>
               {purchaseOrder.isManuallyEncoded
-                ? "Backfilled record with no approval workflow. It can't be edited, only deleted and re-encoded."
+                ? isEncodedEditable
+                  ? "Backfilled record with no approval workflow. As coordinator, you can edit and save changes directly."
+                  : "Backfilled record with no approval workflow. Only the coordinator can edit it."
                 : !isOwner && !canApproveReject
                   ? "This purchase order belongs to another sales person and is read-only."
                   : isRejected
@@ -725,7 +733,9 @@ export function PurchaseOrderDetailsDialog({
                   <tbody>
                     {purchaseOrder.items.map((item) => (
                       <tr key={item.id} className="border-t">
-                        <td className="py-1 pr-3">{item.description}</td>
+                        <td className="py-1 pr-3">
+                          <TruncatedText>{item.description}</TruncatedText>
+                        </td>
                         <td className="py-1 pr-3">{item.quantity}</td>
                         <td className="py-1 pr-3">
                           {item.unitCost === null ? (
@@ -914,7 +924,9 @@ export function PurchaseOrderDetailsDialog({
                                   />
                                 </td>
                               ) : null}
-                              <td className="py-1 pr-3">{item.description}</td>
+                              <td className="py-1 pr-3">
+                                <TruncatedText>{item.description}</TruncatedText>
+                              </td>
                               <td className="py-1 pr-3">
                                 {formatCurrency(item.directCost)}
                               </td>
@@ -1052,15 +1064,17 @@ export function PurchaseOrderDetailsDialog({
 
                     <div className="flex justify-end gap-2 border-t pt-3">
                       <Button
-                        variant="outline"
+                        variant={isRejected ? "outline" : "default"}
                         onClick={handleSaveDetails}
                         disabled={isSubmitting}
                       >
                         {isSubmitting ? "Saving..." : "Save Changes"}
                       </Button>
-                      <Button onClick={handleResubmit} disabled={isSubmitting}>
-                        {isSubmitting ? "Submitting..." : "Submit for Approval"}
-                      </Button>
+                      {isRejected ? (
+                        <Button onClick={handleResubmit} disabled={isSubmitting}>
+                          {isSubmitting ? "Submitting..." : "Submit for Approval"}
+                        </Button>
+                      ) : null}
                     </div>
                   </div>
                 ) : (

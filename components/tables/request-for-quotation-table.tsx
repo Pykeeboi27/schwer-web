@@ -6,6 +6,7 @@ import {
   EmptyState,
   ResponsiveTable,
   StatusBadge,
+  TruncatedText,
 } from "@/components/patterns";
 import type { RequestForQuotation } from "@/lib/sales/quotations";
 import { formatCurrency } from "@/lib/utils/number-format";
@@ -37,7 +38,9 @@ function ItemsBreakdown({ request }: { request: RequestForQuotation }) {
       <tbody>
         {request.items.map((item) => (
           <tr key={item.id} className="border-t">
-            <td className="py-1 pr-3">{item.description}</td>
+            <td className="py-1 pr-3">
+              <TruncatedText>{item.description}</TruncatedText>
+            </td>
             <td className="py-1 pr-3">{item.quantity}</td>
             <td className="py-1 pr-3">
               {item.unitCost === null ? (

@@ -1,7 +1,13 @@
 "use client";
 
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { DataCard, DataField, EmptyState, ResponsiveTable } from "@/components/patterns";
+import {
+  DataCard,
+  DataField,
+  EmptyState,
+  ResponsiveTable,
+  TruncatedText,
+} from "@/components/patterns";
 import type { CostingApprovedHistoryItem } from "@/lib/engineering/costing-quotations";
 import { formatCurrency } from "@/lib/utils/number-format";
 import { ExternalLink } from "lucide-react";
@@ -166,7 +172,9 @@ export function CostingHistoryTable({ items }: CostingHistoryTableProps) {
                   <tbody>
                     {viewing.items.map((item) => (
                       <tr key={item.id} className="border-t">
-                        <td className="py-1 pr-3">{item.description}</td>
+                        <td className="py-1 pr-3">
+                          <TruncatedText>{item.description}</TruncatedText>
+                        </td>
                         <td className="py-1 pr-3">{item.quantity}</td>
                         <td className="py-1 pr-3">
                           {item.unitCost === null ? (

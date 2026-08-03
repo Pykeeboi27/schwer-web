@@ -708,7 +708,14 @@ export type PurchaseOrderItemPricingInput = {
 /**
  * Editing step for a rejected PO: re-price it per item (margin/bank/sop %,
  * lead time, payment terms) and update its references, ahead of resubmitting
- * for approval. Only permitted while the PO is in the `rejected` state.
+ * for approval. Also doubles as the edit path for manually-encoded POs
+ * (migration 0027) -- those stay permanently `approved` with no workflow to
+ * resubmit into, so they're gated on is_manually_encoded + coordinator role
+ * instead of status. Unlike the rejected-PO case (implicitly restricted to
+ * the owner client-side, backed by the department-wide sales RLS policy),
+ * this coordinator check is asserted here explicitly since a manually-encoded
+ * PO's owner is just whichever sales person the coordinator attributed it to,
+ * not necessarily the person who should be allowed to edit it.
  */
 export async function updatePurchaseOrderDetails(input: {
   purchaseOrderId: string;
@@ -724,7 +731,9 @@ export async function updatePurchaseOrderDetails(input: {
 
   const { data: po, error: poError } = await supabase
     .from("purchase_orders")
-    .select("id, status, purchase_order_items(id, line_total, quantity)")
+    .select(
+      "id, status, is_manually_encoded, purchase_order_items(id, line_total, quantity)",
+    )
     .eq("id", input.purchaseOrderId)
     .single();
 
@@ -733,7 +742,14 @@ export async function updatePurchaseOrderDetails(input: {
   }
 
   if (po.status !== "rejected") {
-    throw new Error("Only rejected purchase orders can be edited.");
+    if (!po.is_manually_encoded) {
+      throw new Error("Only rejected purchase orders can be edited.");
+    }
+
+    const profile = await getCurrentProfile();
+    if (!canEncodeExistingPurchaseOrders(profile)) {
+      throw new Error("Only the coordinator can edit a manually-encoded purchase order.");
+    }
   }
 
   const itemRows = Array.isArray(po.purchase_order_items) ? po.purchase_order_items : [];
@@ -1097,6 +1113,8 @@ export type EncodeExistingPoPaymentInput = {
 export type EncodeExistingPurchaseOrderInput = {
   poNumber: string;
   clientId: string;
+  /** Sales person this PO is attributed to (purchase_orders.created_by). */
+  salesPersonId: string;
   subject: string;
   clientPoNumber: string | null;
   quotationReference: string | null;
@@ -1186,6 +1204,7 @@ export async function encodeExistingPurchaseOrder(
     p_po: {
       po_number: input.poNumber,
       client_id: input.clientId,
+      sales_person_id: input.salesPersonId,
       sector: clientRow.sector,
       subject: input.subject,
       cost: aggregate.directCost,

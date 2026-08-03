@@ -28,6 +28,7 @@ import {
   PricingBreakdown,
   ResponsiveTable,
   StatusBadge,
+  TruncatedText,
   textareaClassName,
 } from "@/components/patterns";
 import {
@@ -808,7 +809,9 @@ export function QuotationDetailsDialog({
                             />
                           </td>
                         ) : null}
-                        <td className="py-1 pr-3">{item.description}</td>
+                        <td className="py-1 pr-3">
+                          <TruncatedText>{item.description}</TruncatedText>
+                        </td>
                         <td className="py-1 pr-3">{formatCurrency(item.directCost)}</td>
                         <td className="py-1 pr-3">
                           <NumberInput
@@ -879,7 +882,9 @@ export function QuotationDetailsDialog({
                           className="mt-0.5 shrink-0"
                         />
                       ) : null}
-                      <p className="min-w-0 flex-1 font-medium">{item.description}</p>
+                      <TruncatedText className="min-w-0 max-w-none flex-1 font-medium">
+                        {item.description}
+                      </TruncatedText>
                     </div>
                   }
                 >
@@ -1126,7 +1131,9 @@ export function QuotationDetailsDialog({
                       <tbody>
                         {quotation.items.map((item) => (
                           <tr key={item.id} className="border-t">
-                            <td className="py-1 pr-3">{item.description}</td>
+                            <td className="py-1 pr-3">
+                              <TruncatedText>{item.description}</TruncatedText>
+                            </td>
                             <td className="py-1 pr-3">
                               {formatCurrency(item.lineTotal)}
                             </td>
@@ -1188,7 +1195,11 @@ export function QuotationDetailsDialog({
                   cards={quotation.items.map((item) => (
                     <DataCard
                       key={item.id}
-                      header={<p className="font-medium">{item.description}</p>}
+                      header={
+                        <TruncatedText className="max-w-none font-medium">
+                          {item.description}
+                        </TruncatedText>
+                      }
                     >
                       <DataField
                         label="Direct Cost"

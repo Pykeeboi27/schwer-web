@@ -30,6 +30,7 @@ import {
   DataField,
   PricingBreakdown,
   ResponsiveTable,
+  TruncatedText,
 } from "@/components/patterns";
 import { computeLandedUnitCost } from "@/lib/engineering/landed-cost";
 import {
@@ -53,11 +54,23 @@ type ClientOption = {
   companyName: string;
 };
 
+type SalesPersonOption = {
+  id: string;
+  email: string;
+};
+
 type EncodeExistingPoDialogProps = {
   clients: ClientOption[];
+  /** Active sales-department profiles, for attributing the PO to its owner. */
+  salesPeople: SalesPersonOption[];
   /** Current signed-in user's id -- used to scope proof-of-payment storage paths. */
   userId: string;
 };
+
+/** "j.carpio@schwer-ph.com" -> "j.carpio" */
+function emailUsername(email: string): string {
+  return email.split("@")[0] || email;
+}
 
 const PAYMENT_TERMS_OPTIONS = [
   "50% Down Payment, 50% Upon Delivery",
@@ -135,7 +148,11 @@ const STEP_LABELS: Record<StepId, string> = {
  * atomic call (encodeExistingPurchaseOrderAction -> fn_encode_existing_po,
  * migrations/0027).
  */
-export function EncodeExistingPoDialog({ clients, userId }: EncodeExistingPoDialogProps) {
+export function EncodeExistingPoDialog({
+  clients,
+  salesPeople,
+  userId,
+}: EncodeExistingPoDialogProps) {
   const router = useRouter();
   const { success, error } = useToast();
   const formId = useId();
@@ -147,6 +164,7 @@ export function EncodeExistingPoDialog({ clients, userId }: EncodeExistingPoDial
 
   const [poNumber, setPoNumber] = useState("");
   const [clientId, setClientId] = useState("");
+  const [salesPersonId, setSalesPersonId] = useState("");
   const [subject, setSubject] = useState("");
   const [clientPoNumber, setClientPoNumber] = useState("");
   const [quotationReference, setQuotationReference] = useState("");
@@ -174,6 +192,7 @@ export function EncodeExistingPoDialog({ clients, userId }: EncodeExistingPoDial
     setActiveTab("details");
     setPoNumber("");
     setClientId("");
+    setSalesPersonId("");
     setSubject("");
     setClientPoNumber("");
     setQuotationReference("");
@@ -281,6 +300,7 @@ export function EncodeExistingPoDialog({ clients, userId }: EncodeExistingPoDial
   const step1Valid =
     poNumber.trim() !== "" &&
     clientId !== "" &&
+    salesPersonId !== "" &&
     subject.trim() !== "" &&
     poDate !== "" &&
     items.length > 0 &&
@@ -307,6 +327,8 @@ export function EncodeExistingPoDialog({ clients, userId }: EncodeExistingPoDial
   };
 
   const clientName = clients.find((c) => c.id === clientId)?.companyName ?? "—";
+  const salesPersonName = salesPeople.find((p) => p.id === salesPersonId)?.email;
+  const salesPersonLabel = salesPersonName ? emailUsername(salesPersonName) : "—";
 
   const totalPayments = payments.reduce((sum, p) => sum + (Number(p.amount) || 0), 0);
 
@@ -342,6 +364,7 @@ export function EncodeExistingPoDialog({ clients, userId }: EncodeExistingPoDial
       const response = await encodeExistingPurchaseOrderAction({
         poNumber,
         clientId,
+        salesPersonId,
         subject,
         clientPoNumber,
         quotationReference,
@@ -453,6 +476,21 @@ export function EncodeExistingPoDialog({ clients, userId }: EncodeExistingPoDial
                   </Select>
                 </div>
                 <div className="md:col-span-2">
+                  <Label htmlFor={`${formId}-sales-person`}>Sales Person</Label>
+                  <Select value={salesPersonId} onValueChange={setSalesPersonId}>
+                    <SelectTrigger id={`${formId}-sales-person`} className="mt-1">
+                      <SelectValue placeholder="Select sales person" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {salesPeople.map((person) => (
+                        <SelectItem key={person.id} value={person.id}>
+                          {emailUsername(person.email)}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="md:col-span-2">
                   <Label htmlFor={`${formId}-subject`}>Subject</Label>
                   <Input
                     id={`${formId}-subject`}
@@ -557,7 +595,9 @@ export function EncodeExistingPoDialog({ clients, userId }: EncodeExistingPoDial
                     <tbody>
                       {pricedItems.map((item) => (
                         <tr key={item.key} className="border-t">
-                          <td className="py-1 pr-3">{item.description || "—"}</td>
+                          <td className="py-1 pr-3">
+                            <TruncatedText>{item.description || "—"}</TruncatedText>
+                          </td>
                           <td className="py-1 pr-3">{item.quantity}</td>
                           <td className="py-1 pr-3">
                             <NumberInput
@@ -579,9 +619,9 @@ export function EncodeExistingPoDialog({ clients, userId }: EncodeExistingPoDial
                   <DataCard
                     key={item.key}
                     header={
-                      <p className="min-w-0 flex-1 font-medium">
+                      <TruncatedText className="min-w-0 max-w-none flex-1 font-medium">
                         {item.description || "—"}
-                      </p>
+                      </TruncatedText>
                     }
                   >
                     <DataField label="Qty" value={item.quantity} />
@@ -731,7 +771,9 @@ export function EncodeExistingPoDialog({ clients, userId }: EncodeExistingPoDial
                               />
                             </td>
                           ) : null}
-                          <td className="py-1 pr-3">{item.description || "—"}</td>
+                          <td className="py-1 pr-3">
+                            <TruncatedText>{item.description || "—"}</TruncatedText>
+                          </td>
                           <td className="py-1 pr-3">{formatCurrency(item.directCost)}</td>
                           <td className="py-1 pr-3">
                             <NumberInput
@@ -784,9 +826,9 @@ export function EncodeExistingPoDialog({ clients, userId }: EncodeExistingPoDial
                             className="mt-0.5 shrink-0"
                           />
                         ) : null}
-                        <p className="min-w-0 flex-1 font-medium">
+                        <TruncatedText className="min-w-0 max-w-none flex-1 font-medium">
                           {item.description || "—"}
-                        </p>
+                        </TruncatedText>
                       </div>
                     }
                   >
@@ -919,6 +961,8 @@ export function EncodeExistingPoDialog({ clients, userId }: EncodeExistingPoDial
                 <dd className="font-medium">{poNumber || "—"}</dd>
                 <dt className="text-muted-foreground">Client</dt>
                 <dd className="font-medium">{clientName}</dd>
+                <dt className="text-muted-foreground">Sales Person</dt>
+                <dd className="font-medium">{salesPersonLabel}</dd>
                 <dt className="text-muted-foreground">Subject</dt>
                 <dd className="font-medium">{subject || "—"}</dd>
                 <dt className="text-muted-foreground">PO Date</dt>
@@ -944,7 +988,9 @@ export function EncodeExistingPoDialog({ clients, userId }: EncodeExistingPoDial
                     <tbody>
                       {pricedItems.map((item) => (
                         <tr key={item.key} className="border-t">
-                          <td className="py-1 pr-3">{item.description}</td>
+                          <td className="py-1 pr-3">
+                            <TruncatedText>{item.description}</TruncatedText>
+                          </td>
                           <td className="py-1 pr-3">{item.quantity}</td>
                           <td className="py-1 pr-3">
                             {formatCurrency(Number(item.rawCost) || 0)}
@@ -959,7 +1005,11 @@ export function EncodeExistingPoDialog({ clients, userId }: EncodeExistingPoDial
                 cards={pricedItems.map((item) => (
                   <DataCard
                     key={item.key}
-                    header={<p className="font-medium">{item.description}</p>}
+                    header={
+                      <TruncatedText className="max-w-none font-medium">
+                        {item.description}
+                      </TruncatedText>
+                    }
                   >
                     <DataField label="Qty" value={item.quantity} />
                     <DataField
