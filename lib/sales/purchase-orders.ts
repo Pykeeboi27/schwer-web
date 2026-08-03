@@ -748,7 +748,9 @@ export async function updatePurchaseOrderDetails(input: {
   }
 
   if (input.salesPersonId && !po.is_manually_encoded) {
-    throw new Error("Sales person can only be reassigned on a manually-encoded purchase order.");
+    throw new Error(
+      "Sales person can only be reassigned on a manually-encoded purchase order.",
+    );
   }
 
   let reassignedSalesPersonId: string | undefined;
