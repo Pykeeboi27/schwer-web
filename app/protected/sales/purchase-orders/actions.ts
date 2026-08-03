@@ -292,6 +292,8 @@ export type PurchaseOrderDetailsInput = {
   leadTimeDays: string;
   clientPoNumber: string;
   quotationReference: string;
+  /** Coordinator-only: reassigns a manually-encoded PO's sales person. */
+  salesPersonId?: string;
 };
 
 /**
@@ -349,6 +351,7 @@ export async function updatePurchaseOrderDetailsAction(
       leadTimeDays,
       clientPoNumber: asOptionalString(input.clientPoNumber),
       quotationReference: asOptionalString(input.quotationReference),
+      salesPersonId: asOptionalString(input.salesPersonId),
     });
 
     revalidatePath("/protected/sales/purchase-orders");

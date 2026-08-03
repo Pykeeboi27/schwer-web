@@ -8,7 +8,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { ENCODED_PO_AUTHOR_LABEL } from "@/lib/sales/po-labels";
 import type { SalesPoPayment, SalesPurchaseOrder } from "@/lib/sales/purchase-orders";
 import { useMemo, useState } from "react";
 
@@ -20,12 +19,6 @@ type ExecutivePurchaseOrdersViewProps = {
 };
 
 type FilterOption = { id: string; name: string };
-
-// Sentinel owner-filter id for manually-encoded POs: every encoded PO shows
-// "Coordinator" as its author (see ENCODED_PO_AUTHOR_LABEL) rather than the
-// individual who entered it, so they all collapse into one filter entry
-// instead of one per coordinator.
-const ENCODED_PO_OWNER_FILTER_ID = "__coordinator__";
 
 function uniqueOptions(options: FilterOption[]): FilterOption[] {
   const byId = new Map<string, FilterOption>();
@@ -47,11 +40,10 @@ export function ExecutivePurchaseOrdersView({
   const ownerOptions = useMemo(
     () =>
       uniqueOptions(
-        purchaseOrders.map((po) =>
-          po.isManuallyEncoded
-            ? { id: ENCODED_PO_OWNER_FILTER_ID, name: ENCODED_PO_AUTHOR_LABEL }
-            : { id: po.createdBy, name: po.createdByName || "Unknown" },
-        ),
+        purchaseOrders.map((po) => ({
+          id: po.createdBy,
+          name: po.createdByName || "Unknown",
+        })),
       ),
     [purchaseOrders],
   );
@@ -68,11 +60,7 @@ export function ExecutivePurchaseOrdersView({
 
   const filtered = useMemo(() => {
     return purchaseOrders.filter((po) => {
-      if (ownerFilter === ENCODED_PO_OWNER_FILTER_ID) {
-        if (!po.isManuallyEncoded) {
-          return false;
-        }
-      } else if (ownerFilter !== "all" && po.createdBy !== ownerFilter) {
+      if (ownerFilter !== "all" && po.createdBy !== ownerFilter) {
         return false;
       }
       if (clientFilter !== "all" && po.clientId !== clientFilter) {

@@ -106,6 +106,7 @@ export default async function SalesPurchaseOrdersPage() {
                 payments={payments}
                 currentUserId={profile?.id ?? ""}
                 currentUserRole={profile?.role ?? null}
+                salesPeople={salesPeople}
               />
             ) : (
               <p className="text-sm text-destructive">
@@ -124,6 +125,7 @@ export default async function SalesPurchaseOrdersPage() {
                 payments={payments}
                 currentUserId={profile?.id ?? ""}
                 currentUserRole={profile?.role ?? null}
+                salesPeople={salesPeople}
               />
             ) : (
               <p className="text-sm text-destructive">
@@ -140,6 +142,7 @@ export default async function SalesPurchaseOrdersPage() {
               payments={payments}
               currentUserId={profile?.id ?? ""}
               currentUserRole={profile?.role ?? null}
+              salesPeople={salesPeople}
             />
           ) : (
             <p className="text-sm text-destructive">

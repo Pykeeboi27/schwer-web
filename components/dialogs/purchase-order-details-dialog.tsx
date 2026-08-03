@@ -47,6 +47,11 @@ import { useRouter } from "next/navigation";
 import { Pencil, Trash2 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 
+type SalesPersonOption = {
+  id: string;
+  email: string;
+};
+
 type PurchaseOrderDetailsDialogProps = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -54,7 +59,14 @@ type PurchaseOrderDetailsDialogProps = {
   payments: SalesPoPayment[];
   currentUserId: string;
   currentUserRole: string | null;
+  /** Active sales-department profiles, for reassigning a manually-encoded PO's owner. */
+  salesPeople?: SalesPersonOption[];
 };
+
+/** "j.carpio@schwer-ph.com" -> "j.carpio" */
+function emailUsername(email: string): string {
+  return email.split("@")[0] || email;
+}
 
 const PAYMENT_TERMS_OPTIONS = [
   "50% Down Payment, 50% Upon Delivery",
@@ -146,6 +158,7 @@ export function PurchaseOrderDetailsDialog({
   payments,
   currentUserId,
   currentUserRole,
+  salesPeople = [],
 }: PurchaseOrderDetailsDialogProps) {
   const router = useRouter();
   const { success, error } = useToast();
@@ -161,6 +174,7 @@ export function PurchaseOrderDetailsDialog({
   const [rejectionReason, setRejectionReason] = useState("");
   const [editClientPoNumber, setEditClientPoNumber] = useState("");
   const [editQuotationReference, setEditQuotationReference] = useState("");
+  const [editSalesPersonId, setEditSalesPersonId] = useState("");
   const [hasUnequalMargins, setHasUnequalMargins] = useState(false);
   const [itemPricing, setItemPricing] = useState<Record<string, ItemPricingFields>>({});
   const [uniformMarginPercentage, setUniformMarginPercentage] = useState("");
@@ -253,6 +267,7 @@ export function PurchaseOrderDetailsDialog({
     }
     setEditClientPoNumber(purchaseOrder.clientPoNumber ?? "");
     setEditQuotationReference(purchaseOrder.quotationReference ?? "");
+    setEditSalesPersonId(purchaseOrder.createdBy);
     setHasUnequalMargins(purchaseOrder.hasUnequalMargins);
     const nextItemPricing: Record<string, ItemPricingFields> = {};
     purchaseOrder.items.forEach((item) => {
@@ -452,6 +467,11 @@ export function PurchaseOrderDetailsDialog({
   };
 
   const handleSaveDetails = async () => {
+    if (isEncodedEditable && editSalesPersonId.trim() === "") {
+      error("Please select a sales person.");
+      return;
+    }
+
     const trimmedLeadTime = leadTimeDays.trim();
 
     const itemsPayload: PurchaseOrderItemPricingFormInput[] = [];
@@ -501,6 +521,7 @@ export function PurchaseOrderDetailsDialog({
       leadTimeDays: trimmedLeadTime,
       clientPoNumber: editClientPoNumber.trim(),
       quotationReference: editQuotationReference.trim(),
+      salesPersonId: isEncodedEditable ? editSalesPersonId.trim() : undefined,
     });
     if (!response.success) {
       error(response.error ?? "Failed to save purchase order details.");
@@ -642,7 +663,31 @@ export function PurchaseOrderDetailsDialog({
                   </div>
                   <div className="grid grid-cols-[160px_1fr] gap-2">
                     <dt className="text-muted-foreground">Authored By</dt>
-                    <dd>{purchaseOrder.createdByName}</dd>
+                    <dd>
+                      {isEncodedEditable ? (
+                        <Select
+                          value={editSalesPersonId}
+                          onValueChange={setEditSalesPersonId}
+                        >
+                          <SelectTrigger
+                            id="po-sales-person"
+                            aria-label="Sales person"
+                            className="h-8"
+                          >
+                            <SelectValue placeholder="Select sales person" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {salesPeople.map((person) => (
+                              <SelectItem key={person.id} value={person.id}>
+                                {emailUsername(person.email)}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      ) : (
+                        purchaseOrder.createdByName
+                      )}
+                    </dd>
                   </div>
                   <div className="grid grid-cols-[160px_1fr] gap-2">
                     <dt className="text-muted-foreground">Subject</dt>

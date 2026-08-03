@@ -15,11 +15,18 @@ import type { SalesPoPayment, SalesPurchaseOrder } from "@/lib/sales/purchase-or
 import { FileText, Search } from "lucide-react";
 import { useMemo, useState, type KeyboardEvent } from "react";
 
+type SalesPersonOption = {
+  id: string;
+  email: string;
+};
+
 type PurchaseOrdersTableProps = {
   purchaseOrders: SalesPurchaseOrder[];
   payments: SalesPoPayment[];
   currentUserId: string;
   currentUserRole: string | null;
+  /** Active sales-department profiles, for reassigning a manually-encoded PO's owner. */
+  salesPeople?: SalesPersonOption[];
 };
 
 type SortBy = "approvedAt" | "poAmount";
@@ -78,6 +85,7 @@ export function PurchaseOrdersTable({
   payments,
   currentUserId,
   currentUserRole,
+  salesPeople,
 }: PurchaseOrdersTableProps) {
   const [sortBy, setSortBy] = useState<SortBy>("approvedAt");
   const [sortDirection, setSortDirection] = useState<SortDirection>("desc");
@@ -309,6 +317,7 @@ export function PurchaseOrdersTable({
         payments={payments}
         currentUserId={currentUserId}
         currentUserRole={currentUserRole}
+        salesPeople={salesPeople}
         onOpenChange={(open) => {
           if (!open) setSelectedPurchaseOrderId(null);
         }}

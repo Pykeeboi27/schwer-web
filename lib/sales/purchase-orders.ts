@@ -18,14 +18,6 @@ import { PROOF_OF_PAYMENT_BUCKET } from "@/lib/sales/proof-of-payment";
 import { createClient } from "@/lib/supabase/server";
 import { validatePoTotalAmount } from "@/lib/utils/form-validation";
 
-// Re-exported for callers that already import from this module; defined in
-// lib/sales/po-labels.ts (a client-safe module with no server-only imports)
-// -- see that file's comment for why. Applied at the data layer below so
-// every UI surface inherits it uniformly; created_by/encoded_by still hold
-// the real user id for audit and are never mutated.
-import { ENCODED_PO_AUTHOR_LABEL } from "@/lib/sales/po-labels";
-export { ENCODED_PO_AUTHOR_LABEL };
-
 export type PurchaseOrderStatus =
   "draft" | "pending" | "approved" | "rejected" | "cancelled";
 
@@ -323,9 +315,7 @@ export async function listPurchaseOrders(): Promise<SalesPurchaseOrder[]> {
       approvedAt: row.approved_at ?? null,
       createdAt: row.created_at,
       createdBy: row.created_by,
-      createdByName: row.is_manually_encoded
-        ? ENCODED_PO_AUTHOR_LABEL
-        : (resolveDisplayName(creator) ?? "Unknown"),
+      createdByName: resolveDisplayName(creator) ?? "Unknown",
       itemCount: items.length,
       isManuallyEncoded: Boolean(row.is_manually_encoded),
     };
@@ -715,7 +705,10 @@ export type PurchaseOrderItemPricingInput = {
  * the owner client-side, backed by the department-wide sales RLS policy),
  * this coordinator check is asserted here explicitly since a manually-encoded
  * PO's owner is just whichever sales person the coordinator attributed it to,
- * not necessarily the person who should be allowed to edit it.
+ * not necessarily the person who should be allowed to edit it. That same edit
+ * path also lets the coordinator reassign salesPersonId (created_by) to a
+ * different active sales-department profile -- e.g. correcting a mistaken
+ * assignment made at encode time.
  */
 export async function updatePurchaseOrderDetails(input: {
   purchaseOrderId: string;
@@ -726,6 +719,8 @@ export async function updatePurchaseOrderDetails(input: {
   leadTimeDays: number | null;
   clientPoNumber: string | null;
   quotationReference: string | null;
+  /** Reassigns which sales person a manually-encoded PO belongs to (created_by). Coordinator-only; ignored/rejected outside that edit path. */
+  salesPersonId?: string | null;
 }): Promise<void> {
   const supabase = await createClient();
 
@@ -750,6 +745,27 @@ export async function updatePurchaseOrderDetails(input: {
     if (!canEncodeExistingPurchaseOrders(profile)) {
       throw new Error("Only the coordinator can edit a manually-encoded purchase order.");
     }
+  }
+
+  if (input.salesPersonId && !po.is_manually_encoded) {
+    throw new Error("Sales person can only be reassigned on a manually-encoded purchase order.");
+  }
+
+  let reassignedSalesPersonId: string | undefined;
+  if (input.salesPersonId) {
+    const { data: salesPersonRow, error: salesPersonError } = await supabase
+      .from("profiles")
+      .select("id")
+      .eq("id", input.salesPersonId)
+      .eq("department", "sales")
+      .eq("is_active", true)
+      .maybeSingle();
+
+    if (salesPersonError || !salesPersonRow) {
+      throw new Error("Selected sales person is not an active sales department user.");
+    }
+
+    reassignedSalesPersonId = salesPersonRow.id;
   }
 
   const itemRows = Array.isArray(po.purchase_order_items) ? po.purchase_order_items : [];
@@ -837,6 +853,7 @@ export async function updatePurchaseOrderDetails(input: {
       quotation_reference: input.quotationReference
         ? input.quotationReference.toUpperCase()
         : null,
+      ...(reassignedSalesPersonId ? { created_by: reassignedSalesPersonId } : {}),
     })
     .eq("id", input.purchaseOrderId);
 
