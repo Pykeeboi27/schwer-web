@@ -28,7 +28,8 @@ export default async function RequestForQuotationPage() {
   const requests = response.success ? (response.data ?? []) : [];
   const clientOptions = clients
     .filter((client) => client.isActive)
-    .map((client) => ({ id: client.id, companyName: client.companyName }));
+    .map((client) => ({ id: client.id, companyName: client.companyName }))
+    .sort((a, b) => a.companyName.localeCompare(b.companyName));
 
   return (
     <div className="flex flex-col gap-6">

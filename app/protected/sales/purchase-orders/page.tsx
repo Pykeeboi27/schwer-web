@@ -41,7 +41,8 @@ export default async function SalesPurchaseOrdersPage() {
   const purchaseOrders = response.success ? (response.data ?? []) : [];
   const clientOptions = clients
     .filter((client) => client.isActive)
-    .map((client) => ({ id: client.id, companyName: client.companyName }));
+    .map((client) => ({ id: client.id, companyName: client.companyName }))
+    .sort((a, b) => a.companyName.localeCompare(b.companyName));
 
   // Closed/recognized sales reflect fully-approved POs only.
   const totals = purchaseOrders.reduce(
