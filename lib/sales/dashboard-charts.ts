@@ -41,20 +41,34 @@ function toSector(value: unknown): SectorPerformanceSlice["sector"] | null {
 
 /**
  * Aggregates booked-revenue sales quotations (status `approved` or `closed` —
- * `closed` is an approved quotation already converted to a purchase order) for
- * the two dashboard charts: total value by client sector, and value/count per
- * client.
+ * `closed` is an approved quotation already converted to a purchase order),
+ * plus standalone manually-encoded purchase orders (which have no source
+ * quotation to aggregate through), for the two dashboard charts: total value
+ * by client sector, and value/count per client.
  */
 export async function getSalesDashboardCharts(): Promise<SalesDashboardCharts> {
   const supabase = await createClient();
-  const { data, error } = await supabase
-    .from("quotations")
-    .select("amount, client_id, clients:client_id(company_name, sector)")
-    .eq("phase", "sales")
-    .in("status", ["approved", "closed"]);
+  const [
+    { data: quotationRows, error: quotationError },
+    { data: encodedPoRows, error: encodedPoError },
+  ] = await Promise.all([
+    supabase
+      .from("quotations")
+      .select("amount, client_id, clients:client_id(company_name, sector)")
+      .eq("phase", "sales")
+      .in("status", ["approved", "closed"]),
+    supabase
+      .from("purchase_orders")
+      .select("po_amount, client_id, sector, clients:client_id(company_name)")
+      .eq("status", "approved")
+      .eq("is_manually_encoded", true),
+  ]);
 
-  if (error) {
-    throw new Error(error.message || "Failed to load sales dashboard charts.");
+  if (quotationError) {
+    throw new Error(quotationError.message || "Failed to load sales dashboard charts.");
+  }
+  if (encodedPoError) {
+    throw new Error(encodedPoError.message || "Failed to load sales dashboard charts.");
   }
 
   const sectorTotals = new Map<
@@ -63,11 +77,13 @@ export async function getSalesDashboardCharts(): Promise<SalesDashboardCharts> {
   >();
   const clientTotals = new Map<string, ClientDistributionBar>();
 
-  for (const row of data ?? []) {
-    const client = Array.isArray(row.clients) ? row.clients[0] : row.clients;
-    const amount = Number(row.amount ?? 0);
-
-    const sector = toSector(client?.sector);
+  function accumulate(
+    amount: number,
+    sectorValue: unknown,
+    clientId: unknown,
+    clientName: unknown,
+  ) {
+    const sector = toSector(sectorValue);
     if (sector) {
       const current = sectorTotals.get(sector) ?? { totalAmount: 0, count: 0 };
       sectorTotals.set(sector, {
@@ -76,22 +92,42 @@ export async function getSalesDashboardCharts(): Promise<SalesDashboardCharts> {
       });
     }
 
-    const clientId = String(row.client_id ?? "");
-    if (clientId) {
+    const id = String(clientId ?? "");
+    if (id) {
       const current =
-        clientTotals.get(clientId) ??
+        clientTotals.get(id) ??
         ({
-          clientId,
-          clientName: client?.company_name ?? "Unknown client",
+          clientId: id,
+          clientName: (clientName as string | undefined) ?? "Unknown client",
           totalAmount: 0,
           count: 0,
         } satisfies ClientDistributionBar);
-      clientTotals.set(clientId, {
+      clientTotals.set(id, {
         ...current,
         totalAmount: current.totalAmount + amount,
         count: current.count + 1,
       });
     }
+  }
+
+  for (const row of quotationRows ?? []) {
+    const client = Array.isArray(row.clients) ? row.clients[0] : row.clients;
+    accumulate(
+      Number(row.amount ?? 0),
+      client?.sector,
+      row.client_id,
+      client?.company_name,
+    );
+  }
+
+  for (const row of encodedPoRows ?? []) {
+    const client = Array.isArray(row.clients) ? row.clients[0] : row.clients;
+    accumulate(
+      Number(row.po_amount ?? 0),
+      row.sector,
+      row.client_id,
+      client?.company_name,
+    );
   }
 
   const sectorPerformance: SectorPerformanceSlice[] = (

@@ -240,10 +240,17 @@ export function summarizeRevenueAndMargin(rows: PurchaseOrderMetricRow[]): {
   marginAmount: number;
   weightedMarginPercent: number | null;
 } {
-  const bookedRevenue = rows.reduce((sum, row) => sum + toNumber(row.po_amount), 0);
+  const totalPoValue = rows.reduce((sum, row) => sum + toNumber(row.po_amount), 0);
   const marginAmount = rows.reduce((sum, row) => sum + toNumber(row.margin_amount), 0);
+  // "Booked Revenue" is deliberately net of margin -- margin is its own
+  // tracked figure (weightedMarginPercent / the Avg. Overall Margin card),
+  // not folded into the headline revenue KPI. Scoped to this one summary;
+  // other "booked revenue" readings elsewhere in this file (revenue
+  // breakdown charts, per-owner sales performance) intentionally still use
+  // the full po_amount.
+  const bookedRevenue = totalPoValue - marginAmount;
   const weightedMarginPercent =
-    bookedRevenue > 0 ? (marginAmount / bookedRevenue) * 100 : null;
+    totalPoValue > 0 ? (marginAmount / totalPoValue) * 100 : null;
 
   return {
     bookedRevenue,

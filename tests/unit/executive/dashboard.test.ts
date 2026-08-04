@@ -54,10 +54,11 @@ describe("getExecutiveKpiSummary", () => {
   it("combines booked revenue, annual target, and quarterly targets", async () => {
     const kpi = await getExecutiveKpiSummary({ referenceDate });
 
-    expect(kpi.revenueYtdBooked).toBe(300);
+    // bookedRevenue is net of margin: (200 + 100) po_amount - (40 + 10) margin = 250.
+    expect(kpi.revenueYtdBooked).toBe(250);
     expect(kpi.annualTarget).toBe(1000);
     expect(kpi.quarterlyTargets).toEqual({ q1: 100, q2: 200, q3: null, q4: null });
-    expect(kpi.revenueVsTargetDelta).toBe(-700);
+    expect(kpi.revenueVsTargetDelta).toBe(-750);
     expect(kpi.marginYtdWeightedPercent).toBeCloseTo((50 / 300) * 100, 5);
   });
 });
@@ -105,7 +106,7 @@ describe("getExecutiveDashboardData", () => {
     const data = await getExecutiveDashboardData("ytd", { viewer, referenceDate });
 
     expect(data.periodFilter).toBe("ytd");
-    expect(data.kpis.revenueYtdBooked).toBe(300);
+    expect(data.kpis.revenueYtdBooked).toBe(250);
     expect(data.poSummary.poCount).toBe(2);
     expect(data.salesPerformance[0].ownerId).toBe("o1");
     expect(data.charts).toEqual({ sectorPerformance: [], clientDistribution: [] });

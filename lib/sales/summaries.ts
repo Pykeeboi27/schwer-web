@@ -51,6 +51,7 @@ export async function getSalesSummary(currentUserId: string): Promise<SalesSumma
     { count: totalClients, error: clientsError },
     { data: quotationRows, error: quotationError },
     { data: poRows, error: poError },
+    { data: encodedPoRows, error: encodedPoError },
     draft,
     pending,
     approved,
@@ -75,6 +76,15 @@ export async function getSalesSummary(currentUserId: string): Promise<SalesSumma
     // created manually) by addPoPayment, unlike quotations.recognized_amount,
     // which only tracks payments for POs still linked to their source quotation.
     supabase.from("purchase_orders").select("recognized_amount").eq("status", "approved"),
+    // Manually-encoded POs (Existing Purchase Order Encoding) are standalone
+    // records with no source quotation, so they never appear in the
+    // quotations query above — they must be added to the closed-sale totals
+    // separately or they'd be invisible to this dashboard.
+    supabase
+      .from("purchase_orders")
+      .select("po_amount, created_by")
+      .eq("status", "approved")
+      .eq("is_manually_encoded", true),
     getQuotationCountByStatus("draft"),
     getQuotationCountByStatus("pending"),
     getQuotationCountByStatus("approved"),
@@ -82,22 +92,28 @@ export async function getSalesSummary(currentUserId: string): Promise<SalesSumma
     getQuotationCountByStatus("closed"),
   ]);
 
-  if (clientsError || quotationError || poError) {
+  if (clientsError || quotationError || poError || encodedPoError) {
     throw new Error("Failed to load sales dashboard summary.");
   }
 
-  const { myClosedSaleTotal, companyClosedSaleTotal } = (quotationRows ?? []).reduce(
-    (totals, row) => {
-      const amount = Number(row.amount ?? 0);
-      if (row.sales_person_id === currentUserId) {
-        totals.myClosedSaleTotal += amount;
-      } else {
-        totals.companyClosedSaleTotal += amount;
-      }
-      return totals;
-    },
-    { myClosedSaleTotal: 0, companyClosedSaleTotal: 0 },
-  );
+  const closedSaleTotals = { myClosedSaleTotal: 0, companyClosedSaleTotal: 0 };
+  for (const row of quotationRows ?? []) {
+    const amount = Number(row.amount ?? 0);
+    if (row.sales_person_id === currentUserId) {
+      closedSaleTotals.myClosedSaleTotal += amount;
+    } else {
+      closedSaleTotals.companyClosedSaleTotal += amount;
+    }
+  }
+  for (const row of encodedPoRows ?? []) {
+    const amount = Number(row.po_amount ?? 0);
+    if (row.created_by === currentUserId) {
+      closedSaleTotals.myClosedSaleTotal += amount;
+    } else {
+      closedSaleTotals.companyClosedSaleTotal += amount;
+    }
+  }
+  const { myClosedSaleTotal, companyClosedSaleTotal } = closedSaleTotals;
   const recognizedSaleTotal = (poRows ?? []).reduce(
     (sum, row) => sum + Number(row.recognized_amount ?? 0),
     0,
