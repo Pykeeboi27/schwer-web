@@ -85,6 +85,10 @@ export type SupabaseMockConfig = {
   claims?: { sub: string; email?: string } | null;
   /** Error returned from `auth.getClaims()` (null = success). */
   claimsError?: unknown;
+  /** Error returned from `auth.updateUser` (null = success). */
+  updateUserError?: unknown;
+  /** Error returned from `auth.signOut` (null = success). */
+  signOutError?: unknown;
   /** Error returned from `rpc()` calls (null = success). */
   rpcError?: unknown;
 };
@@ -97,6 +101,8 @@ export type SupabaseMock = {
     getClaims: ReturnType<typeof vi.fn>;
     signUp: ReturnType<typeof vi.fn>;
     signInWithPassword: ReturnType<typeof vi.fn>;
+    updateUser: ReturnType<typeof vi.fn>;
+    signOut: ReturnType<typeof vi.fn>;
   };
 };
 
@@ -144,7 +150,18 @@ export function createSupabaseMock(config: SupabaseMockConfig = {}): SupabaseMoc
     error: config.signInError ?? null,
   }));
 
+  const updateUser = vi.fn(async () => ({
+    data: { user: config.user ?? null },
+    error: config.updateUserError ?? null,
+  }));
+
+  const signOut = vi.fn(async () => ({ error: config.signOutError ?? null }));
+
   const rpc = vi.fn(async () => ({ data: null, error: config.rpcError ?? null }));
 
-  return { from, rpc, auth: { getUser, getClaims, signUp, signInWithPassword } };
+  return {
+    from,
+    rpc,
+    auth: { getUser, getClaims, signUp, signInWithPassword, updateUser, signOut },
+  };
 }
