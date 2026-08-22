@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   buildMonthBuckets,
   buildQuarterBuckets,
+  buildQuarterMonthBuckets,
   buildWeekBuckets,
   getCurrentYear,
   getMonthLabel,
@@ -45,6 +46,65 @@ describe("executive period helpers", () => {
       startDate: "2026-01-01",
       endDate: "2026-05-16",
     });
+  });
+
+  it("scopes monthly and quarterly ranges to an explicit selection", () => {
+    const referenceDate = new Date("2026-08-22T12:00:00.000Z");
+
+    expect(getPeriodDateRange("monthly", referenceDate, { month: 4 })).toEqual({
+      year: 2026,
+      startDate: "2026-04-01",
+      endDate: "2026-04-30",
+    });
+
+    expect(getPeriodDateRange("quarterly", referenceDate, { quarter: 1 })).toEqual({
+      year: 2026,
+      startDate: "2026-01-01",
+      endDate: "2026-03-31",
+    });
+
+    // February in a non-leap year -- month end is derived, not hardcoded.
+    expect(getPeriodDateRange("monthly", new Date(2026, 7, 22), { month: 2 })).toEqual({
+      year: 2026,
+      startDate: "2026-02-01",
+      endDate: "2026-02-28",
+    });
+  });
+
+  it("falls back to the reference date period for missing or invalid selections", () => {
+    const referenceDate = new Date("2026-08-22T12:00:00.000Z");
+
+    expect(getPeriodDateRange("monthly", referenceDate, { month: 13 })).toEqual(
+      getPeriodDateRange("monthly", referenceDate),
+    );
+    expect(getPeriodDateRange("quarterly", referenceDate, { quarter: 0 })).toEqual(
+      getPeriodDateRange("quarterly", referenceDate),
+    );
+    // A monthly selection must not leak into the quarterly range, and vice versa.
+    expect(getPeriodDateRange("quarterly", referenceDate, { month: 4 })).toEqual({
+      year: 2026,
+      startDate: "2026-07-01",
+      endDate: "2026-09-30",
+    });
+    expect(getPeriodDateRange("ytd", referenceDate, { month: 4, quarter: 1 })).toEqual({
+      year: 2026,
+      startDate: "2026-01-01",
+      endDate: "2026-08-22",
+    });
+  });
+
+  it("builds the three months of a quarter", () => {
+    expect(buildQuarterMonthBuckets(2, 2026)).toEqual([
+      { month: 4, label: "Apr", year: 2026 },
+      { month: 5, label: "May", year: 2026 },
+      { month: 6, label: "Jun", year: 2026 },
+    ]);
+    expect(buildQuarterMonthBuckets(4, 2026).map((b) => b.label)).toEqual([
+      "Oct",
+      "Nov",
+      "Dec",
+    ]);
+    expect(() => buildQuarterMonthBuckets(5, 2026)).toThrow(RangeError);
   });
 
   it("builds month and quarter buckets", () => {

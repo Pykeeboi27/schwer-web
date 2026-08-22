@@ -11,6 +11,8 @@ import {
 import type { SalesPoPayment, SalesPurchaseOrder } from "@/lib/sales/purchase-orders";
 import { useMemo, useState } from "react";
 
+const DEFAULT_PAGE_SIZE = 25;
+
 type ExecutivePurchaseOrdersViewProps = {
   purchaseOrders: SalesPurchaseOrder[];
   payments: SalesPoPayment[];
@@ -104,11 +106,15 @@ export function ExecutivePurchaseOrdersView({
         </Select>
       </div>
 
+      {/* Pagination lives inside the table so it slices *after* the table's own
+          search, status filter, and sort -- paginating here would scope those
+          to the current page. */}
       <PurchaseOrdersTable
         purchaseOrders={filtered}
         payments={payments}
         currentUserId={currentUserId}
         currentUserRole={currentUserRole}
+        pageSize={DEFAULT_PAGE_SIZE}
       />
     </div>
   );

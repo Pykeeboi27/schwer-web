@@ -14,3 +14,10 @@ export { ResponsiveTable, DataCard, DataField, TruncatedText } from "./responsiv
 export { BeamTick } from "./beam-tick";
 export { ConfirmDialog } from "./confirm-dialog";
 export { PricingBreakdown } from "./pricing-breakdown";
+export {
+  TablePagination,
+  clampPage,
+  getPageCount,
+  getPageRange,
+  DEFAULT_PAGE_SIZE_OPTIONS,
+} from "./table-pagination";

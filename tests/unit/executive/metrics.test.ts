@@ -17,8 +17,8 @@ describe("executive KPI metric helpers", () => {
 
     const summary = summarizeRevenueAndMargin(rows);
 
-    // bookedRevenue is net of margin: (100 + 300) po_amount - (20 + 30) margin = 350.
-    expect(summary.bookedRevenue).toBe(350);
+    // bookedRevenue is the gross PO total: 100 + 300 = 400 (margin is not netted out).
+    expect(summary.bookedRevenue).toBe(400);
     expect(summary.marginAmount).toBe(50);
     expect(summary.weightedMarginPercent).toBe(12.5);
   });
@@ -31,10 +31,10 @@ describe("executive KPI metric helpers", () => {
 
     const kpis = buildKpiSummaryFromRows(rows, 500);
 
-    // bookedRevenue is net of margin: (250 + 150) po_amount - (50 + 30) margin = 320.
-    expect(kpis.revenueYtdBooked).toBe(320);
+    // bookedRevenue is the gross PO total: 250 + 150 = 400.
+    expect(kpis.revenueYtdBooked).toBe(400);
     expect(kpis.annualTarget).toBe(500);
-    expect(kpis.revenueVsTargetDelta).toBe(-180);
+    expect(kpis.revenueVsTargetDelta).toBe(-100);
     expect(kpis.marginYtdWeightedPercent).toBe(20);
   });
 

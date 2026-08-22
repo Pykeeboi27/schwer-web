@@ -46,9 +46,19 @@ type PurchaseOrderRange = {
 export type ExecutiveDashboardQueryOptions = {
   viewer?: CurrentProfile | null;
   referenceDate?: Date;
-  /** Month (1-12) to bucket the Monthly-view weekly revenue breakdown by. */
+  /** Month (1-12) the Monthly view is scoped to. Defaults to the reference date's month. */
   breakdownMonth?: number;
+  /** Quarter (1-4) the Quarterly view is scoped to. Defaults to the reference date's quarter. */
+  breakdownQuarter?: number;
 };
+
+/** Period-scoping selection shared by every period-aware query below. */
+function toPeriodSelection(options: ExecutiveDashboardQueryOptions): {
+  month?: number;
+  quarter?: number;
+} {
+  return { month: options.breakdownMonth, quarter: options.breakdownQuarter };
+}
 
 export const EMPTY_EXECUTIVE_KPIS: ExecutiveKpiSummary = {
   revenueYtdBooked: 0,
@@ -242,13 +252,13 @@ export function summarizeRevenueAndMargin(rows: PurchaseOrderMetricRow[]): {
 } {
   const totalPoValue = rows.reduce((sum, row) => sum + toNumber(row.po_amount), 0);
   const marginAmount = rows.reduce((sum, row) => sum + toNumber(row.margin_amount), 0);
-  // "Booked Revenue" is deliberately net of margin -- margin is its own
-  // tracked figure (weightedMarginPercent / the Avg. Overall Margin card),
-  // not folded into the headline revenue KPI. Scoped to this one summary;
-  // other "booked revenue" readings elsewhere in this file (revenue
-  // breakdown charts, per-owner sales performance) intentionally still use
-  // the full po_amount.
-  const bookedRevenue = totalPoValue - marginAmount;
+  // "Booked Revenue" is the gross total PO value -- the same figure the sales
+  // page reports as Total PO Value, and what the annual target is measured
+  // against. Margin stays its own tracked figure (weightedMarginPercent / the
+  // Avg. Overall Margin card) rather than being netted out of revenue, which
+  // also keeps this consistent with the revenue breakdown charts and per-owner
+  // sales performance -- both of which already sum the full po_amount.
+  const bookedRevenue = totalPoValue;
   const weightedMarginPercent =
     totalPoValue > 0 ? (marginAmount / totalPoValue) * 100 : null;
 
@@ -498,7 +508,11 @@ export async function getExecutivePoSummary(
   options: ExecutiveDashboardQueryOptions = {},
 ): Promise<ExecutivePoSummary> {
   const referenceDate = options.referenceDate ?? new Date();
-  const periodRange = getPeriodDateRange(periodFilter, referenceDate);
+  const periodRange = getPeriodDateRange(
+    periodFilter,
+    referenceDate,
+    toPeriodSelection(options),
+  );
   const rows = await executiveDashboardQueries.fetchPurchaseOrderRows({
     startDate: periodRange.startDate,
     endDate: periodRange.endDate,
@@ -512,7 +526,11 @@ export async function getExecutiveSalesPerformance(
   options: ExecutiveDashboardQueryOptions = {},
 ): Promise<ExecutiveSalesPerformanceRow[]> {
   const referenceDate = options.referenceDate ?? new Date();
-  const periodRange = getPeriodDateRange(periodFilter, referenceDate);
+  const periodRange = getPeriodDateRange(
+    periodFilter,
+    referenceDate,
+    toPeriodSelection(options),
+  );
 
   const [rows, roster] = await Promise.all([
     executiveDashboardQueries.fetchPurchaseOrderRows({

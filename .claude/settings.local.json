@@ -90,9 +90,12 @@
       "PowerShell(\\(Get-Content \"C:\\\\Users\\\\SPM\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\schwer-xlsx-extract\\\\xl\\\\worksheets\\\\sheet1.xml\" -Raw\\) -split \"<row \" | Measure-Object | Select-Object -ExpandProperty Count)",
       "PowerShell(Get-ChildItem *)",
       "WebSearch",
-      "WebFetch(domain:vercel.com)"
+      "WebFetch(domain:vercel.com)",
+      "PowerShell(npx vitest run tests/unit/executive)"
     ]
   },
   "enableAllProjectMcpServers": true,
-  "enabledMcpjsonServers": ["supabase"]
+  "enabledMcpjsonServers": [
+    "supabase"
+  ]
 }

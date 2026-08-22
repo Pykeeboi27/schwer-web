@@ -2,6 +2,7 @@ import { ClientDistributionChart } from "@/components/sales/client-distribution-
 import { SectorPerformanceChart } from "@/components/sales/sector-performance-chart";
 import { BookedVsCollectedChart } from "@/components/executive/booked-vs-collected-chart";
 import { RevenueMonthSelect } from "@/components/executive/revenue-month-select";
+import { RevenueQuarterSelect } from "@/components/executive/revenue-quarter-select";
 import { RevenueTrendChart } from "@/components/executive/revenue-trend-chart";
 import { EmptyState } from "@/components/patterns";
 import {
@@ -14,7 +15,12 @@ import {
 import { getExecutiveAccessRedirect } from "@/lib/executive/access";
 import { getExecutiveDashboardData } from "@/lib/executive/dashboard";
 import { formatCurrency, formatPercent } from "@/lib/executive/format";
-import { getMonthLabel } from "@/lib/executive/period";
+import {
+  buildQuarterMonthBuckets,
+  getMonthLabel,
+  getQuarterFromMonth,
+  getQuarterLabel,
+} from "@/lib/executive/period";
 import { PERIOD_FILTERS, type PeriodFilter } from "@/lib/executive/types";
 import { cn } from "@/lib/utils";
 import { getCurrentProfile } from "@/lib/profile/get-current-profile";
@@ -22,7 +28,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 
 type SalesDashboardPageProps = {
-  searchParams?: Promise<{ period?: string; month?: string }>;
+  searchParams?: Promise<{ period?: string; month?: string; quarter?: string }>;
 };
 
 function parsePeriodFilter(period: string | undefined): PeriodFilter {
@@ -38,6 +44,17 @@ function parseBreakdownMonth(month: string | undefined, currentMonth: number): n
     return currentMonth;
   }
   return Math.min(parsed, currentMonth);
+}
+
+function parseBreakdownQuarter(
+  quarter: string | undefined,
+  currentQuarter: number,
+): number {
+  const parsed = Number(quarter);
+  if (!Number.isInteger(parsed) || parsed < 1) {
+    return currentQuarter;
+  }
+  return Math.min(parsed, currentQuarter);
 }
 
 const PERIOD_LABELS: Record<PeriodFilter, string> = {
@@ -61,7 +78,12 @@ export default async function ExecutiveSalesDashboardPage({
 
   const now = new Date();
   const currentMonth = now.getMonth() + 1;
+  const currentQuarter = getQuarterFromMonth(currentMonth);
   const selectedMonth = parseBreakdownMonth(resolvedSearchParams?.month, currentMonth);
+  const selectedQuarter = parseBreakdownQuarter(
+    resolvedSearchParams?.quarter,
+    currentQuarter,
+  );
 
   let dashboard;
 
@@ -69,6 +91,7 @@ export default async function ExecutiveSalesDashboardPage({
     dashboard = await getExecutiveDashboardData(selectedPeriod, {
       viewer: profile,
       breakdownMonth: selectedMonth,
+      breakdownQuarter: selectedQuarter,
     });
   } catch {
     return (
@@ -89,9 +112,24 @@ export default async function ExecutiveSalesDashboardPage({
     );
   }
 
-  const quarterBreakdownRows = dashboard.revenueBreakdown.quarterlyRevenue;
   const ytdBreakdownRows = dashboard.revenueBreakdown.ytdRevenueByMonth;
   const weekBreakdownRows = dashboard.revenueBreakdown.weeklyRevenue;
+
+  // Quarterly drills into the three months of the selected quarter, mirroring how
+  // Monthly drills into the weeks of the selected month.
+  const monthlyRevenueByMonth = new Map(
+    dashboard.revenueBreakdown.monthlyRevenue.map((entry) => [
+      entry.month,
+      entry.bookedRevenue,
+    ]),
+  );
+  const quarterBreakdownRows = buildQuarterMonthBuckets(
+    selectedQuarter,
+    now.getFullYear(),
+  ).map((bucket) => ({
+    label: bucket.label,
+    bookedRevenue: monthlyRevenueByMonth.get(bucket.month) ?? 0,
+  }));
 
   const hasBreakdownData =
     selectedPeriod === "quarterly"
@@ -119,7 +157,7 @@ export default async function ExecutiveSalesDashboardPage({
   const trendData =
     selectedPeriod === "quarterly"
       ? quarterBreakdownRows.map((e) => ({
-          label: `Q${e.quarter}`,
+          label: e.label,
           value: e.bookedRevenue,
         }))
       : selectedPeriod === "monthly"
@@ -131,6 +169,13 @@ export default async function ExecutiveSalesDashboardPage({
             label: MONTH_LABELS[e.month - 1] ?? String(e.month),
             value: e.bookedRevenue,
           }));
+
+  const periodScopeLabel =
+    selectedPeriod === "quarterly"
+      ? `${getQuarterLabel(selectedQuarter)} ${now.getFullYear()}`
+      : selectedPeriod === "monthly"
+        ? `${getMonthLabel(selectedMonth)} ${now.getFullYear()}`
+        : `year to date ${now.getFullYear()}`;
 
   return (
     <div className="flex flex-col gap-6">
@@ -177,7 +222,9 @@ export default async function ExecutiveSalesDashboardPage({
               <CardTitle>Revenue Breakdown</CardTitle>
               <CardDescription>
                 {selectedPeriod === "quarterly"
-                  ? "Quarterly booked revenue for the current year"
+                  ? `Booked revenue by month for ${getQuarterLabel(selectedQuarter)} ${now.getFullYear()}${
+                      selectedQuarter === currentQuarter ? " · current" : ""
+                    }`
                   : selectedPeriod === "monthly"
                     ? `Booked revenue by week for ${getMonthLabel(selectedMonth)} ${now.getFullYear()}${
                         selectedMonth === currentMonth ? " · current" : ""
@@ -189,6 +236,11 @@ export default async function ExecutiveSalesDashboardPage({
               <RevenueMonthSelect
                 selectedMonth={selectedMonth}
                 currentMonth={currentMonth}
+              />
+            ) : selectedPeriod === "quarterly" ? (
+              <RevenueQuarterSelect
+                selectedQuarter={selectedQuarter}
+                currentQuarter={currentQuarter}
               />
             ) : null}
           </div>
@@ -206,39 +258,44 @@ export default async function ExecutiveSalesDashboardPage({
       </Card>
 
       {/* PO summary + quick stats */}
-      <div className="grid gap-4 sm:grid-cols-3">
-        <Card>
-          <CardHeader className="pb-1">
-            <CardDescription className="uppercase tracking-widest text-xs font-medium">
-              PO Count
-            </CardDescription>
-            <CardTitle className="text-3xl font-bold tabular-nums">
-              {dashboard.poSummary.poCount}
-            </CardTitle>
-          </CardHeader>
-        </Card>
+      <div className="flex flex-col gap-2">
+        <p className="text-xs font-medium uppercase tracking-widest text-muted-foreground">
+          Showing {periodScopeLabel}
+        </p>
+        <div className="grid gap-4 sm:grid-cols-3">
+          <Card>
+            <CardHeader className="pb-1">
+              <CardDescription className="uppercase tracking-widest text-xs font-medium">
+                PO Count
+              </CardDescription>
+              <CardTitle className="text-3xl font-bold tabular-nums">
+                {dashboard.poSummary.poCount}
+              </CardTitle>
+            </CardHeader>
+          </Card>
 
-        <Card>
-          <CardHeader className="pb-1">
-            <CardDescription className="uppercase tracking-widest text-xs font-medium">
-              Total PO Value
-            </CardDescription>
-            <CardTitle className="text-2xl font-bold tabular-nums">
-              {formatCurrency(dashboard.poSummary.totalPoValue)}
-            </CardTitle>
-          </CardHeader>
-        </Card>
+          <Card>
+            <CardHeader className="pb-1">
+              <CardDescription className="uppercase tracking-widest text-xs font-medium">
+                Total PO Value
+              </CardDescription>
+              <CardTitle className="text-2xl font-bold tabular-nums">
+                {formatCurrency(dashboard.poSummary.totalPoValue)}
+              </CardTitle>
+            </CardHeader>
+          </Card>
 
-        <Card>
-          <CardHeader className="pb-1">
-            <CardDescription className="uppercase tracking-widest text-xs font-medium">
-              Total Margin
-            </CardDescription>
-            <CardTitle className="text-2xl font-bold tabular-nums">
-              {formatCurrency(dashboard.poSummary.totalMarginAmount)}
-            </CardTitle>
-          </CardHeader>
-        </Card>
+          <Card>
+            <CardHeader className="pb-1">
+              <CardDescription className="uppercase tracking-widest text-xs font-medium">
+                Total Margin
+              </CardDescription>
+              <CardTitle className="text-2xl font-bold tabular-nums">
+                {formatCurrency(dashboard.poSummary.totalMarginAmount)}
+              </CardTitle>
+            </CardHeader>
+          </Card>
+        </div>
       </div>
 
       {/* Purchase order collections */}

@@ -54,11 +54,11 @@ describe("getExecutiveKpiSummary", () => {
   it("combines booked revenue, annual target, and quarterly targets", async () => {
     const kpi = await getExecutiveKpiSummary({ referenceDate });
 
-    // bookedRevenue is net of margin: (200 + 100) po_amount - (40 + 10) margin = 250.
-    expect(kpi.revenueYtdBooked).toBe(250);
+    // bookedRevenue is the gross PO total: 200 + 100 = 300, matching Total PO Value.
+    expect(kpi.revenueYtdBooked).toBe(300);
     expect(kpi.annualTarget).toBe(1000);
     expect(kpi.quarterlyTargets).toEqual({ q1: 100, q2: 200, q3: null, q4: null });
-    expect(kpi.revenueVsTargetDelta).toBe(-750);
+    expect(kpi.revenueVsTargetDelta).toBe(-700);
     expect(kpi.marginYtdWeightedPercent).toBeCloseTo((50 / 300) * 100, 5);
   });
 });
@@ -70,6 +70,24 @@ describe("getExecutivePoSummary", () => {
       totalPoValue: 300,
       totalMarginAmount: 50,
       totalCollectedAmount: 0,
+    });
+  });
+
+  it("queries the selected month rather than the reference date's month", async () => {
+    await getExecutivePoSummary("monthly", { referenceDate, breakdownMonth: 2 });
+
+    expect(executiveDashboardQueries.fetchPurchaseOrderRows).toHaveBeenCalledWith({
+      startDate: "2026-02-01",
+      endDate: "2026-02-28",
+    });
+  });
+
+  it("queries the selected quarter rather than the reference date's quarter", async () => {
+    await getExecutivePoSummary("quarterly", { referenceDate, breakdownQuarter: 1 });
+
+    expect(executiveDashboardQueries.fetchPurchaseOrderRows).toHaveBeenCalledWith({
+      startDate: "2026-01-01",
+      endDate: "2026-03-31",
     });
   });
 });
@@ -99,6 +117,15 @@ describe("getExecutiveSalesPerformance", () => {
     expect(performance[1].ownerId).toBe("o2");
     expect(performance[1].ownerName).toBe("Unknown");
   });
+
+  it("scopes the owner ranking to the selected month", async () => {
+    await getExecutiveSalesPerformance("monthly", { referenceDate, breakdownMonth: 4 });
+
+    expect(executiveDashboardQueries.fetchPurchaseOrderRows).toHaveBeenCalledWith({
+      startDate: "2026-04-01",
+      endDate: "2026-04-30",
+    });
+  });
 });
 
 describe("getExecutiveDashboardData", () => {
@@ -106,7 +133,8 @@ describe("getExecutiveDashboardData", () => {
     const data = await getExecutiveDashboardData("ytd", { viewer, referenceDate });
 
     expect(data.periodFilter).toBe("ytd");
-    expect(data.kpis.revenueYtdBooked).toBe(250);
+    expect(data.kpis.revenueYtdBooked).toBe(data.poSummary.totalPoValue);
+    expect(data.kpis.revenueYtdBooked).toBe(300);
     expect(data.poSummary.poCount).toBe(2);
     expect(data.salesPerformance[0].ownerId).toBe("o1");
     expect(data.charts).toEqual({ sectorPerformance: [], clientDistribution: [] });

@@ -91,15 +91,6 @@ export default async function ExecutiveDashboardPage() {
         ) : null}
       </StatCard>
 
-      {/* Total PO value shown separately from Revenue YTD (Booked): Revenue is
-          deliberately net of margin (margin is tracked on its own via the
-          Avg. Overall Margin card below), while this card is the full PO
-          amount -- the two intentionally differ by the margin amount. */}
-      <StatCard
-        label="Total PO Value (YTD)"
-        value={formatCurrency(dashboard.poSummary.totalPoValue)}
-      />
-
       {/* Supporting KPIs */}
       <div className="grid gap-3 sm:grid-cols-3">
         <StatCard
