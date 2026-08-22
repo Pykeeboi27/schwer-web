@@ -14,20 +14,18 @@ import type { ReactNode } from "react";
 export type StatusTone =
   "neutral" | "pending" | "success" | "danger" | "muted" | "info" | "returned";
 
+// Every tone reads off the --status-* tokens in globals.css (single source of
+// truth, shared with Callout) instead of raw Tailwind palette classes — a
+// theme change now actually reaches these badges. Each token already carries
+// its own light/dark value, so no `dark:` variant is needed here.
 const TONE_CLASSES: Record<StatusTone, string> = {
-  neutral:
-    "border-slate-200 bg-slate-50 text-slate-600 dark:border-slate-700 dark:bg-slate-900/40 dark:text-slate-300",
-  pending:
-    "border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-300",
-  success:
-    "border-green-200 bg-green-50 text-green-700 dark:border-green-900 dark:bg-green-950/40 dark:text-green-300",
-  danger:
-    "border-red-200 bg-red-50 text-red-700 dark:border-red-900 dark:bg-red-950/40 dark:text-red-300",
-  muted:
-    "border-gray-200 bg-gray-50 text-gray-500 dark:border-gray-700 dark:bg-gray-900/40 dark:text-gray-400",
-  info: "border-blue-200 bg-blue-50 text-blue-700 dark:border-blue-900 dark:bg-blue-950/40 dark:text-blue-300",
-  returned:
-    "border-orange-200 bg-orange-50 text-orange-700 dark:border-orange-900 dark:bg-orange-950/40 dark:text-orange-300",
+  neutral: "border-status-neutral/30 bg-status-neutral/10 text-status-neutral",
+  pending: "border-status-pending/30 bg-status-pending/10 text-status-pending",
+  success: "border-status-approved/30 bg-status-approved/10 text-status-approved",
+  danger: "border-status-rejected/30 bg-status-rejected/10 text-status-rejected",
+  muted: "border-status-neutral/20 bg-status-neutral/5 text-status-neutral",
+  info: "border-status-info/30 bg-status-info/10 text-status-info",
+  returned: "border-status-returned/30 bg-status-returned/10 text-status-returned",
 };
 
 type StatusMeta = { tone: StatusTone; label: string };

@@ -91,7 +91,20 @@
       "PowerShell(Get-ChildItem *)",
       "WebSearch",
       "WebFetch(domain:vercel.com)",
-      "PowerShell(npx vitest run tests/unit/executive)"
+      "PowerShell(npx vitest run tests/unit/executive)",
+      "Bash(npx prettier *)",
+      "Bash(mkdir -p \"C:/Users/jiroh/AppData/Local/Temp/claude/C--Users-jiroh-Desktop-schwer-web/0c0da918-f761-4e21-835a-b5cc6ed05f07/scratchpad/prettier-test\")",
+      "Bash(printf 'const   x = {a:1,   b:2}\\\\n')",
+      "Bash(echo \"---exit:$?---\")",
+      "Bash(git status *)",
+      "Bash(git --no-pager diff -- components/tables/clients-table.tsx)",
+      "Bash(git --no-pager diff --cached -- components/patterns/data-table.tsx components/patterns/measure.tsx)",
+      "Bash(git --no-pager diff -- .prettierrc.json)",
+      "Read(//tmp/**)",
+      "Bash(git --no-pager diff --stat)",
+      "Bash(git --no-pager diff --cached --stat)",
+      "Bash(git --no-pager diff --cached -- tailwind.config.ts components/patterns/index.ts)",
+      "Bash(git --no-pager diff --cached -- components/patterns/stat-card.tsx components/patterns/status-badge.tsx components/patterns/panel.tsx components/patterns/callout.tsx)"
     ]
   },
   "enableAllProjectMcpServers": true,

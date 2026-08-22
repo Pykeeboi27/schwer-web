@@ -1,5 +1,6 @@
 import { cn } from "@/lib/utils";
 import type { ReactNode } from "react";
+import { Measure } from "./measure";
 
 type StatCardProps = {
   label: ReactNode;
@@ -15,9 +16,10 @@ type StatCardProps = {
 };
 
 /**
- * Tier-2 KPI card. The value is the loudest element: a sentence-case muted
- * label over a large tabular number. Canonical across the sales, executive, and
- * engineering overviews — no more three-different-ways KPI cards.
+ * Tier-2 KPI card. The value is the loudest element: an eyebrow-style muted
+ * label over a large tabular figure set in the display face (Archivo) — the
+ * one place besides the page title that face is allowed to appear. Canonical
+ * across the sales, executive, and engineering overviews.
  */
 export function StatCard({
   label,
@@ -42,14 +44,14 @@ export function StatCard({
       <p
         className={cn(
           "text-sm text-muted-foreground",
-          isHero && "text-sm font-medium uppercase tracking-wide",
+          isHero && "text-[0.6875rem] font-semibold uppercase tracking-[0.18em]",
         )}
       >
         {label}
       </p>
       <p
         className={cn(
-          "mt-2 font-semibold tabular-nums",
+          "mt-2 font-display font-semibold tabular-nums tracking-[-0.02em]",
           isHero ? "text-4xl sm:text-5xl" : "text-3xl",
         )}
       >
@@ -67,24 +69,22 @@ type StatProgressProps = {
   size?: "default" | "hero";
 };
 
-/** Progress meter for the lead KPI (e.g. revenue vs. annual target). */
+/**
+ * Progress meter for the lead KPI (e.g. revenue vs. annual target). A thin
+ * wrapper over `Measure` (`value = percent`, `capacity = 100`) that keeps its
+ * original, simpler percent-based API intact for callers.
+ */
 export function StatProgress({ percent, caption, size = "default" }: StatProgressProps) {
-  const clamped = Math.max(0, Math.min(100, percent));
   const isHero = size === "hero";
 
   return (
     <div>
-      <div
-        className={cn(
-          "w-full overflow-hidden rounded-full bg-muted",
-          isHero ? "h-2.5" : "h-2",
-        )}
-      >
-        <div
-          className="h-full rounded-full bg-primary"
-          style={{ width: `${clamped}%` }}
-        />
-      </div>
+      <Measure
+        value={percent}
+        capacity={100}
+        size={size}
+        ariaLabel={typeof caption === "string" ? caption : "Progress"}
+      />
       {caption ? (
         <p className={cn("mt-1.5 text-muted-foreground", isHero ? "text-sm" : "text-xs")}>
           {caption}

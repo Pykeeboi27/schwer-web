@@ -4,14 +4,14 @@ import { BookedVsCollectedChart } from "@/components/executive/booked-vs-collect
 import { RevenueMonthSelect } from "@/components/executive/revenue-month-select";
 import { RevenueQuarterSelect } from "@/components/executive/revenue-quarter-select";
 import { RevenueTrendChart } from "@/components/executive/revenue-trend-chart";
-import { EmptyState } from "@/components/patterns";
 import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+  DataTableHead,
+  DataTableHeaderCell,
+  EmptyState,
+  PageHeader,
+  Panel,
+  StatCard,
+} from "@/components/patterns";
 import { getExecutiveAccessRedirect } from "@/lib/executive/access";
 import { getExecutiveDashboardData } from "@/lib/executive/dashboard";
 import { formatCurrency, formatPercent } from "@/lib/executive/format";
@@ -26,6 +26,7 @@ import { cn } from "@/lib/utils";
 import { getCurrentProfile } from "@/lib/profile/get-current-profile";
 import Link from "next/link";
 import { redirect } from "next/navigation";
+import type { ReactNode } from "react";
 
 type SalesDashboardPageProps = {
   searchParams?: Promise<{ period?: string; month?: string; quarter?: string }>;
@@ -63,6 +64,26 @@ const PERIOD_LABELS: Record<PeriodFilter, string> = {
   quarterly: "Quarterly",
 };
 
+/**
+ * A ruled band label, echoing the landing page's drafting-sheet hairlines:
+ * a short eyebrow, a rule filling the rest of the width, and an optional
+ * right-aligned note. Used here to mark where the page's time scope changes
+ * -- the one fact the old plain-card layout left the reader to guess at.
+ */
+function ScopeRule({ label, note }: { label: string; note?: ReactNode }) {
+  return (
+    <div className="flex items-center gap-3">
+      <span className="shrink-0 text-[0.6875rem] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+        {label}
+      </span>
+      <span className="h-px flex-1 bg-border" aria-hidden="true" />
+      {note ? (
+        <span className="shrink-0 text-xs font-medium text-foreground">{note}</span>
+      ) : null}
+    </div>
+  );
+}
+
 export default async function ExecutiveSalesDashboardPage({
   searchParams,
 }: SalesDashboardPageProps) {
@@ -96,18 +117,13 @@ export default async function ExecutiveSalesDashboardPage({
   } catch {
     return (
       <div className="flex flex-col gap-6">
-        <Card>
-          <CardHeader>
-            <CardTitle>Sales Details</CardTitle>
-            <CardDescription>Unable to load sales metrics.</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <EmptyState
-              title="Sales data unavailable"
-              description="Please refresh the page or try again later."
-            />
-          </CardContent>
-        </Card>
+        <PageHeader title="Sales Detail" description="Unable to load sales metrics." />
+        <Panel>
+          <EmptyState
+            title="Sales data unavailable"
+            description="Please refresh the page or try again later."
+          />
+        </Panel>
       </div>
     );
   }
@@ -175,17 +191,14 @@ export default async function ExecutiveSalesDashboardPage({
       ? `${getQuarterLabel(selectedQuarter)} ${now.getFullYear()}`
       : selectedPeriod === "monthly"
         ? `${getMonthLabel(selectedMonth)} ${now.getFullYear()}`
-        : `year to date ${now.getFullYear()}`;
+        : `Year to date ${now.getFullYear()}`;
 
   return (
     <div className="flex flex-col gap-6">
-      {/* Page heading */}
-      <div>
-        <h1 className="text-2xl font-semibold tracking-tight">Sales Details</h1>
-        <p className="text-sm text-muted-foreground mt-1">
-          Revenue breakdown, PO summary, and sales performance for the selected period.
-        </p>
-      </div>
+      <PageHeader
+        title="Sales Detail"
+        description="Revenue breakdown, PO summary, and sales performance for the selected period."
+      />
 
       {/* Period filter — segmented control */}
       <div
@@ -215,186 +228,152 @@ export default async function ExecutiveSalesDashboardPage({
       </div>
 
       {/* Revenue Breakdown */}
-      <Card>
-        <CardHeader>
-          <div className="flex items-start justify-between gap-4">
-            <div>
-              <CardTitle>Revenue Breakdown</CardTitle>
-              <CardDescription>
-                {selectedPeriod === "quarterly"
-                  ? `Booked revenue by month for ${getQuarterLabel(selectedQuarter)} ${now.getFullYear()}${
-                      selectedQuarter === currentQuarter ? " · current" : ""
-                    }`
-                  : selectedPeriod === "monthly"
-                    ? `Booked revenue by week for ${getMonthLabel(selectedMonth)} ${now.getFullYear()}${
-                        selectedMonth === currentMonth ? " · current" : ""
-                      }`
-                    : "Month-by-month booked revenue, year to date"}
-              </CardDescription>
-            </div>
-            {selectedPeriod === "monthly" ? (
-              <RevenueMonthSelect
-                selectedMonth={selectedMonth}
-                currentMonth={currentMonth}
-              />
-            ) : selectedPeriod === "quarterly" ? (
-              <RevenueQuarterSelect
-                selectedQuarter={selectedQuarter}
-                currentQuarter={currentQuarter}
-              />
-            ) : null}
-          </div>
-        </CardHeader>
-        <CardContent>
-          {hasBreakdownData ? (
-            <RevenueTrendChart data={trendData} />
-          ) : (
-            <EmptyState
-              title="No breakdown data yet"
-              description="No purchase order data is available for the selected period."
+      <Panel
+        title="Revenue Breakdown"
+        description={
+          selectedPeriod === "quarterly"
+            ? `Booked revenue by month for ${getQuarterLabel(selectedQuarter)} ${now.getFullYear()}${
+                selectedQuarter === currentQuarter ? " · current" : ""
+              }`
+            : selectedPeriod === "monthly"
+              ? `Booked revenue by week for ${getMonthLabel(selectedMonth)} ${now.getFullYear()}${
+                  selectedMonth === currentMonth ? " · current" : ""
+                }`
+              : "Month-by-month booked revenue, year to date"
+        }
+        actions={
+          selectedPeriod === "monthly" ? (
+            <RevenueMonthSelect
+              selectedMonth={selectedMonth}
+              currentMonth={currentMonth}
             />
-          )}
-        </CardContent>
-      </Card>
+          ) : selectedPeriod === "quarterly" ? (
+            <RevenueQuarterSelect
+              selectedQuarter={selectedQuarter}
+              currentQuarter={currentQuarter}
+            />
+          ) : undefined
+        }
+      >
+        {hasBreakdownData ? (
+          <RevenueTrendChart data={trendData} />
+        ) : (
+          <EmptyState
+            title="No breakdown data yet"
+            description="No purchase order data is available for the selected period."
+          />
+        )}
+      </Panel>
 
-      {/* PO summary + quick stats */}
-      <div className="flex flex-col gap-2">
-        <p className="text-xs font-medium uppercase tracking-widest text-muted-foreground">
-          Showing {periodScopeLabel}
-        </p>
+      {/* PO summary + quick stats — everything below this rule, up to the
+          all-time section, is scoped to the period filter above. */}
+      <div className="flex flex-col gap-3">
+        <ScopeRule label="Period" note={periodScopeLabel} />
         <div className="grid gap-4 sm:grid-cols-3">
-          <Card>
-            <CardHeader className="pb-1">
-              <CardDescription className="uppercase tracking-widest text-xs font-medium">
-                PO Count
-              </CardDescription>
-              <CardTitle className="text-3xl font-bold tabular-nums">
-                {dashboard.poSummary.poCount}
-              </CardTitle>
-            </CardHeader>
-          </Card>
-
-          <Card>
-            <CardHeader className="pb-1">
-              <CardDescription className="uppercase tracking-widest text-xs font-medium">
-                Total PO Value
-              </CardDescription>
-              <CardTitle className="text-2xl font-bold tabular-nums">
-                {formatCurrency(dashboard.poSummary.totalPoValue)}
-              </CardTitle>
-            </CardHeader>
-          </Card>
-
-          <Card>
-            <CardHeader className="pb-1">
-              <CardDescription className="uppercase tracking-widest text-xs font-medium">
-                Total Margin
-              </CardDescription>
-              <CardTitle className="text-2xl font-bold tabular-nums">
-                {formatCurrency(dashboard.poSummary.totalMarginAmount)}
-              </CardTitle>
-            </CardHeader>
-          </Card>
+          <StatCard label="PO Count" value={dashboard.poSummary.poCount} />
+          <StatCard
+            label="Total PO Value"
+            value={formatCurrency(dashboard.poSummary.totalPoValue)}
+          />
+          <StatCard
+            label="Total Margin"
+            value={formatCurrency(dashboard.poSummary.totalMarginAmount)}
+          />
         </div>
       </div>
 
       {/* Purchase order collections */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Purchase Orders: Booked vs Collected</CardTitle>
-          <CardDescription>
-            How much of the period&apos;s booked PO value has actually been collected.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <BookedVsCollectedChart
-            totalBooked={dashboard.poSummary.totalPoValue}
-            totalCollected={dashboard.poSummary.totalCollectedAmount}
-          />
-        </CardContent>
-      </Card>
+      <Panel
+        title="Purchase Orders: Booked vs Collected"
+        description="How much of the period's booked PO value has actually been collected."
+      >
+        <BookedVsCollectedChart
+          totalBooked={dashboard.poSummary.totalPoValue}
+          totalCollected={dashboard.poSummary.totalCollectedAmount}
+        />
+      </Panel>
 
-      {/* Sector + Client charts */}
-      <div className="grid gap-4 lg:grid-cols-2">
-        <Card>
-          <CardHeader>
-            <CardTitle>Sector Performance</CardTitle>
-            <CardDescription>Approved quotations by sector.</CardDescription>
-          </CardHeader>
-          <CardContent>
+      {/* Sector + Client charts — these aggregate all-time approved
+          quotations, not the period filter above, so they're marked off with
+          their own rule rather than implying they share that scope. */}
+      <div className="flex flex-col gap-3">
+        <ScopeRule label="All time" note="Not filtered by period" />
+        <div className="grid gap-4 lg:grid-cols-2">
+          <Panel title="Sector Performance" description="Approved quotations by sector.">
             <SectorPerformanceChart slices={dashboard.charts.sectorPerformance} />
-          </CardContent>
-        </Card>
+          </Panel>
 
-        <Card>
-          <CardHeader>
-            <CardTitle>Client Distribution</CardTitle>
-            <CardDescription>Top clients by approved quotation value.</CardDescription>
-          </CardHeader>
-          <CardContent>
+          <Panel
+            title="Client Distribution"
+            description="Top clients by approved quotation value."
+          >
             <ClientDistributionChart bars={dashboard.charts.clientDistribution} />
-          </CardContent>
-        </Card>
+          </Panel>
+        </div>
       </div>
 
       {/* Sales Performance Overview */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Sales Performance Overview</CardTitle>
-          <CardDescription>Ranked by PO owner for the selected period.</CardDescription>
-        </CardHeader>
-        <CardContent>
-          {hasSalesPerformanceData ? (
-            <div className="overflow-x-auto">
-              <table className="w-full border-collapse text-sm">
-                <thead>
-                  <tr className="border-b text-xs font-medium uppercase tracking-widest text-muted-foreground">
-                    <th className="w-8 px-3 py-1.5 text-left font-medium">#</th>
-                    <th className="px-3 py-1.5 text-left font-medium">Owner</th>
-                    <th className="px-3 py-1.5 text-right font-medium">Booked Revenue</th>
-                    <th className="px-3 py-1.5 text-right font-medium">Margin</th>
-                    <th className="px-3 py-1.5 text-right font-medium">Margin %</th>
+      <Panel
+        title="Sales Performance Overview"
+        description="Ranked by PO owner for the selected period."
+        padded={false}
+      >
+        {hasSalesPerformanceData ? (
+          <div className="overflow-x-auto">
+            <table className="w-full border-collapse text-sm">
+              <DataTableHead>
+                <tr className="border-b text-xs font-medium uppercase tracking-widest text-muted-foreground">
+                  <DataTableHeaderCell className="w-8 text-left">#</DataTableHeaderCell>
+                  <DataTableHeaderCell className="text-left">Owner</DataTableHeaderCell>
+                  <DataTableHeaderCell className="text-right">
+                    Booked Revenue
+                  </DataTableHeaderCell>
+                  <DataTableHeaderCell className="text-right">Margin</DataTableHeaderCell>
+                  <DataTableHeaderCell className="text-right">
+                    Margin %
+                  </DataTableHeaderCell>
+                </tr>
+              </DataTableHead>
+              <tbody>
+                {dashboard.salesPerformance.map((row, index) => (
+                  <tr
+                    key={row.ownerId}
+                    className={cn(
+                      "border-t transition-colors hover:bg-muted/50",
+                      index % 2 === 0 ? "bg-muted/20" : "",
+                    )}
+                  >
+                    <td className="px-3 py-2.5 font-semibold text-muted-foreground tabular-nums">
+                      {index + 1}
+                    </td>
+                    <td className="max-w-0 truncate px-3 py-2.5 font-medium">
+                      {row.ownerName}
+                    </td>
+                    <td className="px-3 py-2.5 text-right tabular-nums">
+                      {formatCurrency(row.bookedRevenue)}
+                    </td>
+                    <td className="px-3 py-2.5 text-right tabular-nums text-muted-foreground">
+                      {formatCurrency(row.marginAmount)}
+                    </td>
+                    <td className="px-3 py-2.5 text-right tabular-nums text-muted-foreground">
+                      {row.marginPercentAverage === null
+                        ? "N/A"
+                        : formatPercent(row.marginPercentAverage)}
+                    </td>
                   </tr>
-                </thead>
-                <tbody>
-                  {dashboard.salesPerformance.map((row, index) => (
-                    <tr
-                      key={row.ownerId}
-                      className={cn(
-                        "rounded-md transition-colors hover:bg-muted/50",
-                        index % 2 === 0 ? "bg-muted/20" : "",
-                      )}
-                    >
-                      <td className="px-3 py-2.5 font-semibold text-muted-foreground tabular-nums">
-                        {index + 1}
-                      </td>
-                      <td className="max-w-0 truncate px-3 py-2.5 font-medium">
-                        {row.ownerName}
-                      </td>
-                      <td className="px-3 py-2.5 text-right tabular-nums">
-                        {formatCurrency(row.bookedRevenue)}
-                      </td>
-                      <td className="px-3 py-2.5 text-right tabular-nums text-muted-foreground">
-                        {formatCurrency(row.marginAmount)}
-                      </td>
-                      <td className="px-3 py-2.5 text-right tabular-nums text-muted-foreground">
-                        {row.marginPercentAverage === null
-                          ? "N/A"
-                          : formatPercent(row.marginPercentAverage)}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          ) : (
+                ))}
+              </tbody>
+            </table>
+          </div>
+        ) : (
+          <div className="p-4 sm:p-5">
             <EmptyState
               title="No sales performance data yet"
               description="Owner ranking will appear once purchase orders are approved."
             />
-          )}
-        </CardContent>
-      </Card>
+          </div>
+        )}
+      </Panel>
     </div>
   );
 }

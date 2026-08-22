@@ -6,12 +6,13 @@ type SectorPerformanceChartProps = {
   slices: SectorPerformanceSlice[];
 };
 
-// Matches the tones used by the client sector tags (components/sales/sector-badge.tsx):
-// commercial = blue, industrial = amber, solar = emerald.
+// Same --chart-1..3 tokens as the client sector tags
+// (components/sales/sector-badge.tsx), so a sector reads as the same color
+// in both places and follows theme/dark-mode changes automatically.
 const SECTOR_COLORS: Record<SectorPerformanceSlice["sector"], string> = {
-  commercial: "#3b82f6",
-  industrial: "#f59e0b",
-  solar: "#10b981",
+  commercial: "hsl(var(--chart-1))",
+  industrial: "hsl(var(--chart-2))",
+  solar: "hsl(var(--chart-3))",
 };
 
 const RADIUS = 80;
