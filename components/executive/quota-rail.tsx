@@ -1,7 +1,4 @@
-"use client";
-
-import { cn } from "@/lib/utils";
-import { useEffect, useState } from "react";
+import { Measure } from "@/components/patterns";
 
 export type QuotaRailProps = {
   /** Null when no quota has been set for this person/year yet. */
@@ -44,11 +41,11 @@ function getPaceFraction(year: number, referenceDate: Date): number {
 }
 
 /**
- * The signature element for quota tracking: a progress rail that reads
- * against *pace*, not just amount. A plain bar can only say "60% there" — this
- * one also says whether 60% is good news (May) or bad news (November). The
- * moving pace marker carries that second fact; the fixed tick at the right
- * edge is the 100% reference the marker is judged against.
+ * Quota tracking's caller onto the signature `Measure`: a rail that reads
+ * against *pace*, not just amount. A plain bar can only say "60% there" —
+ * this one also says whether 60% is good news (May) or bad news (November).
+ * The moving pace marker carries that second fact; the fixed cap tick is the
+ * 100% reference the marker is judged against.
  */
 export function QuotaRail({
   quotaAmount,
@@ -57,13 +54,6 @@ export function QuotaRail({
   referenceDate,
   canEdit = false,
 }: QuotaRailProps) {
-  const [grown, setGrown] = useState(false);
-
-  useEffect(() => {
-    const frame = requestAnimationFrame(() => setGrown(true));
-    return () => cancelAnimationFrame(frame);
-  }, []);
-
   if (quotaAmount === null || quotaAmount <= 0) {
     return (
       <p className="text-sm text-muted-foreground">
@@ -78,16 +68,9 @@ export function QuotaRail({
   const isCurrentYear = today.getFullYear() === year;
   const pacePercent = getPaceFraction(year, today) * 100;
   const percent = (achieved / quotaAmount) * 100;
-  const fillPercent = Math.min(100, percent);
 
   const status: "ahead" | "close" | "behind" =
     percent >= pacePercent ? "ahead" : percent >= pacePercent * 0.8 ? "close" : "behind";
-
-  const fillColor = {
-    ahead: "bg-green-500",
-    close: "bg-amber-500",
-    behind: "bg-red-500",
-  }[status];
 
   const daysLeft = isCurrentYear
     ? Math.max(
@@ -112,35 +95,15 @@ export function QuotaRail({
 
   return (
     <div>
-      <div
-        className="relative h-2.5 w-full overflow-hidden rounded-full bg-muted"
-        role="progressbar"
-        aria-valuenow={Math.round(fillPercent)}
-        aria-valuemin={0}
-        aria-valuemax={100}
-        aria-label={`${year} quota progress`}
-      >
-        <div
-          className={cn(
-            "h-full rounded-full transition-[width] duration-700 ease-out motion-reduce:transition-none",
-            fillColor,
-          )}
-          style={{ width: grown ? `${fillPercent}%` : "0%" }}
-        />
-        {/* Fixed 100% reference tick. */}
-        <div
-          className="absolute inset-y-0 right-0 w-px bg-foreground/70"
-          aria-hidden="true"
-        />
-        {/* Pace marker: where the year's elapsed time says achievement "should" be. */}
-        {isCurrentYear ? (
-          <div
-            className="absolute inset-y-0 w-px bg-foreground/40"
-            style={{ left: `${Math.min(99, pacePercent)}%` }}
-            aria-hidden="true"
-          />
-        ) : null}
-      </div>
+      <Measure
+        value={achieved}
+        capacity={quotaAmount}
+        tone={status}
+        capTick
+        pace={isCurrentYear ? pacePercent : undefined}
+        animate
+        ariaLabel={`${year} quota progress`}
+      />
       <p className="mt-1.5 text-xs text-muted-foreground">
         {formatCurrency(achieved)} of {formatCurrency(quotaAmount)} ·{" "}
         {Math.round(percent)}% · {statusLabel}

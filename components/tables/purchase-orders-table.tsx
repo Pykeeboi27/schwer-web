@@ -4,16 +4,19 @@ import { PurchaseOrderDetailsDialog } from "@/components/dialogs/purchase-order-
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
+  clampPage,
   DataCard,
   DataField,
   EmptyState,
+  getPageRange,
   ResponsiveTable,
   StatusBadge,
   statusLabel,
+  TablePagination,
 } from "@/components/patterns";
 import type { SalesPoPayment, SalesPurchaseOrder } from "@/lib/sales/purchase-orders";
 import { FileText, Search } from "lucide-react";
-import { useMemo, useState, type KeyboardEvent } from "react";
+import { useEffect, useMemo, useState, type KeyboardEvent } from "react";
 
 type SalesPersonOption = {
   id: string;
@@ -27,6 +30,12 @@ type PurchaseOrdersTableProps = {
   currentUserRole: string | null;
   /** Active sales-department profiles, for reassigning a manually-encoded PO's owner. */
   salesPeople?: SalesPersonOption[];
+  /**
+   * Rows per page. Omit to render every row unpaginated (the sales workspace's
+   * behaviour); pass a size to page the list, which the executive view does
+   * because it shows every PO across Sales.
+   */
+  pageSize?: number;
 };
 
 type SortBy = "approvedAt" | "poAmount";
@@ -86,6 +95,7 @@ export function PurchaseOrdersTable({
   currentUserId,
   currentUserRole,
   salesPeople,
+  pageSize,
 }: PurchaseOrdersTableProps) {
   const [sortBy, setSortBy] = useState<SortBy>("approvedAt");
   const [sortDirection, setSortDirection] = useState<SortDirection>("desc");
@@ -114,6 +124,34 @@ export function PurchaseOrdersTable({
 
     return sortedRows(filtered, sortBy, sortDirection);
   }, [purchaseOrders, searchQuery, approvalFilter, sortBy, sortDirection]);
+
+  const paginationEnabled = pageSize !== undefined;
+  const [rowsPerPage, setRowsPerPage] = useState(pageSize ?? 25);
+  const [page, setPage] = useState(1);
+
+  // Any change to the visible result set -- an upstream filter, the search box,
+  // the status filter, or the sort -- makes the current page number meaningless,
+  // so start over at the first page. Keyed on the row ids rather than the array
+  // reference so a realtime refresh that returns the same POs leaves the reader
+  // where they were.
+  const rowSetSignature = useMemo(
+    () => purchaseOrders.map((po) => po.id).join(","),
+    [purchaseOrders],
+  );
+  useEffect(() => {
+    setPage(1);
+  }, [rowSetSignature, searchQuery, approvalFilter, sortBy, sortDirection]);
+
+  // Clamped rather than corrected in state: the row count can shrink between
+  // the click that set `page` and this render.
+  const safePage = clampPage(page, filteredAndSorted.length, rowsPerPage);
+  const visibleRows = useMemo(() => {
+    if (!paginationEnabled) {
+      return filteredAndSorted;
+    }
+    const { start, end } = getPageRange(safePage, rowsPerPage, filteredAndSorted.length);
+    return filteredAndSorted.slice(start, end);
+  }, [paginationEnabled, filteredAndSorted, safePage, rowsPerPage]);
 
   const selectedPurchaseOrder = useMemo(() => {
     if (!selectedPurchaseOrderId) return null;
@@ -208,12 +246,12 @@ export function PurchaseOrdersTable({
               </tr>
             </thead>
             <tbody>
-              {filteredAndSorted.length === 0 ? (
+              {visibleRows.length === 0 ? (
                 <tr>
                   <td colSpan={6}>{emptyState}</td>
                 </tr>
               ) : (
-                filteredAndSorted.map((purchaseOrder) => (
+                visibleRows.map((purchaseOrder) => (
                   <tr
                     key={purchaseOrder.id}
                     className="cursor-pointer border-t hover:bg-muted/30 focus-visible:bg-muted/40 focus-visible:outline-none"
@@ -265,10 +303,10 @@ export function PurchaseOrdersTable({
           </table>
         }
         cards={
-          filteredAndSorted.length === 0 ? (
+          visibleRows.length === 0 ? (
             <div className="rounded-lg border">{emptyState}</div>
           ) : (
-            filteredAndSorted.map((purchaseOrder) => (
+            visibleRows.map((purchaseOrder) => (
               <DataCard
                 key={purchaseOrder.id}
                 onActivate={() => setSelectedPurchaseOrderId(purchaseOrder.id)}
@@ -310,6 +348,21 @@ export function PurchaseOrdersTable({
           )
         }
       />
+
+      {paginationEnabled ? (
+        <TablePagination
+          className="mt-4"
+          page={safePage}
+          pageSize={rowsPerPage}
+          totalItems={filteredAndSorted.length}
+          itemLabel="purchase orders"
+          onPageChange={setPage}
+          onPageSizeChange={(nextSize) => {
+            setRowsPerPage(nextSize);
+            setPage(1);
+          }}
+        />
+      ) : null}
 
       <PurchaseOrderDetailsDialog
         open={selectedPurchaseOrder !== null}

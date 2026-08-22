@@ -6,6 +6,18 @@ export type PeriodDateRange = {
   endDate: string;
 };
 
+/**
+ * Which slice of the year the caller is looking at. Both fields are optional --
+ * each falls back to the reference date's own month/quarter, so existing callers
+ * that only pass a filter keep the "current period" behaviour.
+ */
+export type PeriodSelection = {
+  /** 1-12. Only read when the filter is "monthly". */
+  month?: number;
+  /** 1-4. Only read when the filter is "quarterly". */
+  quarter?: number;
+};
+
 const MONTH_LABELS = [
   "Jan",
   "Feb",
@@ -60,21 +72,34 @@ export function getQuarterLabel(quarter: number): string {
   return `Q${quarter}`;
 }
 
+function isValidMonth(value: number | undefined): value is number {
+  return Number.isInteger(value) && (value as number) >= 1 && (value as number) <= 12;
+}
+
+function isValidQuarter(value: number | undefined): value is number {
+  return Number.isInteger(value) && (value as number) >= 1 && (value as number) <= 4;
+}
+
 export function getPeriodDateRange(
   periodFilter: PeriodFilter,
   referenceDate = new Date(),
+  selection: PeriodSelection = {},
 ): PeriodDateRange {
   const year = referenceDate.getFullYear();
 
   if (periodFilter === "monthly") {
-    const month = referenceDate.getMonth() + 1;
+    const month = isValidMonth(selection.month)
+      ? selection.month
+      : referenceDate.getMonth() + 1;
     const startDate = toIsoDate(new Date(year, month - 1, 1));
     const endDate = toIsoDate(getMonthEndDate(year, month));
     return { year, startDate, endDate };
   }
 
   if (periodFilter === "quarterly") {
-    const quarter = getQuarterFromMonth(referenceDate.getMonth() + 1);
+    const quarter = isValidQuarter(selection.quarter)
+      ? selection.quarter
+      : getQuarterFromMonth(referenceDate.getMonth() + 1);
     const startMonth = (quarter - 1) * 3 + 1;
     const endMonth = startMonth + 2;
     const startDate = toIsoDate(new Date(year, startMonth - 1, 1));
@@ -105,6 +130,23 @@ export function buildQuarterBuckets(
   return [1, 2, 3, 4].map((quarter) => ({
     quarter,
     label: getQuarterLabel(quarter),
+    year,
+  }));
+}
+
+/** The three calendar months that make up a quarter, in order. */
+export function buildQuarterMonthBuckets(
+  quarter: number,
+  year: number,
+): Array<{ month: number; label: string; year: number }> {
+  if (!Number.isInteger(quarter) || quarter < 1 || quarter > 4) {
+    throw new RangeError("Quarter must be an integer between 1 and 4.");
+  }
+
+  const startMonth = (quarter - 1) * 3 + 1;
+  return [startMonth, startMonth + 1, startMonth + 2].map((month) => ({
+    month,
+    label: getMonthLabel(month),
     year,
   }));
 }

@@ -60,6 +60,10 @@ export default async function ExecutiveQuotasPage() {
       <PageHeader
         title="Quotas"
         description={`Each salesperson's ${year} annual quota, tracked against their approved purchase orders for the year.`}
+        scope={[
+          { label: "Year", value: String(year) },
+          { label: "Source", value: "Approved purchase orders" },
+        ]}
       />
 
       <div className="grid gap-3 sm:grid-cols-3">

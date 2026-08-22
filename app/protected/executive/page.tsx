@@ -59,7 +59,8 @@ export default async function ExecutiveDashboardPage() {
     avgCostingResult.status === "fulfilled" ? avgCostingResult.value : null;
 
   const canEditTarget = isTargetEditor(profile);
-  const currentYear = new Date().getFullYear();
+  const now = new Date();
+  const currentYear = now.getFullYear();
 
   const annualTarget = dashboard.kpis.annualTarget;
   const revenueYtd = dashboard.kpis.revenueYtdBooked;
@@ -68,11 +69,22 @@ export default async function ExecutiveDashboardPage() {
       ? Math.min(Math.round((revenueYtd / annualTarget) * 100), 100)
       : null;
 
+  // Everything on this page is YTD from one source (approved purchase
+  // orders) -- unlike Sales Detail, there's no mixed time-scope to untangle,
+  // but the reader still shouldn't have to guess the window or where the
+  // numbers come from.
+  const yearStart = new Date(currentYear, 0, 1);
+  const scopeRange = `${new Intl.DateTimeFormat("en-PH", { day: "2-digit", month: "short" }).format(yearStart)} – ${new Intl.DateTimeFormat("en-PH", { day: "2-digit", month: "short", year: "numeric" }).format(now)}`;
+
   return (
     <div className="flex flex-col gap-6">
       <PageHeader
         title="Executive Dashboard"
         description="Company-wide KPI snapshot — year to date."
+        scope={[
+          { label: "Scope", value: `YTD · ${scopeRange}` },
+          { label: "Source", value: "Approved purchase orders" },
+        ]}
       />
 
       {/* Lead KPI */}
@@ -90,15 +102,6 @@ export default async function ExecutiveDashboardPage() {
           />
         ) : null}
       </StatCard>
-
-      {/* Total PO value shown separately from Revenue YTD (Booked): Revenue is
-          deliberately net of margin (margin is tracked on its own via the
-          Avg. Overall Margin card below), while this card is the full PO
-          amount -- the two intentionally differ by the margin amount. */}
-      <StatCard
-        label="Total PO Value (YTD)"
-        value={formatCurrency(dashboard.poSummary.totalPoValue)}
-      />
 
       {/* Supporting KPIs */}
       <div className="grid gap-3 sm:grid-cols-3">

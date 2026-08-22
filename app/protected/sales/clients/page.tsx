@@ -25,7 +25,7 @@ export default async function SalesClientsPage() {
       />
 
       <Panel>
-        <ClientsTable clients={clients} />
+        <ClientsTable clients={clients} pageSize={25} />
       </Panel>
     </div>
   );

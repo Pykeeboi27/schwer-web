@@ -23,6 +23,13 @@ export default {
           "Arial",
           "sans-serif",
         ],
+        // Display face -- page titles and numeric figures only (StatCard,
+        // Measure captions, hero KPIs). Never panel headings or body text;
+        // see components/patterns/stat-card.tsx.
+        display: ["var(--font-archivo)", "var(--font-geist-sans)", "sans-serif"],
+        // Reference numbers (PO/quotation numbers) -- a real mono stack
+        // instead of falling through to Tailwind's default.
+        mono: ["ui-monospace", "Cascadia Mono", "Segoe UI Mono", "Consolas", "monospace"],
       },
       boxShadow: {
         xs: "0 1px 2px 0 hsl(var(--foreground) / 0.04)",
@@ -68,6 +75,20 @@ export default {
           "3": "hsl(var(--chart-3))",
           "4": "hsl(var(--chart-4))",
           "5": "hsl(var(--chart-5))",
+        },
+        data: {
+          booked: "hsl(var(--data-booked))",
+          collected: "hsl(var(--data-collected))",
+          track: "hsl(var(--data-track))",
+          tick: "hsl(var(--data-tick))",
+        },
+        status: {
+          pending: "hsl(var(--status-pending))",
+          approved: "hsl(var(--status-approved))",
+          rejected: "hsl(var(--status-rejected))",
+          neutral: "hsl(var(--status-neutral))",
+          info: "hsl(var(--status-info))",
+          returned: "hsl(var(--status-returned))",
         },
       },
       borderRadius: {

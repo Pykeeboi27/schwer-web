@@ -3,12 +3,13 @@ import type { ReactNode } from "react";
 
 export type CalloutTone = "info" | "success" | "warning" | "destructive" | "muted";
 
+// info/success/warning read off the same --status-* tokens as StatusBadge
+// (single source of truth); destructive/muted were already theme tokens and
+// are left as-is.
 const TONE_CLASSES: Record<CalloutTone, string> = {
-  info: "border-blue-200 bg-blue-50/60 text-blue-900 dark:border-blue-900 dark:bg-blue-950/30 dark:text-blue-200",
-  success:
-    "border-green-200 bg-green-50/70 text-green-900 dark:border-green-900 dark:bg-green-950/30 dark:text-green-200",
-  warning:
-    "border-amber-200 bg-amber-50/70 text-amber-900 dark:border-amber-900 dark:bg-amber-950/30 dark:text-amber-200",
+  info: "border-status-info/30 bg-status-info/10 text-status-info",
+  success: "border-status-approved/30 bg-status-approved/10 text-status-approved",
+  warning: "border-status-pending/30 bg-status-pending/10 text-status-pending",
   destructive: "border-destructive/40 bg-destructive/10 text-destructive",
   muted: "border-border bg-muted/40 text-foreground",
 };

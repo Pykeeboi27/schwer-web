@@ -1,4 +1,4 @@
-import { EmptyState } from "@/components/patterns";
+import { EmptyState, Measure } from "@/components/patterns";
 import { formatCurrency } from "@/lib/utils/number-format";
 
 type TrendBar = {
@@ -20,22 +20,22 @@ export function RevenueTrendChart({ data }: RevenueTrendChartProps) {
     );
   }
 
-  const max = Math.max(...data.map((d) => d.value), 1);
+  const capacity = Math.max(...data.map((d) => d.value), 1);
 
   return (
     <div className="space-y-2">
       {data.map((bar) => (
         <div key={bar.label} className="flex items-center gap-3 text-sm">
-          <span className="w-8 shrink-0 text-right text-xs text-muted-foreground">
+          <span className="w-10 shrink-0 text-right text-xs text-muted-foreground">
             {bar.label}
           </span>
-          <div className="h-2.5 flex-1 overflow-hidden rounded-full bg-muted">
-            <div
-              className="h-full rounded-full bg-primary"
-              style={{ width: `${(bar.value / max) * 100}%` }}
-              aria-hidden
-            />
-          </div>
+          <Measure
+            value={bar.value}
+            capacity={capacity}
+            tone="booked"
+            className="flex-1"
+            ariaLabel={`${bar.label}: ${formatCurrency(bar.value)}`}
+          />
           <span className="w-32 shrink-0 text-right text-xs tabular-nums text-muted-foreground">
             {formatCurrency(bar.value)}
           </span>

@@ -3,21 +3,22 @@ import { cn } from "@/lib/utils";
 
 export type ClientSector = "commercial" | "industrial" | "solar";
 
+// Same three tokens as the executive sector charts (--chart-1..3 in
+// globals.css) so a sector reads as the same color everywhere it appears —
+// this badge and components/sales/sector-performance-chart.tsx used to
+// diverge on two independent hardcoded hex maps.
 const SECTOR_META: Record<ClientSector, { label: string; className: string }> = {
   commercial: {
     label: "Commercial",
-    className:
-      "border-blue-200 bg-blue-50 text-blue-700 dark:border-blue-900 dark:bg-blue-950/40 dark:text-blue-300",
+    className: "border-chart-1/30 bg-chart-1/10 text-chart-1",
   },
   industrial: {
     label: "Industrial",
-    className:
-      "border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-300",
+    className: "border-chart-2/30 bg-chart-2/10 text-chart-2",
   },
   solar: {
     label: "Solar",
-    className:
-      "border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-900 dark:bg-emerald-950/40 dark:text-emerald-300",
+    className: "border-chart-3/30 bg-chart-3/10 text-chart-3",
   },
 };
 

@@ -1,4 +1,4 @@
-import { EmptyState } from "@/components/patterns";
+import { EmptyState, Measure } from "@/components/patterns";
 import { formatCurrency } from "@/lib/utils/number-format";
 
 type BookedVsCollectedChartProps = {
@@ -6,6 +6,11 @@ type BookedVsCollectedChartProps = {
   totalCollected: number;
 };
 
+/**
+ * The flagship two-tone measure: booked (graphite) and collected (verdigris)
+ * read as a pair against a shared capacity, so the gap between the two rows
+ * *is* receivables exposure at a glance.
+ */
 export function BookedVsCollectedChart({
   totalBooked,
   totalCollected,
@@ -19,9 +24,7 @@ export function BookedVsCollectedChart({
     );
   }
 
-  const max = Math.max(totalBooked, totalCollected, 1);
-  const bookedWidth = Math.max((totalBooked / max) * 100, 1.5);
-  const collectedWidth = Math.max((totalCollected / max) * 100, 1.5);
+  const capacity = Math.max(totalBooked, totalCollected, 1);
   const collectedShare = Math.min((totalCollected / totalBooked) * 100, 100);
 
   return (
@@ -33,13 +36,13 @@ export function BookedVsCollectedChart({
             {formatCurrency(totalBooked)}
           </span>
         </div>
-        <div className="h-3 w-full overflow-hidden rounded-full bg-muted">
-          <div
-            className="h-full rounded-full bg-primary"
-            style={{ width: `${bookedWidth}%` }}
-            aria-hidden
-          />
-        </div>
+        <Measure
+          value={totalBooked}
+          capacity={capacity}
+          tone="booked"
+          minFillPercent={1.5}
+          ariaLabel="Total booked"
+        />
       </div>
 
       <div className="space-y-1.5">
@@ -49,13 +52,13 @@ export function BookedVsCollectedChart({
             {formatCurrency(totalCollected)}
           </span>
         </div>
-        <div className="h-3 w-full overflow-hidden rounded-full bg-muted">
-          <div
-            className="h-full rounded-full bg-emerald-500"
-            style={{ width: `${collectedWidth}%` }}
-            aria-hidden
-          />
-        </div>
+        <Measure
+          value={totalCollected}
+          capacity={capacity}
+          tone="collected"
+          minFillPercent={1.5}
+          ariaLabel="Actual collected"
+        />
       </div>
 
       <p className="text-xs text-muted-foreground">

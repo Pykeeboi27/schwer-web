@@ -2,15 +2,15 @@ import { Skeleton } from "@/components/ui/skeleton";
 
 export default function ExecutiveDashboardLoading() {
   return (
-    <div className="flex flex-col gap-4">
-      <Skeleton className="h-24 w-full" />
-      <Skeleton className="h-16 w-full" />
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        <Skeleton className="h-28 w-full" />
-        <Skeleton className="h-28 w-full" />
-        <Skeleton className="h-28 w-full" />
+    <div className="flex flex-col gap-6">
+      <Skeleton className="h-16 w-full rounded-none" />
+      <Skeleton className="h-40 w-full rounded-lg" />
+      <div className="grid gap-3 sm:grid-cols-3">
+        <Skeleton className="h-24 w-full rounded-lg" />
+        <Skeleton className="h-24 w-full rounded-lg" />
+        <Skeleton className="h-24 w-full rounded-lg" />
       </div>
-      <Skeleton className="h-72 w-full" />
+      <Skeleton className="h-64 w-full rounded-lg" />
     </div>
   );
 }

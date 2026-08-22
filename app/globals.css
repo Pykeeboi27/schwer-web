@@ -23,9 +23,33 @@
     --border: 0 0% 89.8%;
     --input: 0 0% 89.8%;
     --ring: 25 87% 40%;
-    --chart-1: 12 76% 61%;
-    --chart-2: 173 58% 39%;
-    --chart-3: 197 37% 24%;
+
+    /* Data tokens -- for measures/charts only. Orange (--primary) is brand
+       identity and never fills a data quantity; these two poles (graphite for
+       the booked whole, verdigris for the collected/realized part) are what
+       carry meaning in a chart. See components/patterns/measure.tsx. */
+    --data-booked: 220 14% 24%;
+    --data-collected: 174 62% 28%;
+    --data-track: 220 13% 91%;
+    --data-tick: 220 14% 24%;
+
+    /* Status tokens -- single source of truth for StatusBadge/Callout tones,
+       replacing raw Tailwind palette classes so retheming reaches them. */
+    --status-pending: 38 92% 34%;
+    --status-approved: 174 62% 28%;
+    --status-rejected: 0 72% 42%;
+    --status-neutral: 220 9% 42%;
+    --status-info: 217 58% 40%;
+    /* "Returned for edits" -- distinct from rejected (terminal, red) and
+       pending (waiting on someone else); a violet reads as "back with you." */
+    --status-returned: 262 47% 44%;
+
+    /* Sector chart colors -- commercial / industrial / solar. Deliberately
+       excludes brand orange (25 87% 40%) so a sector slice is never
+       confusable with the identity color. --chart-4/5 are unused headroom. */
+    --chart-1: 217 55% 45%;
+    --chart-2: 220 14% 38%;
+    --chart-3: 43 85% 38%;
     --chart-4: 43 74% 66%;
     --chart-5: 27 87% 67%;
     --radius: 0.625rem;
@@ -50,9 +74,22 @@
     --border: 0 0% 20%;
     --input: 0 0% 20%;
     --ring: 25 90% 55%;
-    --chart-1: 220 70% 50%;
-    --chart-2: 160 60% 45%;
-    --chart-3: 30 80% 55%;
+
+    --data-booked: 220 10% 78%;
+    --data-collected: 174 52% 48%;
+    --data-track: 220 8% 24%;
+    --data-tick: 220 10% 78%;
+
+    --status-pending: 38 84% 58%;
+    --status-approved: 174 52% 48%;
+    --status-rejected: 0 70% 60%;
+    --status-neutral: 220 8% 62%;
+    --status-info: 217 62% 62%;
+    --status-returned: 262 60% 72%;
+
+    --chart-1: 217 62% 62%;
+    --chart-2: 220 10% 66%;
+    --chart-3: 43 80% 58%;
     --chart-4: 280 65% 60%;
     --chart-5: 340 75% 55%;
   }

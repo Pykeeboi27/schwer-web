@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Geist } from "next/font/google";
+import { Archivo, Geist } from "next/font/google";
 import { ThemeProvider } from "next-themes";
 import "./globals.css";
 
@@ -20,13 +20,26 @@ const geistSans = Geist({
   subsets: ["latin"],
 });
 
+// Display face for page titles and numeric figures only -- see
+// tailwind.config.ts `fontFamily.display` and the restraint clause in
+// components/patterns/stat-card.tsx.
+const archivo = Archivo({
+  variable: "--font-archivo",
+  display: "swap",
+  subsets: ["latin"],
+});
+
 export default function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className={geistSans.variable} suppressHydrationWarning>
+    <html
+      lang="en"
+      className={`${geistSans.variable} ${archivo.variable}`}
+      suppressHydrationWarning
+    >
       <body className="font-sans antialiased">
         <ThemeProvider
           attribute="class"

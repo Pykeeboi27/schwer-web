@@ -11,13 +11,26 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { DataCard, DataField, EmptyState, ResponsiveTable } from "@/components/patterns";
+import {
+  clampPage,
+  DataCard,
+  DataField,
+  EmptyState,
+  getPageRange,
+  ResponsiveTable,
+  TablePagination,
+} from "@/components/patterns";
 import type { SalesClient } from "@/lib/sales/clients";
 import { Pencil, SearchX } from "lucide-react";
-import { useMemo, useState, type KeyboardEvent } from "react";
+import { useEffect, useMemo, useState, type KeyboardEvent } from "react";
 
 type ClientsTableProps = {
   clients: SalesClient[];
+  /**
+   * Rows per page. Omit to render every row unpaginated; pass a size to page
+   * the list. Same opt-in convention as `PurchaseOrdersTable`.
+   */
+  pageSize?: number;
 };
 
 type SectorFilter = "all" | SalesClient["sector"];
@@ -52,7 +65,7 @@ function onRowKeyDown(
   }
 }
 
-export function ClientsTable({ clients }: ClientsTableProps) {
+export function ClientsTable({ clients, pageSize }: ClientsTableProps) {
   const [search, setSearch] = useState("");
   const [sectorFilter, setSectorFilter] = useState<SectorFilter>("all");
   const [selectedClient, setSelectedClient] = useState<SalesClient | null>(null);
@@ -70,6 +83,34 @@ export function ClientsTable({ clients }: ClientsTableProps) {
       }),
     [clients, normalizedSearch, sectorFilter],
   );
+
+  const paginationEnabled = pageSize !== undefined;
+  const [rowsPerPage, setRowsPerPage] = useState(pageSize ?? 25);
+  const [page, setPage] = useState(1);
+
+  // Any change to the visible result set -- the incoming client list, the
+  // search box, or the sector filter -- makes the current page number
+  // meaningless, so start over at the first page. Keyed on row ids rather
+  // than the array reference so a refresh that returns the same clients
+  // leaves the reader where they were.
+  const rowSetSignature = useMemo(
+    () => clients.map((client) => client.id).join(","),
+    [clients],
+  );
+  useEffect(() => {
+    setPage(1);
+  }, [rowSetSignature, normalizedSearch, sectorFilter]);
+
+  // Clamped rather than corrected in state: the row count can shrink between
+  // the click that set `page` and this render.
+  const safePage = clampPage(page, filteredClients.length, rowsPerPage);
+  const visibleClients = useMemo(() => {
+    if (!paginationEnabled) {
+      return filteredClients;
+    }
+    const { start, end } = getPageRange(safePage, rowsPerPage, filteredClients.length);
+    return filteredClients.slice(start, end);
+  }, [paginationEnabled, filteredClients, safePage, rowsPerPage]);
 
   const openClient = (client: SalesClient, editMode: boolean) => {
     setOpenInEditMode(editMode);
@@ -135,12 +176,12 @@ export function ClientsTable({ clients }: ClientsTableProps) {
               </tr>
             </thead>
             <tbody>
-              {filteredClients.length === 0 ? (
+              {visibleClients.length === 0 ? (
                 <tr>
                   <td colSpan={7}>{emptyState}</td>
                 </tr>
               ) : (
-                filteredClients.map((client) => (
+                visibleClients.map((client) => (
                   <tr
                     key={client.id}
                     className="cursor-pointer border-t hover:bg-muted/30 focus-visible:bg-muted/40 focus-visible:outline-none"
@@ -193,10 +234,10 @@ export function ClientsTable({ clients }: ClientsTableProps) {
           </table>
         }
         cards={
-          filteredClients.length === 0 ? (
+          visibleClients.length === 0 ? (
             <div className="rounded-lg border">{emptyState}</div>
           ) : (
-            filteredClients.map((client) => (
+            visibleClients.map((client) => (
               <DataCard
                 key={client.id}
                 onActivate={() => openClient(client, false)}
@@ -235,6 +276,21 @@ export function ClientsTable({ clients }: ClientsTableProps) {
           )
         }
       />
+
+      {paginationEnabled ? (
+        <TablePagination
+          className="mt-4"
+          page={safePage}
+          pageSize={rowsPerPage}
+          totalItems={filteredClients.length}
+          itemLabel="clients"
+          onPageChange={setPage}
+          onPageSizeChange={(nextSize) => {
+            setRowsPerPage(nextSize);
+            setPage(1);
+          }}
+        />
+      ) : null}
 
       <ClientDetailsDialog
         open={selectedClient !== null}

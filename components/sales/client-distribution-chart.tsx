@@ -1,4 +1,4 @@
-import { EmptyState } from "@/components/patterns";
+import { EmptyState, Measure } from "@/components/patterns";
 import type { ClientDistributionBar } from "@/lib/sales/dashboard-charts";
 import { cn } from "@/lib/utils";
 import { formatCurrency } from "@/lib/utils/number-format";
@@ -39,37 +39,34 @@ export function ClientDistributionChart({
     });
   }
 
-  const max = Math.max(...rows.map((row) => row.totalAmount), 1);
+  const capacity = Math.max(...rows.map((row) => row.totalAmount), 1);
 
   return (
     <ul
       className={cn("space-y-3 text-sm", scrollable && "max-h-80 overflow-y-auto pr-1")}
     >
-      {rows.map((row) => {
-        const width = Math.max((row.totalAmount / max) * 100, 1.5);
-        return (
-          <li key={row.clientId} className="space-y-1">
-            <div className="flex min-w-0 items-baseline justify-between gap-3">
-              <span className="min-w-0 truncate font-medium" title={row.clientName}>
-                {row.clientName}
+      {rows.map((row) => (
+        <li key={row.clientId} className="space-y-1">
+          <div className="flex min-w-0 items-baseline justify-between gap-3">
+            <span className="min-w-0 truncate font-medium" title={row.clientName}>
+              {row.clientName}
+            </span>
+            <span className="shrink-0 whitespace-nowrap text-muted-foreground">
+              {formatCurrency(row.totalAmount)}
+              <span className="ml-2">
+                ({row.count} {row.count === 1 ? "quote" : "quotes"})
               </span>
-              <span className="shrink-0 whitespace-nowrap text-muted-foreground">
-                {formatCurrency(row.totalAmount)}
-                <span className="ml-2">
-                  ({row.count} {row.count === 1 ? "quote" : "quotes"})
-                </span>
-              </span>
-            </div>
-            <div className="h-2.5 w-full overflow-hidden rounded-full bg-muted">
-              <div
-                className="h-full rounded-full bg-primary"
-                style={{ width: `${width}%` }}
-                aria-hidden
-              />
-            </div>
-          </li>
-        );
-      })}
+            </span>
+          </div>
+          <Measure
+            value={row.totalAmount}
+            capacity={capacity}
+            tone="booked"
+            minFillPercent={1.5}
+            ariaLabel={`${row.clientName}: ${formatCurrency(row.totalAmount)}`}
+          />
+        </li>
+      ))}
     </ul>
   );
 }

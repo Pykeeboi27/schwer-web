@@ -70,6 +70,7 @@ export default async function ExecutiveApprovalsPage() {
       <PageHeader
         title="Executive Approvals"
         description="Review high-value quotations from Sales that require owner or executive approval. Quotations of ₱3,000,000 or above appear here when assigned to your account."
+        scope={[{ label: "Threshold", value: "≥ ₱3,000,000" }]}
       />
 
       <Panel title="Pending Quotations">

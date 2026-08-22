@@ -13,10 +13,12 @@ type PanelProps = {
 };
 
 /**
- * Tier-3 content container — chart, form, or grouped content. Flat surface
- * (`border bg-card`, no shadow); the header is a `text-base` heading with an
- * optional muted subtitle. Replaces the hand-rolled `rounded-md border bg-card
- * p-4` + `text-lg` boxes scattered across the overviews.
+ * Tier-3 content container — chart, form, or grouped content. Same surface
+ * recipe as `StatCard` and `DataCard` (`rounded-lg border bg-card shadow-xs`)
+ * so cards, panels, and KPI tiles read as one system rather than three; the
+ * header is a `text-base` heading with an optional muted subtitle. Replaces
+ * the hand-rolled `rounded-md border bg-card p-4` + `text-lg` boxes scattered
+ * across the overviews.
  */
 export function Panel({
   title,
