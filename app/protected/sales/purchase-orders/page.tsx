@@ -4,11 +4,13 @@ import { PurchaseOrdersTable } from "@/components/tables/purchase-orders-table";
 import { RealtimeRefresh } from "@/components/realtime/realtime-refresh";
 import { MarkSectionRead } from "@/components/notifications/mark-section-read";
 import { PageHeader, Panel, StatCard } from "@/components/patterns";
+import { getPeriodDateRange } from "@/lib/executive/period";
 import { getCurrentProfile } from "@/lib/profile/get-current-profile";
 import {
   canEncodeExistingPurchaseOrders,
   getSalesAccessRedirect,
 } from "@/lib/sales/access";
+import { fetchBookedPoRows, sumBookedRevenue } from "@/lib/sales/booked-revenue";
 import { listClients } from "@/lib/sales/clients";
 import { listPoPayments } from "@/lib/sales/purchase-orders";
 import { listSalesDepartmentProfiles } from "@/lib/sales/sales-people";
@@ -33,11 +35,18 @@ export default async function SalesPurchaseOrdersPage() {
     redirect(redirectPath);
   }
 
-  const [response, payments, clients, salesPeople] = await Promise.all([
+  const ytdRange = getPeriodDateRange("ytd");
+
+  const [response, payments, clients, salesPeople, bookedRows] = await Promise.all([
     fetchPurchaseOrdersAction(profile?.department ?? undefined),
     listPoPayments(),
     listClients(),
     listSalesDepartmentProfiles(),
+    // Closed/Recognized Sales share the same canonical YTD definition as every
+    // other "booked revenue" card in the app -- see lib/sales/booked-revenue.ts.
+    // The table below still shows each row's own (line-item-repriced) amount;
+    // only these two header totals are sourced from the shared definition.
+    fetchBookedPoRows(ytdRange.startDate, ytdRange.endDate),
   ]);
 
   const purchaseOrders = response.success ? (response.data ?? []) : [];
@@ -46,19 +55,13 @@ export default async function SalesPurchaseOrdersPage() {
     .map((client) => ({ id: client.id, companyName: client.companyName }))
     .sort((a, b) => a.companyName.localeCompare(b.companyName));
 
-  // Closed/recognized sales reflect fully-approved POs only.
-  const totals = purchaseOrders.reduce(
-    (accumulator, purchaseOrder) => {
-      if (purchaseOrder.status !== "approved") {
-        return accumulator;
-      }
-      return {
-        closed: accumulator.closed + purchaseOrder.poAmount,
-        recognized: accumulator.recognized + purchaseOrder.recognizedAmount,
-      };
-    },
-    { closed: 0, recognized: 0 },
-  );
+  const totals = {
+    closed: sumBookedRevenue(bookedRows),
+    recognized: bookedRows.reduce(
+      (sum, row) => sum + Number(row.recognized_amount ?? 0),
+      0,
+    ),
+  };
 
   const isSalesDepartment = profile?.department === "sales";
 
@@ -90,8 +93,15 @@ export default async function SalesPurchaseOrdersPage() {
       />
 
       <div className="grid gap-4 sm:grid-cols-2">
-        <StatCard label="Closed Sales" value={formatCurrency(totals.closed)} accent />
-        <StatCard label="Recognized Sales" value={formatCurrency(totals.recognized)} />
+        <StatCard
+          label="Closed Sales (YTD)"
+          value={formatCurrency(totals.closed)}
+          accent
+        />
+        <StatCard
+          label="Recognized Sales (YTD)"
+          value={formatCurrency(totals.recognized)}
+        />
       </div>
 
       {isSalesDepartment ? (

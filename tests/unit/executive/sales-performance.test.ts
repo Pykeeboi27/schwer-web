@@ -98,6 +98,26 @@ describe("executive sales performance helpers", () => {
     ).toBe(10);
   });
 
+  it("attributes a PO to its linked quotation's sales_person_id, not its own created_by", () => {
+    const rows: PurchaseOrderMetricRow[] = [
+      {
+        created_by: "coordinator-1",
+        po_amount: 300,
+        margin_amount: 0,
+        po_date: "2026-06-01",
+        quotation_id: "q-1",
+        quotations: { sales_person_id: "owner-a" },
+      },
+    ];
+
+    const names = new Map<string, string>([["owner-a", "Aimee"]]);
+    const result = buildSalesPerformanceFromRows(rows, names);
+
+    expect(result).toHaveLength(1);
+    expect(result[0]).toMatchObject({ ownerId: "owner-a", bookedRevenue: 300 });
+    expect(result.some((entry) => entry.ownerId === "coordinator-1")).toBe(false);
+  });
+
   it("excludes POs with no margin_percentage from the average instead of treating them as zero", () => {
     const rows: PurchaseOrderMetricRow[] = [
       {
