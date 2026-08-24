@@ -7,17 +7,10 @@ import {
   StatProgress,
 } from "@/components/patterns";
 import { getExecutiveAccessRedirect, isTargetEditor } from "@/lib/executive/access";
+import { formatCurrency } from "@/lib/executive/format";
 import { getSalesQuotaProgress } from "@/lib/executive/quotas";
 import { getCurrentProfile } from "@/lib/profile/get-current-profile";
 import { redirect } from "next/navigation";
-
-function formatCurrency(amount: number): string {
-  return new Intl.NumberFormat("en-PH", {
-    style: "currency",
-    currency: "PHP",
-    maximumFractionDigits: 0,
-  }).format(amount);
-}
 
 export default async function ExecutiveQuotasPage() {
   const profile = await getCurrentProfile();
@@ -48,20 +41,20 @@ export default async function ExecutiveQuotasPage() {
     );
   }
 
-  const withQuota = progress.filter(
+  const { entries, totalAchieved: teamAchieved, unattributedAchieved } = progress;
+  const withQuota = entries.filter(
     (entry) => entry.quotaAmount !== null && entry.quotaAmount > 0,
   );
   const teamQuota = withQuota.reduce((sum, entry) => sum + (entry.quotaAmount ?? 0), 0);
-  const teamAchieved = progress.reduce((sum, entry) => sum + entry.achieved, 0);
   const teamPercent = teamQuota > 0 ? (teamAchieved / teamQuota) * 100 : null;
 
   return (
     <div className="flex flex-col gap-6">
       <PageHeader
         title="Quotas"
-        description={`Each salesperson's ${year} annual quota, tracked against their approved purchase orders for the year.`}
+        description={`Each salesperson's ${year} annual quota, tracked against their approved purchase orders year-to-date.`}
         scope={[
-          { label: "Year", value: String(year) },
+          { label: "Period", value: "Year-to-date" },
           { label: "Source", value: "Approved purchase orders" },
         ]}
       />
@@ -72,7 +65,7 @@ export default async function ExecutiveQuotasPage() {
           value={formatCurrency(teamQuota)}
           accent
         />
-        <StatCard label="Booked this year" value={formatCurrency(teamAchieved)} />
+        <StatCard label="Booked YTD" value={formatCurrency(teamAchieved)} />
         <StatCard
           label="Team attainment"
           value={teamPercent === null ? "—" : `${Math.round(teamPercent)}%`}
@@ -96,18 +89,18 @@ export default async function ExecutiveQuotasPage() {
         title={`${year} quotas by salesperson`}
         description={
           canEdit
-            ? "Set an annual peso goal per salesperson. Progress tracks their approved purchase orders across the year."
+            ? "Set an annual peso goal per salesperson. Progress tracks their approved purchase orders year-to-date."
             : "You can view quota progress but cannot edit it."
         }
       >
-        {progress.length === 0 ? (
+        {entries.length === 0 ? (
           <EmptyState
             title="No sales staff yet"
             description="Active sales department profiles will appear here."
           />
         ) : (
           <div className="grid gap-3 lg:grid-cols-2">
-            {progress.map((entry) => (
+            {entries.map((entry) => (
               <QuotaEditorForm
                 key={entry.profileId}
                 entry={entry}
@@ -117,6 +110,21 @@ export default async function ExecutiveQuotasPage() {
             ))}
           </div>
         )}
+        {unattributedAchieved > 0 ? (
+          <div className="mt-3 flex items-center justify-between rounded-lg border border-dashed p-4 text-sm">
+            <div>
+              <p className="font-medium">Unattributed</p>
+              <p className="text-xs text-muted-foreground">
+                Approved POs with no active salesperson on the roster (e.g. a deactivated
+                user or a coordinator-entered PO). Included in the team totals above but
+                not tracked against any individual quota.
+              </p>
+            </div>
+            <p className="shrink-0 pl-4 font-semibold tabular-nums">
+              {formatCurrency(unattributedAchieved)}
+            </p>
+          </div>
+        ) : null}
       </Panel>
     </div>
   );

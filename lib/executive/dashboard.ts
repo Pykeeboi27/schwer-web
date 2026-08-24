@@ -1,5 +1,3 @@
-import { cache } from "react";
-
 import { isExecutiveDashboardViewer } from "@/lib/executive/access";
 import {
   buildMonthBuckets,
@@ -20,6 +18,13 @@ import type {
   WeeklyRevenuePoint,
 } from "@/lib/executive/types";
 import type { CurrentProfile } from "@/lib/profile/get-current-profile";
+import {
+  fetchBookedPoRows,
+  resolveBookedOwnerId,
+  sumBookedRevenue,
+  UNATTRIBUTED_OWNER_ID,
+  type BookedPoRow,
+} from "@/lib/sales/booked-revenue";
 import { getSalesDashboardCharts } from "@/lib/sales/dashboard-charts";
 import { getQuarterlyTargets } from "@/lib/executive/targets";
 import { createClient } from "@/lib/supabase/server";
@@ -29,14 +34,8 @@ export type SalesRosterEntry = {
   ownerName: string;
 };
 
-export type PurchaseOrderMetricRow = {
-  po_amount: number | string | null;
-  margin_amount: number | string | null;
-  po_date: string | null;
-  created_by?: string | null;
-  margin_percentage?: number | string | null;
-  recognized_amount?: number | string | null;
-};
+/** Alias kept for call-site/test readability -- see BookedPoRow in lib/sales/booked-revenue.ts. */
+export type PurchaseOrderMetricRow = BookedPoRow;
 
 type PurchaseOrderRange = {
   startDate: string;
@@ -130,34 +129,9 @@ function getDayFromPoDate(dateValue: string | null): number | null {
   return day;
 }
 
-// Request-scoped memoization keyed on the primitive date bounds. The executive
-// dashboard requests the same YTD range from several branches (KPI, revenue
-// breakdown, PO summary, sales performance); keying on strings — rather than the
-// fresh range object each caller passes — lets `cache()` dedupe them into a
-// single `purchase_orders` scan per distinct range.
-const fetchPurchaseOrderRowsCached = cache(
-  async (startDate: string, endDate: string): Promise<PurchaseOrderMetricRow[]> => {
-    const supabase = await createClient();
-    const { data, error } = await supabase
-      .from("purchase_orders")
-      .select(
-        "po_amount, margin_amount, po_date:approved_at, created_by, margin_percentage, recognized_amount",
-      )
-      .eq("status", "approved")
-      .gte("approved_at", startDate)
-      .lte("approved_at", `${endDate}T23:59:59.999Z`);
-
-    if (error) {
-      throw new Error("Failed to load executive dashboard purchase orders.");
-    }
-
-    return (data ?? []) as PurchaseOrderMetricRow[];
-  },
-);
-
 export const executiveDashboardQueries = {
   fetchPurchaseOrderRows(range: PurchaseOrderRange): Promise<PurchaseOrderMetricRow[]> {
-    return fetchPurchaseOrderRowsCached(range.startDate, range.endDate);
+    return fetchBookedPoRows(range.startDate, range.endDate);
   },
 
   async fetchAnnualTarget(year: number): Promise<number | null> {
@@ -250,7 +224,7 @@ export function summarizeRevenueAndMargin(rows: PurchaseOrderMetricRow[]): {
   marginAmount: number;
   weightedMarginPercent: number | null;
 } {
-  const totalPoValue = rows.reduce((sum, row) => sum + toNumber(row.po_amount), 0);
+  const totalPoValue = sumBookedRevenue(rows);
   const marginAmount = rows.reduce((sum, row) => sum + toNumber(row.margin_amount), 0);
   // "Booked Revenue" is the gross total PO value -- the same figure the sales
   // page reports as Total PO Value, and what the annual target is measured
@@ -363,7 +337,7 @@ export function buildPoSummaryFromRows(
 ): ExecutivePoSummary {
   return {
     poCount: rows.length,
-    totalPoValue: rows.reduce((sum, row) => sum + toNumber(row.po_amount), 0),
+    totalPoValue: sumBookedRevenue(rows),
     totalMarginAmount: rows.reduce((sum, row) => sum + toNumber(row.margin_amount), 0),
     totalCollectedAmount: rows.reduce(
       (sum, row) => sum + toNumber(row.recognized_amount),
@@ -404,7 +378,12 @@ export function buildSalesPerformanceFromRows(
   }
 
   for (const row of rows) {
-    const ownerId = row.created_by ? String(row.created_by) : "unassigned";
+    // Same owner resolution as the Quotas page (quotation's sales_person_id,
+    // falling back to the PO's created_by) so the two tables agree on who a
+    // PO belongs to; "unassigned" is this table's own label for that fallback.
+    const resolvedOwnerId = resolveBookedOwnerId(row);
+    const ownerId =
+      resolvedOwnerId === UNATTRIBUTED_OWNER_ID ? "unassigned" : resolvedOwnerId;
     const fallbackOwnerName = ownerId === "unassigned" ? "Unassigned" : "Unknown";
     const ownerName = ownerNameMap.get(ownerId) ?? fallbackOwnerName;
 
@@ -544,9 +523,10 @@ export async function getExecutiveSalesPerformance(
   const extraOwnerIds = Array.from(
     new Set(
       rows
-        .map((row) => row.created_by)
+        .map((row) => resolveBookedOwnerId(row))
         .filter(
-          (ownerId): ownerId is string => Boolean(ownerId) && !rosterIds.has(ownerId!),
+          (ownerId): ownerId is string =>
+            ownerId !== UNATTRIBUTED_OWNER_ID && !rosterIds.has(ownerId),
         ),
     ),
   );

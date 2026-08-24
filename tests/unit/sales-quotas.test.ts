@@ -1,64 +1,14 @@
 import { describe, expect, it } from "vitest";
 
 import {
-  attributePurchaseOrdersToSalesPerson,
   buildAverageCostingToPoDaysFromRows,
   computeQuotaPercent,
   validateQuotaAmountInput,
 } from "@/lib/executive/quotas";
 import { getQuotationAging } from "@/lib/sales/quotation-aging";
 
-describe("attributePurchaseOrdersToSalesPerson", () => {
-  it("attributes a PO to its linked quotation's salesperson", () => {
-    const rows = [{ po_amount: 100_000, created_by: "creator-1", quotation_id: "q-1" }];
-    const quotationSalesPersonMap = new Map([["q-1", "salesperson-1"]]);
-
-    const totals = attributePurchaseOrdersToSalesPerson(rows, quotationSalesPersonMap);
-
-    expect(totals.get("salesperson-1")).toBe(100_000);
-    expect(totals.has("creator-1")).toBe(false);
-  });
-
-  it("falls back to the PO's created_by when the linked quotation has no salesperson", () => {
-    const rows = [{ po_amount: 50_000, created_by: "creator-1", quotation_id: "q-1" }];
-    const quotationSalesPersonMap = new Map([["q-1", null]]);
-
-    const totals = attributePurchaseOrdersToSalesPerson(rows, quotationSalesPersonMap);
-
-    expect(totals.get("creator-1")).toBe(50_000);
-  });
-
-  it("falls back to created_by for manual POs with no linked quotation", () => {
-    const rows = [{ po_amount: 75_000, created_by: "creator-1", quotation_id: null }];
-
-    const totals = attributePurchaseOrdersToSalesPerson(rows, new Map());
-
-    expect(totals.get("creator-1")).toBe(75_000);
-  });
-
-  it("sums multiple POs attributed to the same salesperson", () => {
-    const rows = [
-      { po_amount: 100_000, created_by: "creator-1", quotation_id: "q-1" },
-      { po_amount: 200_000, created_by: "creator-2", quotation_id: "q-2" },
-    ];
-    const quotationSalesPersonMap = new Map([
-      ["q-1", "salesperson-1"],
-      ["q-2", "salesperson-1"],
-    ]);
-
-    const totals = attributePurchaseOrdersToSalesPerson(rows, quotationSalesPersonMap);
-
-    expect(totals.get("salesperson-1")).toBe(300_000);
-  });
-
-  it("skips POs with neither a quotation owner nor a created_by", () => {
-    const rows = [{ po_amount: 10_000, created_by: null, quotation_id: null }];
-
-    const totals = attributePurchaseOrdersToSalesPerson(rows, new Map());
-
-    expect(totals.size).toBe(0);
-  });
-});
+// PO-to-salesperson attribution (attributeBookedRevenue / resolveBookedOwnerId)
+// now lives in lib/sales/booked-revenue.ts -- see tests/unit/booked-revenue.test.ts.
 
 describe("computeQuotaPercent", () => {
   it("returns null when no quota is set", () => {

@@ -6,6 +6,12 @@ import {
   getCurrentProfile,
   type CurrentProfile,
 } from "@/lib/profile/get-current-profile";
+import {
+  attributeBookedRevenue,
+  fetchBookedPoRows,
+  sumBookedRevenue,
+  UNATTRIBUTED_OWNER_ID,
+} from "@/lib/sales/booked-revenue";
 import { createClient } from "@/lib/supabase/server";
 
 export type SalesQuotaRosterEntry = {
@@ -20,12 +26,6 @@ export type SalesQuotaProgress = {
   achieved: number;
   /** achieved / quotaAmount * 100, unclamped (can exceed 100). Null when no quota is set. */
   percent: number | null;
-};
-
-type ApprovedPoRow = {
-  po_amount: number | string | null;
-  created_by: string | null;
-  quotation_id: string | null;
 };
 
 function toNumber(value: number | string | null | undefined): number {
@@ -55,91 +55,26 @@ export async function getSalesRoster(): Promise<SalesQuotaRosterEntry[]> {
   return roster.map((entry) => ({ profileId: entry.ownerId, name: entry.ownerName }));
 }
 
-type ApprovedPoWithQuotationOwnerRow = {
-  po_amount: number | string | null;
-  created_by: string | null;
-  quotation_id: string | null;
-  quotations:
-    { sales_person_id: string | null } | { sales_person_id: string | null }[] | null;
-};
-
 /**
- * Fetches approved POs together with their linked quotation's
- * `sales_person_id` via an embedded join, instead of a separate follow-up
- * query resolving each distinct `quotation_id` — one round-trip instead of two.
+ * YTD booked-PO totals keyed by attributed salesperson profile id, plus the
+ * true company-wide total (matching Revenue YTD (Booked) / Total PO Value /
+ * Closed Sales) and the portion of it that couldn't be attributed to anyone
+ * on the active sales roster.
  */
-async function fetchApprovedPurchaseOrdersWithQuotationOwner(
-  startDate: string,
-  endDate: string,
-): Promise<ApprovedPoWithQuotationOwnerRow[]> {
-  const supabase = await createClient();
-  const { data, error } = await supabase
-    .from("purchase_orders")
-    .select(
-      "po_amount, created_by, quotation_id, quotations:quotation_id(sales_person_id)",
-    )
-    .eq("status", "approved")
-    .gte("approved_at", startDate)
-    .lte("approved_at", `${endDate}T23:59:59.999Z`);
+export async function getYtdPoBySalesPerson(referenceDate = new Date()): Promise<{
+  bySalesPerson: Map<string, number>;
+  totalAchieved: number;
+  unattributedAchieved: number;
+}> {
+  const ytdRange = getPeriodDateRange("ytd", referenceDate);
+  const rows = await fetchBookedPoRows(ytdRange.startDate, ytdRange.endDate);
+  const bySalesPerson = attributeBookedRevenue(rows);
 
-  if (error) {
-    throw new Error("Failed to load purchase orders for quota progress.");
-  }
-
-  return (data ?? []) as ApprovedPoWithQuotationOwnerRow[];
-}
-
-/**
- * Attributes each approved PO to a salesperson: the linked quotation's
- * `sales_person_id` when one exists, falling back to the PO's own
- * `created_by` for manually created POs with no linked quotation (or whose
- * quotation has no assigned salesperson).
- */
-export function attributePurchaseOrdersToSalesPerson(
-  rows: ApprovedPoRow[],
-  quotationSalesPersonMap: Map<string, string | null>,
-): Map<string, number> {
-  const totals = new Map<string, number>();
-
-  for (const row of rows) {
-    const quotationOwner = row.quotation_id
-      ? quotationSalesPersonMap.get(row.quotation_id)
-      : null;
-    const ownerId = quotationOwner ?? row.created_by;
-
-    if (!ownerId) {
-      continue;
-    }
-
-    totals.set(ownerId, (totals.get(ownerId) ?? 0) + toNumber(row.po_amount));
-  }
-
-  return totals;
-}
-
-/** Approved-PO totals for the given year, keyed by attributed salesperson profile id. */
-export async function getAnnualPoBySalesPerson(
-  year: number,
-): Promise<Map<string, number>> {
-  const startDate = `${year}-01-01`;
-  const endDate = `${year}-12-31`;
-
-  const rawRows = await fetchApprovedPurchaseOrdersWithQuotationOwner(startDate, endDate);
-
-  const rows: ApprovedPoRow[] = rawRows.map((row) => ({
-    po_amount: row.po_amount,
-    created_by: row.created_by,
-    quotation_id: row.quotation_id,
-  }));
-
-  const quotationSalesPersonMap = new Map<string, string | null>();
-  for (const row of rawRows) {
-    if (!row.quotation_id) continue;
-    const quotation = Array.isArray(row.quotations) ? row.quotations[0] : row.quotations;
-    quotationSalesPersonMap.set(row.quotation_id, quotation?.sales_person_id ?? null);
-  }
-
-  return attributePurchaseOrdersToSalesPerson(rows, quotationSalesPersonMap);
+  return {
+    bySalesPerson,
+    totalAchieved: sumBookedRevenue(rows),
+    unattributedAchieved: bySalesPerson.get(UNATTRIBUTED_OWNER_ID) ?? 0,
+  };
 }
 
 /** Quotas set for the given year, keyed by profile id. */
@@ -202,25 +137,37 @@ export async function upsertSalesQuota(
   }
 }
 
+export type SalesQuotaProgressResult = {
+  entries: SalesQuotaProgress[];
+  /** Sum of every entry's `achieved` plus `unattributedAchieved` -- always equals
+   *  the company-wide booked-revenue total (Revenue YTD (Booked) / Total PO
+   *  Value / Closed Sales), so this card can never read differently from those. */
+  totalAchieved: number;
+  /** Portion of totalAchieved attributed to a PO with no active-roster salesperson
+   *  (a deactivated user, a coordinator, or no owner at all) -- previously dropped
+   *  silently; now surfaced so the entries + this value reconcile to totalAchieved. */
+  unattributedAchieved: number;
+};
+
 /** Quota + achieved-vs-quota progress for every active salesperson, for the executive Quotas tab. */
 export async function getSalesQuotaProgress(
   year: number,
-  options: { viewer?: CurrentProfile | null } = {},
-): Promise<SalesQuotaProgress[]> {
+  options: { viewer?: CurrentProfile | null; referenceDate?: Date } = {},
+): Promise<SalesQuotaProgressResult> {
   if (options.viewer !== undefined && !isTargetEditor(options.viewer)) {
     throw new Error("Unauthorized sales quota access.");
   }
 
-  const [roster, quotas, achievedMap] = await Promise.all([
+  const [roster, quotas, ytd] = await Promise.all([
     getSalesRoster(),
     getSalesQuotas(year),
-    getAnnualPoBySalesPerson(year),
+    getYtdPoBySalesPerson(options.referenceDate),
   ]);
 
-  return roster
+  const entries = roster
     .map((entry) => {
       const quotaAmount = quotas.get(entry.profileId) ?? null;
-      const achieved = achievedMap.get(entry.profileId) ?? 0;
+      const achieved = ytd.bySalesPerson.get(entry.profileId) ?? 0;
 
       return {
         profileId: entry.profileId,
@@ -231,6 +178,12 @@ export async function getSalesQuotaProgress(
       };
     })
     .sort((a, b) => a.name.localeCompare(b.name));
+
+  return {
+    entries,
+    totalAchieved: ytd.totalAchieved,
+    unattributedAchieved: ytd.unattributedAchieved,
+  };
 }
 
 /** Single-person quota progress, for the sales dashboard's "My quota" card. */
@@ -239,14 +192,14 @@ export async function getMyQuotaProgress(
   year: number,
 ): Promise<SalesQuotaProgress> {
   const supabase = await createClient();
-  const [{ data: quotaRow, error: quotaError }, achievedMap] = await Promise.all([
+  const [{ data: quotaRow, error: quotaError }, ytd] = await Promise.all([
     supabase
       .from("sales_quotas")
       .select("quota_amount")
       .eq("profile_id", profileId)
       .eq("year", year)
       .maybeSingle(),
-    getAnnualPoBySalesPerson(year),
+    getYtdPoBySalesPerson(),
   ]);
 
   if (quotaError) {
@@ -254,7 +207,7 @@ export async function getMyQuotaProgress(
   }
 
   const quotaAmount = quotaRow ? toNumber(quotaRow.quota_amount) : null;
-  const achieved = achievedMap.get(profileId) ?? 0;
+  const achieved = ytd.bySalesPerson.get(profileId) ?? 0;
 
   return {
     profileId,

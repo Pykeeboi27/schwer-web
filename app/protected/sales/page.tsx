@@ -42,17 +42,17 @@ export default async function SalesDashboardPage() {
     <div className="flex flex-col gap-6">
       <PageHeader
         title="Sales Dashboard"
-        description="Snapshot of client volume, quotation pipeline, and closed vs recognized sales."
+        description="Snapshot of client volume, quotation pipeline, and year-to-date closed vs recognized sales."
       />
 
       <div className="grid gap-3 sm:grid-cols-2">
         <StatCard
-          label="My Closed Sales"
+          label="My Closed Sales (YTD)"
           value={formatCurrency(summary.myClosedSaleTotal)}
           accent
         />
         <StatCard
-          label="Company Closed Sales"
+          label="Company Closed Sales (YTD)"
           value={formatCurrency(summary.companyClosedSaleTotal)}
           accent
         />
@@ -71,7 +71,7 @@ export default async function SalesDashboardPage() {
       <div className="grid gap-3 sm:grid-cols-2">
         <StatCard label="Active Clients" value={summary.totalClients} />
         <StatCard
-          label="Recognized Sales"
+          label="Recognized Sales (YTD)"
           value={formatCurrency(summary.recognizedSaleTotal)}
         />
       </div>
