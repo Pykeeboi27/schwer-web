@@ -17,14 +17,14 @@ export function DashboardLayout({ children, sidebar }: DashboardLayoutProps) {
 
   if (!isModuleRoute) {
     return (
-      <div className="mx-auto flex w-full max-w-5xl flex-col gap-6 p-4 sm:p-6 lg:p-8">
+      <div className="mx-auto flex w-full max-w-5xl flex-col gap-8 p-4 sm:p-6 lg:p-10">
         {children}
       </div>
     );
   }
 
   return (
-    <div className="mx-auto flex w-full max-w-7xl gap-6 p-4 sm:p-6 lg:p-8 lg:gap-8">
+    <div className="mx-auto flex w-full max-w-7xl gap-6 p-4 sm:p-6 lg:gap-10 lg:p-10">
       {sidebar ?? <Sidebar />}
       <div className="min-w-0 flex-1">{children}</div>
     </div>

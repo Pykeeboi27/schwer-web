@@ -8,17 +8,17 @@ import type {
 
 /**
  * Codifies the table chrome that was hand-copied across ~10 files (executive,
- * sales, costing): a `bg-muted/40` head, `px-3 py-2` cells, and a `border-t`
+ * sales, costing): a `bg-wash` head, `px-4 py-3` cells, and a `border-t`
  * row rule. Exported as both classNames (for the many tables that need a
  * per-column width or a custom cell) and thin wrapper components (for new
  * tables). Pair with `ResponsiveTable` for the card fallback below `md`.
  */
-export const dataTableHeadClassName = "bg-muted/40 text-left";
-export const dataTableHeaderCellClassName = "px-3 py-2 font-medium";
-export const dataTableCellClassName = "px-3 py-2";
+export const dataTableHeadClassName = "bg-wash text-left";
+export const dataTableHeaderCellClassName = "px-4 py-3 font-medium";
+export const dataTableCellClassName = "px-4 py-3";
 export const dataTableRowClassName = "border-t";
 export const dataTableInteractiveRowClassName =
-  "cursor-pointer border-t transition-colors hover:bg-muted/40 focus-visible:bg-muted/40 focus-visible:outline-none";
+  "cursor-pointer border-t transition-colors hover:bg-wash focus-visible:bg-wash focus-visible:outline-none";
 
 export function DataTableHead({
   className,

@@ -8,7 +8,7 @@ export default function EngineeringLoading() {
         <Skeleton className="h-4 w-full max-w-xl" />
       </div>
 
-      <section className="grid gap-3 rounded-md border bg-card p-5 sm:grid-cols-3">
+      <section className="grid gap-4 rounded-md border bg-card p-5 sm:grid-cols-3">
         {Array.from({ length: 3 }).map((_, index) => (
           <div key={index} className="space-y-2 rounded border p-3">
             <Skeleton className="h-3 w-24" />

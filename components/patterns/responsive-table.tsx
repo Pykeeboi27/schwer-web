@@ -20,7 +20,9 @@ type ResponsiveTableProps = {
 export function ResponsiveTable({ table, cards, className }: ResponsiveTableProps) {
   return (
     <div className={className}>
-      <div className="hidden overflow-x-auto rounded-lg border md:block">{table}</div>
+      <div className="hidden overflow-x-auto rounded-lg border border-frame bg-card md:block">
+        {table}
+      </div>
       <div className="space-y-3 md:hidden">{cards}</div>
     </div>
   );
@@ -64,9 +66,9 @@ export function DataCard({
       onClick={onActivate}
       onKeyDown={interactive ? (event) => onCardKeyDown(event, onActivate!) : undefined}
       className={cn(
-        "rounded-lg border bg-card p-4 text-sm shadow-xs",
+        "rounded-lg border border-frame bg-card p-5 text-sm shadow-card",
         interactive &&
-          "cursor-pointer transition-colors hover:bg-muted/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+          "cursor-pointer transition-colors hover:bg-wash focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
         className,
       )}
     >

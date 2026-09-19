@@ -32,7 +32,7 @@ export default async function RequestForQuotationPage() {
     .sort((a, b) => a.companyName.localeCompare(b.companyName));
 
   return (
-    <div className="flex flex-col gap-6">
+    <div className="flex flex-col gap-8">
       <RealtimeRefresh tables={["quotations", "quotation_items"]} />
       <MarkSectionRead section="request_for_quotation" />
       <PageHeader

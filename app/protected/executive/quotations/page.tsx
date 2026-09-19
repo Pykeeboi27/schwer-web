@@ -26,7 +26,7 @@ export default async function ExecutiveQuotationsPage() {
   const quotations = quotationsResponse.success ? (quotationsResponse.data ?? []) : [];
 
   return (
-    <div className="flex flex-col gap-6">
+    <div className="flex flex-col gap-8">
       <RealtimeRefresh tables={["quotations", "quotation_approvals"]} />
       <PageHeader
         title="Quotations"

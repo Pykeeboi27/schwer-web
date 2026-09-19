@@ -4,7 +4,12 @@
 
 @layer base {
   :root {
-    --background: 0 0% 100%;
+    /* Surface stack: canvas (--background) -> paper (--card) -> field (--field).
+       Neutrals carry a faint cast of the brand hue (25deg, same as --primary)
+       at low saturation, so surfaces feel tied to the mark without any new
+       color entering the system. --wash is the quiet band/table-head tint,
+       --frame the tinted card border, --border the plain hairline. */
+    --background: 25 22% 96.5%;
     --foreground: 0 0% 3.9%;
     --card: 0 0% 100%;
     --card-foreground: 0 0% 3.9%;
@@ -14,14 +19,22 @@
     --primary-foreground: 0 0% 100%;
     --secondary: 220 14% 20%;
     --secondary-foreground: 0 0% 100%;
-    --muted: 0 0% 96.1%;
-    --muted-foreground: 0 0% 45.1%;
-    --accent: 0 0% 96.1%;
+    --muted: 25 12% 93%;
+    --muted-foreground: 25 4% 41%;
+    --accent: 25 12% 93%;
     --accent-foreground: 0 0% 9%;
     --destructive: 0 84% 50%;
     --destructive-foreground: 0 0% 98%;
-    --border: 0 0% 89.8%;
-    --input: 0 0% 89.8%;
+    --border: 25 8% 90%;
+    --input: 25 8% 84%;
+    --field: 25 15% 94.5%;
+    --wash: 25 45% 95%;
+    --frame: 25 35% 86%;
+    /* Inverted band (landing process rail). Separate from --secondary, which
+       flips to light gray in dark mode; the band stays dark in both themes. */
+    --band: 220 14% 20%;
+    --band-foreground: 0 0% 98%;
+    --shadow-color: 0 0% 4%;
     --ring: 25 87% 40%;
 
     /* Data tokens -- for measures/charts only. Orange (--primary) is brand
@@ -52,27 +65,33 @@
     --chart-3: 43 85% 38%;
     --chart-4: 43 74% 66%;
     --chart-5: 27 87% 67%;
-    --radius: 0.625rem;
+    --radius: 1rem;
   }
   .dark {
-    --background: 0 0% 8%;
+    --background: 25 8% 7%;
     --foreground: 0 0% 98%;
-    --card: 0 0% 11%;
+    --card: 25 6% 11%;
     --card-foreground: 0 0% 98%;
-    --popover: 0 0% 11%;
+    --popover: 25 6% 11%;
     --popover-foreground: 0 0% 98%;
     --primary: 25 90% 55%;
     --primary-foreground: 0 0% 100%;
     --secondary: 220 14% 80%;
     --secondary-foreground: 220 14% 10%;
-    --muted: 0 0% 18%;
+    --muted: 25 6% 16%;
     --muted-foreground: 0 0% 65%;
-    --accent: 0 0% 18%;
+    --accent: 25 6% 16%;
     --accent-foreground: 0 0% 98%;
     --destructive: 0 72% 50%;
     --destructive-foreground: 0 0% 98%;
-    --border: 0 0% 20%;
-    --input: 0 0% 20%;
+    --border: 25 6% 20%;
+    --input: 25 6% 26%;
+    --field: 25 8% 14%;
+    --wash: 25 20% 13%;
+    --frame: 25 15% 24%;
+    --band: 220 14% 13%;
+    --band-foreground: 0 0% 98%;
+    --shadow-color: 0 0% 0%;
     --ring: 25 90% 55%;
 
     --data-booked: 220 10% 78%;

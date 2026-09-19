@@ -17,7 +17,7 @@ export default async function SalesClientsPage() {
   const clients = await fetchClients();
 
   return (
-    <div className="flex flex-col gap-6">
+    <div className="flex flex-col gap-8">
       <PageHeader
         title="Clients"
         description="Manage client profiles, generate unique codes, and open full details from the table."

@@ -27,7 +27,7 @@ export default async function ExecutivePurchaseOrdersPage() {
   const purchaseOrders = poResponse.success ? (poResponse.data ?? []) : [];
 
   return (
-    <div className="flex flex-col gap-6">
+    <div className="flex flex-col gap-8">
       <RealtimeRefresh tables={["purchase_orders", "po_approvals"]} />
       <PageHeader
         title="Purchase Orders"

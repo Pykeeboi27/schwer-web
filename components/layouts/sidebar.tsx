@@ -23,8 +23,8 @@ export function Sidebar({ currentUserRole, unseenSections }: SidebarProps) {
   }
 
   return (
-    <aside className="hidden md:block md:w-56 md:shrink-0">
-      <div className="sticky top-20 rounded-lg border bg-card p-3 shadow-xs">
+    <aside className="hidden md:block md:w-64 md:shrink-0">
+      <div className="sticky top-24 rounded-lg border border-frame bg-card p-4 shadow-card">
         <SidebarNav config={config} pathname={pathname} unseenSections={unseenSections} />
       </div>
     </aside>

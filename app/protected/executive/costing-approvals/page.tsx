@@ -30,7 +30,7 @@ export default async function ExecutiveCostingApprovalsPage() {
     : [[], []];
 
   return (
-    <div className="flex flex-col gap-6">
+    <div className="flex flex-col gap-8">
       <RealtimeRefresh tables={["quotations", "quotation_items"]} />
       <MarkSectionRead section="costing_approvals" />
       <PageHeader

@@ -235,14 +235,14 @@ export function PurchaseOrdersTable({
       <ResponsiveTable
         table={
           <table className="w-full table-fixed text-sm">
-            <thead className="bg-muted/40 text-left">
+            <thead className="bg-wash text-left">
               <tr>
-                <th className="w-[22%] px-3 py-2 font-medium">Client</th>
-                <th className="w-[16%] px-3 py-2 font-medium">Total Amount</th>
-                <th className="w-[22%] px-3 py-2 font-medium">Progress</th>
-                <th className="w-[15%] px-3 py-2 font-medium">Authored By</th>
-                <th className="w-[12%] px-3 py-2 font-medium">Approval</th>
-                <th className="w-[13%] px-3 py-2 font-medium">Payment</th>
+                <th className="w-[22%] px-4 py-3 font-medium">Client</th>
+                <th className="w-[16%] px-4 py-3 font-medium">Total Amount</th>
+                <th className="w-[22%] px-4 py-3 font-medium">Progress</th>
+                <th className="w-[15%] px-4 py-3 font-medium">Authored By</th>
+                <th className="w-[12%] px-4 py-3 font-medium">Approval</th>
+                <th className="w-[13%] px-4 py-3 font-medium">Payment</th>
               </tr>
             </thead>
             <tbody>
@@ -254,7 +254,7 @@ export function PurchaseOrdersTable({
                 visibleRows.map((purchaseOrder) => (
                   <tr
                     key={purchaseOrder.id}
-                    className="cursor-pointer border-t hover:bg-muted/30 focus-visible:bg-muted/40 focus-visible:outline-none"
+                    className="cursor-pointer border-t hover:bg-wash focus-visible:bg-wash focus-visible:outline-none"
                     role="button"
                     tabIndex={0}
                     aria-label={`View purchase order ${purchaseOrder.poNumber}`}
@@ -265,17 +265,17 @@ export function PurchaseOrdersTable({
                       )
                     }
                   >
-                    <td className="truncate px-3 py-2" title={purchaseOrder.clientName}>
+                    <td className="truncate px-4 py-3" title={purchaseOrder.clientName}>
                       <p className="truncate">{purchaseOrder.clientName}</p>
                       <p className="truncate font-mono text-xs text-muted-foreground">
                         {purchaseOrder.poNumber} · {purchaseOrder.itemCount}{" "}
                         {purchaseOrder.itemCount === 1 ? "item" : "items"}
                       </p>
                     </td>
-                    <td className="truncate px-3 py-2">
+                    <td className="truncate px-4 py-3">
                       {formatCurrency(purchaseOrder.poAmount)}
                     </td>
-                    <td className="px-3 py-2">
+                    <td className="px-4 py-3">
                       <p className="mb-1 truncate text-xs text-muted-foreground">
                         {formatCurrency(purchaseOrder.recognizedAmount)} /{" "}
                         {formatCurrency(purchaseOrder.poAmount)}
@@ -287,13 +287,13 @@ export function PurchaseOrdersTable({
                         />
                       </div>
                     </td>
-                    <td className="truncate px-3 py-2 text-muted-foreground">
+                    <td className="truncate px-4 py-3 text-muted-foreground">
                       {purchaseOrder.createdByName}
                     </td>
-                    <td className="px-3 py-2">
+                    <td className="px-4 py-3">
                       <StatusBadge status={purchaseOrder.status} />
                     </td>
-                    <td className="px-3 py-2">
+                    <td className="px-4 py-3">
                       <StatusBadge status={purchaseOrder.paymentStatus} />
                     </td>
                   </tr>

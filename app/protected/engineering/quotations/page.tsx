@@ -38,7 +38,7 @@ export default async function EngineeringQuotationsPage() {
   }));
 
   return (
-    <div className="flex flex-col gap-6">
+    <div className="flex flex-col gap-8">
       <RealtimeRefresh tables={["quotations"]} />
       <MarkSectionRead section="engineering_quotations" />
       <PageHeader

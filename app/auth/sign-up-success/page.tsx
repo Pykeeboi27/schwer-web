@@ -13,7 +13,7 @@ export default function Page() {
     <AuthShell>
       <Card className="border-none bg-transparent shadow-none">
         <CardHeader className="px-0">
-          <CardTitle className="text-3xl font-semibold tracking-tight">
+          <CardTitle className="font-display text-3xl font-semibold tracking-tight">
             Check your email
           </CardTitle>
           <CardDescription className="text-base">Account created</CardDescription>

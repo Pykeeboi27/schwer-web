@@ -5,7 +5,7 @@ import { ReadyForPurchaseOrderTable } from "@/components/tables/ready-for-purcha
 import { ReadyForQuotationTable } from "@/components/tables/ready-for-quotation-table";
 import { RealtimeRefresh } from "@/components/realtime/realtime-refresh";
 import { MarkSectionRead } from "@/components/notifications/mark-section-read";
-import { BeamTick, PageHeader, Panel } from "@/components/patterns";
+import { BeamTick, PageHeader, Panel, StatusTile } from "@/components/patterns";
 import { getCurrentProfile } from "@/lib/profile/get-current-profile";
 import { getSalesAccessRedirect } from "@/lib/sales/access";
 import { redirect } from "next/navigation";
@@ -76,7 +76,7 @@ export default async function SalesQuotationsPage() {
   );
 
   return (
-    <div className="flex flex-col gap-6">
+    <div className="flex flex-col gap-8">
       <RealtimeRefresh tables={["quotations", "quotation_approvals"]} />
       <MarkSectionRead section="quotations" />
       <PageHeader
@@ -84,45 +84,11 @@ export default async function SalesQuotationsPage() {
         description="Quotations originate in engineering and reach this page after executive approves the costing. Add the sales details, then submit through the approval workflow."
       />
 
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        {[
-          {
-            label: "Pending",
-            value: pendingCount,
-            className:
-              "border-amber-200 bg-amber-50 dark:border-amber-900 dark:bg-amber-950/40",
-            valueClassName: "text-amber-700 dark:text-amber-300",
-          },
-          {
-            label: "Approved",
-            value: approvedCount,
-            className:
-              "border-green-200 bg-green-50 dark:border-green-900 dark:bg-green-950/40",
-            valueClassName: "text-green-700 dark:text-green-300",
-          },
-          {
-            label: "Closed",
-            value: closedCount,
-            className:
-              "border-blue-200 bg-blue-50 dark:border-blue-900 dark:bg-blue-950/40",
-            valueClassName: "text-blue-700 dark:text-blue-300",
-          },
-          {
-            label: "Rejected",
-            value: rejectedCount,
-            className: "border-red-200 bg-red-50 dark:border-red-900 dark:bg-red-950/40",
-            valueClassName: "text-red-700 dark:text-red-300",
-          },
-        ].map((item) => (
-          <div key={item.label} className={`rounded-md border p-3 ${item.className}`}>
-            <p className="text-sm text-muted-foreground">{item.label}</p>
-            <p
-              className={`mt-1 text-xl font-semibold tabular-nums ${item.valueClassName}`}
-            >
-              {item.value}
-            </p>
-          </div>
-        ))}
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <StatusTile status="pending" value={pendingCount} />
+        <StatusTile status="approved" value={approvedCount} />
+        <StatusTile status="closed" value={closedCount} />
+        <StatusTile status="rejected" value={rejectedCount} />
       </div>
 
       {isSalesDepartment ? (

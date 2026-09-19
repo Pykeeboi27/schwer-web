@@ -17,7 +17,7 @@ export function AuthShell({ children, showBackLink = true }: AuthShellProps) {
   return (
     <div className="grid min-h-svh w-full grid-rows-[auto_1fr] lg:grid-cols-[minmax(0,1fr)_minmax(0,1.3fr)] lg:grid-rows-1">
       {/* Desktop brand panel */}
-      <div className="hidden flex-col justify-between bg-secondary p-10 text-secondary-foreground lg:flex xl:p-12">
+      <div className="hidden flex-col justify-between bg-secondary p-12 text-secondary-foreground lg:flex xl:p-16">
         <Link href="/" className="inline-flex items-center gap-3">
           <SchwerLogo className="h-8" barColor="hsl(var(--secondary-foreground))" />
           <span className="text-sm font-semibold tracking-tight">
@@ -26,12 +26,12 @@ export function AuthShell({ children, showBackLink = true }: AuthShellProps) {
         </Link>
 
         <div className="space-y-5">
-          <p className="inline-flex items-center gap-2.5 text-xs font-semibold uppercase tracking-[0.22em] text-secondary-foreground/60">
+          <p className="inline-flex items-center gap-2.5 text-eyebrow uppercase text-secondary-foreground/60">
             <span className="h-4 w-1 rounded-full bg-primary" aria-hidden="true" />
             Schwer ERP Portal
           </p>
 
-          <p className="max-w-sm text-3xl font-semibold leading-[1.1] tracking-[-0.02em] xl:text-4xl">
+          <p className="max-w-md font-display text-4xl font-normal leading-[1.08] tracking-[-0.012em] xl:text-5xl">
             From costing to collection
             <span className="text-primary">.</span>
           </p>
@@ -42,7 +42,7 @@ export function AuthShell({ children, showBackLink = true }: AuthShellProps) {
         </div>
 
         <div className="space-y-6">
-          <p className="text-xs font-medium uppercase tracking-[0.22em] text-secondary-foreground/50">
+          <p className="text-eyebrow uppercase text-secondary-foreground/50">
             Engineering&ensp;&middot;&ensp;Sales&ensp;&middot;&ensp;Executive
           </p>
 

@@ -2,7 +2,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 
 export default function ExecutiveSalesLoading() {
   return (
-    <div className="flex flex-col gap-6">
+    <div className="flex flex-col gap-8">
       <Skeleton className="h-16 w-full rounded-none" />
       <Skeleton className="h-10 w-64 rounded-lg" />
       <Skeleton className="h-64 w-full rounded-lg" />

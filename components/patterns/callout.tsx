@@ -29,7 +29,7 @@ type CalloutProps = {
 export function Callout({ tone = "muted", title, children, className }: CalloutProps) {
   return (
     <div
-      className={cn("rounded-md border px-3 py-2 text-sm", TONE_CLASSES[tone], className)}
+      className={cn("rounded-md border px-4 py-3 text-sm", TONE_CLASSES[tone], className)}
     >
       {title ? <p className="font-medium">{title}</p> : null}
       {children ? <div className={cn(title && "mt-1")}>{children}</div> : null}

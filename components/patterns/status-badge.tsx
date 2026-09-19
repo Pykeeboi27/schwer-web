@@ -46,6 +46,11 @@ const STATUS_REGISTRY: Record<string, StatusMeta> = {
   overdue: { tone: "danger", label: "Overdue" },
 };
 
+/** Border/fill/text classes for a known status key (falls back to the neutral tone). */
+export function statusToneClassName(status: string): string {
+  return TONE_CLASSES[STATUS_REGISTRY[status]?.tone ?? "neutral"];
+}
+
 /** Default display label for a known status key (falls back to the key itself). */
 export function statusLabel(status: string): string {
   return STATUS_REGISTRY[status]?.label ?? status;

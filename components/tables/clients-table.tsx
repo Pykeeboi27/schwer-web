@@ -164,7 +164,7 @@ export function ClientsTable({ clients, pageSize }: ClientsTableProps) {
       <ResponsiveTable
         table={
           <table className="w-full table-fixed text-sm">
-            <thead className="bg-muted/40 text-left">
+            <thead className="bg-wash text-left">
               <tr>
                 <th className="w-[10%] px-2 py-2 font-medium">Code</th>
                 <th className="w-[24%] px-2 py-2 font-medium">Name</th>
@@ -184,7 +184,7 @@ export function ClientsTable({ clients, pageSize }: ClientsTableProps) {
                 visibleClients.map((client) => (
                   <tr
                     key={client.id}
-                    className="cursor-pointer border-t hover:bg-muted/30 focus-visible:bg-muted/40 focus-visible:outline-none"
+                    className="cursor-pointer border-t hover:bg-wash focus-visible:bg-wash focus-visible:outline-none"
                     role="button"
                     tabIndex={0}
                     aria-label={`View client details for ${client.companyName}`}

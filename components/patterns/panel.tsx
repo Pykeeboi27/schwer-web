@@ -14,7 +14,7 @@ type PanelProps = {
 
 /**
  * Tier-3 content container — chart, form, or grouped content. Same surface
- * recipe as `StatCard` and `DataCard` (`rounded-lg border bg-card shadow-xs`)
+ * recipe as `StatCard` and `DataCard` (`rounded-lg border border-frame bg-card shadow-card`)
  * so cards, panels, and KPI tiles read as one system rather than three; the
  * header is a `text-base` heading with an optional muted subtitle. Replaces
  * the hand-rolled `rounded-md border bg-card p-4` + `text-lg` boxes scattered
@@ -31,9 +31,11 @@ export function Panel({
   const hasHeader = Boolean(title || description || actions);
 
   return (
-    <section className={cn("rounded-lg border bg-card shadow-xs", className)}>
+    <section
+      className={cn("rounded-lg border border-frame bg-card shadow-card", className)}
+    >
       {hasHeader ? (
-        <div className="flex flex-col gap-2 border-b px-4 py-3 sm:flex-row sm:items-start sm:justify-between sm:px-5 sm:py-4">
+        <div className="flex flex-col gap-2 border-b px-5 py-4 sm:flex-row sm:items-start sm:justify-between sm:px-6 sm:py-5">
           <div className="space-y-1">
             {title ? <h2 className="text-base font-semibold">{title}</h2> : null}
             {description ? (
@@ -45,7 +47,7 @@ export function Panel({
           ) : null}
         </div>
       ) : null}
-      <div className={cn(padded && "p-4 sm:p-5")}>{children}</div>
+      <div className={cn(padded && "p-5 sm:p-6")}>{children}</div>
     </section>
   );
 }

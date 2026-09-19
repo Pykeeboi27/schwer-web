@@ -1322,7 +1322,7 @@ export function QuotationDetailsDialog({
         )}
 
         {canEnterClientPo ? (
-          <div className="mt-5 space-y-3 rounded-md border border-blue-200 bg-blue-50/50 p-4 text-sm dark:border-blue-900 dark:bg-blue-950/30">
+          <div className="mt-5 space-y-3 rounded-md border border-status-info/30 bg-status-info/10 p-4 text-sm">
             <div>
               <h3 className="text-base font-semibold">Client Confirmed?</h3>
               <p className="text-xs text-muted-foreground">

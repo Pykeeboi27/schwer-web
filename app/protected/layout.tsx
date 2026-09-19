@@ -16,10 +16,10 @@ export default function ProtectedLayout({ children }: { children: React.ReactNod
   return (
     <main className="flex min-h-screen flex-col">
       <div className="flex w-full flex-1 flex-col">
-        <nav className="sticky top-0 z-30 w-full border-b bg-background/80 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+        <nav className="sticky top-0 z-30 w-full rounded-b-2xl bg-card shadow-card">
           {/* Brand beam: the logo/PageHeader bar motif at global scale. */}
           <div aria-hidden="true" className="h-0.5 w-full bg-primary" />
-          <div className="mx-auto flex h-16 w-full max-w-7xl items-center justify-between gap-3 px-4 sm:px-6">
+          <div className="mx-auto flex h-20 w-full max-w-7xl items-center justify-between gap-3 px-4 sm:px-6">
             <div className="flex min-w-0 items-center gap-1">
               <Suspense fallback={null}>
                 <MobileNavSlot />

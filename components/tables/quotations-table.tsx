@@ -190,16 +190,16 @@ export function QuotationsTable({
       <ResponsiveTable
         table={
           <table className="w-full min-w-[860px] text-sm">
-            <thead className="bg-muted/40 text-left">
+            <thead className="bg-wash text-left">
               <tr>
-                <th className="px-3 py-2 font-medium">ID</th>
-                <th className="px-3 py-2 font-medium">Client Name</th>
-                <th className="px-3 py-2 font-medium">Items</th>
-                <th className="px-3 py-2 font-medium">Amount</th>
-                <th className="px-3 py-2 font-medium">Authored By</th>
-                <th className="px-3 py-2 font-medium">Status</th>
-                <th className="px-3 py-2 font-medium">Date</th>
-                <th className="px-3 py-2 font-medium">Days since costing</th>
+                <th className="px-4 py-3 font-medium">ID</th>
+                <th className="px-4 py-3 font-medium">Client Name</th>
+                <th className="px-4 py-3 font-medium">Items</th>
+                <th className="px-4 py-3 font-medium">Amount</th>
+                <th className="px-4 py-3 font-medium">Authored By</th>
+                <th className="px-4 py-3 font-medium">Status</th>
+                <th className="px-4 py-3 font-medium">Date</th>
+                <th className="px-4 py-3 font-medium">Days since costing</th>
               </tr>
             </thead>
             <tbody>
@@ -211,7 +211,7 @@ export function QuotationsTable({
                 filteredAndSorted.map((quotation) => (
                   <tr
                     key={quotation.id}
-                    className="cursor-pointer border-t hover:bg-muted/30 focus-visible:bg-muted/40 focus-visible:outline-none"
+                    className="cursor-pointer border-t hover:bg-wash focus-visible:bg-wash focus-visible:outline-none"
                     role="button"
                     tabIndex={0}
                     aria-label={`View quotation ${quotation.quotationNumber}`}
@@ -220,24 +220,24 @@ export function QuotationsTable({
                       onRowKeyDown(event, () => setSelectedQuotation(quotation))
                     }
                   >
-                    <td className="px-3 py-2 font-mono text-xs">
+                    <td className="px-4 py-3 font-mono text-xs">
                       {quotation.quotationNumber}
                     </td>
-                    <td className="px-3 py-2">{quotation.clientName}</td>
-                    <td className="px-3 py-2 text-muted-foreground">
+                    <td className="px-4 py-3">{quotation.clientName}</td>
+                    <td className="px-4 py-3 text-muted-foreground">
                       {quotation.items.length}
                     </td>
-                    <td className="px-3 py-2">{formatCurrency(quotation.amount)}</td>
-                    <td className="px-3 py-2 text-muted-foreground">
+                    <td className="px-4 py-3">{formatCurrency(quotation.amount)}</td>
+                    <td className="px-4 py-3 text-muted-foreground">
                       {quotation.salesPersonName ?? "Unassigned"}
                     </td>
-                    <td className="px-3 py-2">
+                    <td className="px-4 py-3">
                       <StatusBadge status={quotation.status} />
                     </td>
-                    <td className="px-3 py-2">
+                    <td className="px-4 py-3">
                       {new Date(quotation.createdAt).toLocaleDateString()}
                     </td>
-                    <td className="px-3 py-2 text-muted-foreground">
+                    <td className="px-4 py-3 text-muted-foreground">
                       {agingLabel(quotation)}
                     </td>
                   </tr>

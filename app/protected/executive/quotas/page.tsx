@@ -29,7 +29,7 @@ export default async function ExecutiveQuotasPage() {
     progress = await getSalesQuotaProgress(year);
   } catch {
     return (
-      <div className="flex flex-col gap-6">
+      <div className="flex flex-col gap-8">
         <PageHeader title="Quotas" description="Unable to load sales quotas." />
         <Panel>
           <EmptyState
@@ -49,7 +49,7 @@ export default async function ExecutiveQuotasPage() {
   const teamPercent = teamQuota > 0 ? (teamAchieved / teamQuota) * 100 : null;
 
   return (
-    <div className="flex flex-col gap-6">
+    <div className="flex flex-col gap-8">
       <PageHeader
         title="Quotas"
         description={`Each salesperson's ${year} annual quota, tracked against their approved purchase orders year-to-date.`}
@@ -59,7 +59,7 @@ export default async function ExecutiveQuotasPage() {
         ]}
       />
 
-      <div className="grid gap-3 sm:grid-cols-3">
+      <div className="grid gap-4 sm:grid-cols-3">
         <StatCard
           label={`Team quota — ${year}`}
           value={formatCurrency(teamQuota)}
@@ -99,7 +99,7 @@ export default async function ExecutiveQuotasPage() {
             description="Active sales department profiles will appear here."
           />
         ) : (
-          <div className="grid gap-3 lg:grid-cols-2">
+          <div className="grid gap-4 lg:grid-cols-2">
             {entries.map((entry) => (
               <QuotaEditorForm
                 key={entry.profileId}

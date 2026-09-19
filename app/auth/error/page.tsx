@@ -41,7 +41,7 @@ export default function Page({
     <AuthShell>
       <Card className="border-none bg-transparent shadow-none">
         <CardHeader className="px-0">
-          <CardTitle className="text-2xl font-semibold tracking-tight">
+          <CardTitle className="font-display text-2xl font-semibold tracking-tight">
             Sorry, something went wrong.
           </CardTitle>
         </CardHeader>

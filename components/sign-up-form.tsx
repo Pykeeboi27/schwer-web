@@ -52,7 +52,7 @@ export function SignUpForm({
     <div className={cn("flex flex-col gap-6", className)} {...props}>
       <Card className="border-none bg-transparent shadow-none">
         <CardHeader className="px-0">
-          <CardTitle className="text-3xl font-semibold tracking-tight">
+          <CardTitle className="font-display text-3xl font-semibold tracking-tight">
             Create account
           </CardTitle>
           <CardDescription className="text-base">
@@ -156,7 +156,7 @@ export function SignUpForm({
                 </div>
               )}
 
-              <Button type="submit" className="w-full text-base" disabled={isPending}>
+              <Button type="submit" size="cta" className="w-full" disabled={isPending}>
                 {isPending ? "Creating account…" : "Create account"}
               </Button>
             </div>
