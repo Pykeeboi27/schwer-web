@@ -24,6 +24,7 @@ const baseData: PurchaseOrderWorksheetData = {
       // sellingAmount 660,000 (600,000 + 10% margin) is already VAT-inclusive
       // (VAT is resolved within cost/margin), so it prints as-is on the line.
       sellingAmount: 660_000,
+      unitSellingAmount: 330_000,
       marginAmount: 60_000,
       bankAmount: 0,
       sopAmount: 0,
@@ -39,6 +40,7 @@ const baseData: PurchaseOrderWorksheetData = {
       // sellingAmount 165,000 (150,000 + 10% margin) is already VAT-inclusive,
       // printed as-is on the line.
       sellingAmount: 165_000,
+      unitSellingAmount: 165_000,
       marginAmount: 15_000,
       bankAmount: 0,
       sopAmount: 0,
@@ -216,14 +218,16 @@ describe("generatePurchaseOrderWorksheetXlsx", () => {
     }
   });
 
-  it("fills item rows with description, qty, unit cost, and the (already VAT-inclusive) selling price", async () => {
+  it("fills item rows with description, qty, unit selling price, and the (already VAT-inclusive) line selling price", async () => {
     const { sheet } = await generateSheet(baseData);
     expect(sheet.match(/<c r="D20"[^>]*>([\s\S]*?)<\/c>/)?.[1]).toContain(
       "Fire pump unit",
     );
     expect(sheet.match(/<c r="M20"[^>]*>([\s\S]*?)<\/c>/)?.[1]).toContain("<v>2</v>");
+    // Unit selling price (330,000) x qty (2) = the line's selling price
+    // (660,000) below -- P x M = R.
     expect(sheet.match(/<c r="P20"[^>]*>([\s\S]*?)<\/c>/)?.[1]).toContain(
-      "<v>300000</v>",
+      "<v>330000</v>",
     );
     // sellingAmount prints as-is -- nothing added on top.
     expect(sheet.match(/<c r="R20"[^>]*>([\s\S]*?)<\/c>/)?.[1]).toContain(
@@ -244,6 +248,7 @@ describe("generatePurchaseOrderWorksheetXlsx", () => {
       unitCost: 100,
       lineTotal: 100,
       sellingAmount: 100,
+      unitSellingAmount: 100,
       marginAmount: 0,
       bankAmount: 0,
       sopAmount: 0,

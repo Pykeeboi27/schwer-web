@@ -287,7 +287,7 @@ export function EncodeExistingPoDialog({
       bankPercentage: Number(item.bankPercentage) || 0,
       sopPercentage: Number(item.sopPercentage) || 0,
     });
-    return { ...item, unitCost, directCost, ...pricing };
+    return { ...item, directCost, ...pricing, unitCost };
   });
 
   const pricing = computeAggregatePricing(pricedItems);
@@ -754,6 +754,7 @@ export function EncodeExistingPoDialog({
                         <th className="py-1 pr-3 font-medium">Margin %</th>
                         <th className="py-1 pr-3 font-medium">Bank %</th>
                         <th className="py-1 pr-3 font-medium">SOP %</th>
+                        <th className="py-1 pr-3 font-medium">Unit Selling</th>
                         <th className="py-1 font-medium">Selling</th>
                       </tr>
                     </thead>
@@ -804,6 +805,9 @@ export function EncodeExistingPoDialog({
                               disabled={!hasUnequalMargins}
                               className="h-7 w-20 text-xs"
                             />
+                          </td>
+                          <td className="py-1 pr-3">
+                            {formatCurrency(item.unitSellingAmount)}
                           </td>
                           <td className="py-1">{formatCurrency(item.sellingAmount)}</td>
                         </tr>
@@ -874,6 +878,10 @@ export function EncodeExistingPoDialog({
                           className="ml-auto h-8 w-24 text-right text-xs"
                         />
                       }
+                    />
+                    <DataField
+                      label="Unit Selling"
+                      value={formatCurrency(item.unitSellingAmount)}
                     />
                     <DataField
                       label="Selling"
@@ -982,6 +990,7 @@ export function EncodeExistingPoDialog({
                         <th className="py-1 pr-3 font-medium">Qty</th>
                         <th className="py-1 pr-3 font-medium">Raw Cost</th>
                         <th className="py-1 pr-3 font-medium">Margin %</th>
+                        <th className="py-1 pr-3 font-medium">Unit Selling</th>
                         <th className="py-1 font-medium">Selling</th>
                       </tr>
                     </thead>
@@ -996,6 +1005,9 @@ export function EncodeExistingPoDialog({
                             {formatCurrency(Number(item.rawCost) || 0)}
                           </td>
                           <td className="py-1 pr-3">{item.marginPercentage}%</td>
+                          <td className="py-1 pr-3">
+                            {formatCurrency(item.unitSellingAmount)}
+                          </td>
                           <td className="py-1">{formatCurrency(item.sellingAmount)}</td>
                         </tr>
                       ))}
@@ -1017,6 +1029,10 @@ export function EncodeExistingPoDialog({
                       value={formatCurrency(Number(item.rawCost) || 0)}
                     />
                     <DataField label="Margin %" value={`${item.marginPercentage}%`} />
+                    <DataField
+                      label="Unit Selling"
+                      value={formatCurrency(item.unitSellingAmount)}
+                    />
                     <DataField
                       label="Selling"
                       value={formatCurrency(item.sellingAmount)}

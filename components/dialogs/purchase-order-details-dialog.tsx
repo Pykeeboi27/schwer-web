@@ -772,6 +772,7 @@ export function PurchaseOrderDetailsDialog({
                       <th className="py-1 pr-3 font-medium">Margin Amt</th>
                       <th className="py-1 pr-3 font-medium">Bank Amt</th>
                       <th className="py-1 pr-3 font-medium">SOP Amt</th>
+                      <th className="py-1 pr-3 font-medium">Unit Selling</th>
                       <th className="py-1 font-medium">Selling</th>
                     </tr>
                   </thead>
@@ -810,6 +811,11 @@ export function PurchaseOrderDetailsDialog({
                         <td className="py-1 pr-3">
                           {item.sopAmount === null ? "—" : formatCurrency(item.sopAmount)}
                         </td>
+                        <td className="py-1 pr-3">
+                          {item.unitSellingAmount === null
+                            ? "—"
+                            : formatCurrency(item.unitSellingAmount)}
+                        </td>
                         <td className="py-1">
                           {item.sellingAmount === null
                             ? "—"
@@ -822,7 +828,9 @@ export function PurchaseOrderDetailsDialog({
                         Total
                       </td>
                       <td className="py-1 pr-3">
-                        {formatCurrency(purchaseOrder.cost ?? 0)}
+                        {formatCurrency(
+                          purchaseOrder.pricedCost ?? purchaseOrder.cost ?? 0,
+                        )}
                       </td>
                       <td className="py-1 pr-3" colSpan={3}></td>
                       <td className="py-1 pr-3">
@@ -834,6 +842,7 @@ export function PurchaseOrderDetailsDialog({
                       <td className="py-1 pr-3">
                         {formatCurrency(purchaseOrder.sopAmount ?? 0)}
                       </td>
+                      <td className="py-1 pr-3"></td>
                       <td className="py-1">
                         {formatCurrency(
                           purchaseOrder.sellingAmount ?? purchaseOrder.poAmount,
@@ -952,6 +961,7 @@ export function PurchaseOrderDetailsDialog({
                             <th className="py-1 pr-3 font-medium">Margin Amt</th>
                             <th className="py-1 pr-3 font-medium">Bank Amt</th>
                             <th className="py-1 pr-3 font-medium">SOP Amt</th>
+                            <th className="py-1 pr-3 font-medium">Unit Selling</th>
                             <th className="py-1 font-medium">Selling</th>
                           </tr>
                         </thead>
@@ -1018,6 +1028,9 @@ export function PurchaseOrderDetailsDialog({
                               <td className="py-1 pr-3">
                                 {formatCurrency(item.sopAmount)}
                               </td>
+                              <td className="py-1 pr-3">
+                                {formatCurrency(item.unitSellingAmount)}
+                              </td>
                               <td className="py-1">
                                 {formatCurrency(item.sellingAmount)}
                               </td>
@@ -1042,6 +1055,7 @@ export function PurchaseOrderDetailsDialog({
                             <td className="py-1 pr-3">
                               {formatCurrency(pricingPreview.sopAmount)}
                             </td>
+                            <td className="py-1 pr-3"></td>
                             <td className="py-1">
                               {formatCurrency(pricingPreview.sellingAmount)}
                             </td>
@@ -1136,7 +1150,7 @@ export function PurchaseOrderDetailsDialog({
                       Per-item breakdown is on the Line Items tab.
                     </p>
                     <PricingBreakdown
-                      directCost={purchaseOrder.cost ?? 0}
+                      directCost={purchaseOrder.pricedCost ?? purchaseOrder.cost ?? 0}
                       marginAmount={purchaseOrder.marginAmount ?? 0}
                       bankAmount={purchaseOrder.bankAmount ?? 0}
                       sopAmount={purchaseOrder.sopAmount ?? 0}

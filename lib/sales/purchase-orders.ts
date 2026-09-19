@@ -34,6 +34,8 @@ export type SalesPurchaseOrderItem = {
   sopPercentage: number | null;
   sopAmount: number | null;
   sellingAmount: number | null;
+  /** Per-unit selling price, rounded to the centavo -- unitSellingAmount * quantity === sellingAmount exactly. Null when unpriced, matching sellingAmount's null semantics. */
+  unitSellingAmount: number | null;
 };
 
 export type SalesPurchaseOrder = {
@@ -47,6 +49,8 @@ export type SalesPurchaseOrder = {
   subject: string;
   poAmount: number;
   cost: number | null;
+  /** SUM of directCost across priced items only (excludes unpriced items), matching the amounts repriced.aggregate rolls up. Null when no item is priced, so callers can fall back to `cost`. */
+  pricedCost: number | null;
   items: SalesPurchaseOrderItem[];
   marginPercentage: number | null;
   marginAmount: number | null;
@@ -265,10 +269,21 @@ export async function listPurchaseOrders(): Promise<SalesPurchaseOrder[]> {
       })),
     );
 
-    const items = storedItems.map((item, index) => ({
-      ...item,
-      ...repriced.items[index],
-    }));
+    // repriced.items[index].unitCost is directCost/quantity re-derived from
+    // the unrounded line_total -- deliberately not merged in below so it
+    // doesn't clobber the item's own (rounded, human-set) unit_cost display
+    // value; only the four amount fields plus unitSellingAmount are taken.
+    const items = storedItems.map((item, index) => {
+      const r = repriced.items[index];
+      return {
+        ...item,
+        marginAmount: r.marginAmount,
+        bankAmount: r.bankAmount,
+        sopAmount: r.sopAmount,
+        sellingAmount: r.sellingAmount,
+        unitSellingAmount: r.unitSellingAmount,
+      };
+    });
 
     return {
       id: row.id,
@@ -284,6 +299,7 @@ export async function listPurchaseOrders(): Promise<SalesPurchaseOrder[]> {
         ? repriced.aggregate.sellingAmount
         : Number(row.po_amount),
       cost: numberOrNull(row.cost),
+      pricedCost: repriced.aggregate ? repriced.aggregate.directCost : null,
       items,
       marginPercentage: numberOrNull(row.margin_percentage),
       marginAmount: repriced.aggregate
@@ -1208,12 +1224,12 @@ export async function encodeExistingPurchaseOrder(
       description: item.description,
       quantity: item.quantity,
       rawCost: item.rawCost,
-      unitCost,
       directCost,
       marginPercentage: item.marginPercentage,
       bankPercentage: item.bankPercentage,
       sopPercentage: item.sopPercentage,
       ...pricing,
+      unitCost,
     };
   });
 

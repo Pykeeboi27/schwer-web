@@ -5,7 +5,8 @@ import {
   computeSalesPricing,
   computeVatBreakdown,
   repriceStoredItems,
-  type SalesPricing,
+  round2,
+  type SalesPricingAmounts,
 } from "@/lib/sales/pricing";
 
 describe("computeSalesPricing", () => {
@@ -27,6 +28,8 @@ describe("computeSalesPricing", () => {
       bankAmount: 55.56,
       sopAmount: 23.33,
       sellingAmount: 1190,
+      unitCost: 1000,
+      unitSellingAmount: 1190,
     });
   });
 
@@ -41,8 +44,108 @@ describe("computeSalesPricing", () => {
 
     // Unit cost = 3333.33; Selling = 3333.33 / 0.75 = 4444.44 (exact, no
     // rounding up), then scaled back up by the 30 quantity.
+    expect(result.unitSellingAmount).toBe(4444.44);
     expect(result.sellingAmount).toBe(133333.2);
     expect(result.marginAmount).toBe(33333.3);
+  });
+
+  it("rounds the per-unit selling price to the centavo before scaling by quantity, so unit price x qty reconciles with a per-unit costing sheet", () => {
+    // Unit cost = 3333.33 / 3 = 1111.11; unit selling = 1111.11 / 0.85 =
+    // 1307.1882... -> rounds to 1307.19. The OLD behavior (round only the
+    // line total) gave 3921.56 here -- one centavo short of 1307.19 * 3.
+    const result = computeSalesPricing({
+      directCost: 3333.33,
+      quantity: 3,
+      marginPercentage: 15,
+      bankPercentage: 0,
+      sopPercentage: 0,
+    });
+
+    expect(result.unitSellingAmount).toBe(1307.19);
+    expect(result.sellingAmount).toBe(3921.57);
+    expect(result.marginAmount).toBe(588.24);
+    expect(round2(result.unitSellingAmount * 3)).toBe(result.sellingAmount);
+  });
+
+  it("guarantees unitSellingAmount * quantity === sellingAmount exactly across awkward cost/qty/percentage combinations", () => {
+    const quantities = [3, 7, 11, 13];
+    const costs = [1000.33, 285000.67, 12345.01];
+    const percentageSets: Array<[number, number, number]> = [
+      [15, 0, 0],
+      [10, 5, 2],
+      [33.33, 7, 0.25],
+    ];
+
+    for (const quantity of quantities) {
+      for (const cost of costs) {
+        for (const [marginPercentage, bankPercentage, sopPercentage] of percentageSets) {
+          const result = computeSalesPricing({
+            directCost: cost,
+            quantity,
+            marginPercentage,
+            bankPercentage,
+            sopPercentage,
+          });
+
+          expect(round2(result.unitSellingAmount * quantity)).toBe(result.sellingAmount);
+        }
+      }
+    }
+  });
+
+  it("leaves no rounding residual: directCost + margin + bank + sop === sellingAmount exactly", () => {
+    const quantities = [1, 2.5, 3, 7, 11, 13];
+    const costs = [1000.33, 285000.67, 12345.01];
+    const percentageSets: Array<[number, number, number]> = [
+      [15, 0, 0],
+      [10, 5, 2],
+      [33.33, 7, 0.25],
+    ];
+
+    for (const quantity of quantities) {
+      for (const cost of costs) {
+        for (const [marginPercentage, bankPercentage, sopPercentage] of percentageSets) {
+          const result = computeSalesPricing({
+            directCost: cost,
+            quantity,
+            marginPercentage,
+            bankPercentage,
+            sopPercentage,
+          });
+
+          expect(
+            round2(cost + result.marginAmount + result.bankAmount + result.sopAmount),
+          ).toBe(result.sellingAmount);
+        }
+      }
+    }
+  });
+
+  it("keeps both invariants for a fractional quantity", () => {
+    const result = computeSalesPricing({
+      directCost: 2500,
+      quantity: 2.5,
+      marginPercentage: 20,
+      bankPercentage: 3,
+      sopPercentage: 1,
+    });
+
+    expect(round2(result.unitSellingAmount * 2.5)).toBe(result.sellingAmount);
+    expect(
+      round2(2500 + result.marginAmount + result.bankAmount + result.sopAmount),
+    ).toBe(result.sellingAmount);
+  });
+
+  it("reports unitCost as directCost / quantity", () => {
+    const result = computeSalesPricing({
+      directCost: 3333.33,
+      quantity: 3,
+      marginPercentage: 0,
+      bankPercentage: 0,
+      sopPercentage: 0,
+    });
+
+    expect(result.unitCost).toBe(3333.33 / 3);
   });
 
   it("defaults to quantity 1 when quantity is omitted or invalid", () => {
@@ -77,6 +180,8 @@ describe("computeSalesPricing", () => {
       bankAmount: 0,
       sopAmount: 0,
       sellingAmount: 0,
+      unitCost: 0,
+      unitSellingAmount: 0,
     });
   });
 
@@ -93,14 +198,13 @@ describe("computeSalesPricing", () => {
     expect(result.sellingAmount).toBe(500);
   });
 
-  it("rounds a margin amount that lands exactly on a centavo boundary correctly, despite floating-point noise", () => {
-    // Unit cost = 2/3 = 0.6666...; Selling = 0.6666.../0.64 = 1.041666...;
-    // unitMargin = 0.375 exactly; marginAmount = 0.375 * 3 = 1.125 exactly --
-    // but 1.125 isn't exactly representable in binary floating point, so the
-    // raw JS value is 1.1249999999999996. Naive `Math.round(n * 100) / 100`
-    // rounds that down to 1.12; the true value (1.125) should round up to
-    // 1.13 under standard round-half-up, matching what a real spreadsheet's
-    // ROUND(1.125, 2) produces.
+  it("derives marginAmount from the rounded per-unit selling price, not the unrounded exact value", () => {
+    // Unit cost = 2/3 = 0.6666...; unit selling = 0.6666.../0.64 =
+    // 1.041666... -> rounds to 1.04 (the per-unit rounding this change
+    // introduces). Line selling = 1.04 * 3 = 3.12, so marginAmount =
+    // 3.12 - 2 = 1.12. This used to be 1.13 under the old round-the-line-
+    // total-only convention (1.0416666... * 3 = 3.125, rounds to 3.13); the
+    // new value is what a per-unit costing sheet would produce.
     const result = computeSalesPricing({
       directCost: 2,
       quantity: 3,
@@ -109,7 +213,8 @@ describe("computeSalesPricing", () => {
       sopPercentage: 0,
     });
 
-    expect(result.marginAmount).toBe(1.13);
+    expect(result.marginAmount).toBe(1.12);
+    expect(result.sellingAmount).toBe(3.12);
   });
 
   it("clamps a margin% of 100 or more instead of dividing by zero", () => {
@@ -251,6 +356,8 @@ describe("repriceStoredItems", () => {
       bankAmount: null,
       sopAmount: null,
       sellingAmount: null,
+      unitCost: null,
+      unitSellingAmount: null,
     });
     expect(aggregate).toBeNull();
   });
@@ -302,7 +409,7 @@ describe("repriceStoredItems", () => {
 
 describe("computeVatBreakdown", () => {
   it("extracts the 12% VAT already embedded in each amount, without adding anything to the total", () => {
-    const pricing: SalesPricing = {
+    const pricing: SalesPricingAmounts = {
       marginAmount: 100,
       bankAmount: 50,
       sopAmount: 20,
@@ -323,7 +430,7 @@ describe("computeVatBreakdown", () => {
   });
 
   it("returns zeroed VAT when there are no taxable components", () => {
-    const pricing: SalesPricing = {
+    const pricing: SalesPricingAmounts = {
       marginAmount: 0,
       bankAmount: 0,
       sopAmount: 0,
@@ -339,5 +446,21 @@ describe("computeVatBreakdown", () => {
       sopVat: 0,
       grandTotal: 800,
     });
+  });
+});
+
+describe("round2", () => {
+  it("rounds a value that lands exactly on a centavo boundary correctly, despite floating-point noise", () => {
+    // 1.125 isn't exactly representable in binary floating point -- the raw
+    // JS value is 1.1249999999999996. Naive `Math.round(n * 100) / 100`
+    // rounds that down to 1.12; round2's toPrecision(12) pre-snap recovers
+    // the true value (1.125) and rounds it up to 1.13 under standard
+    // round-half-up, matching what a real spreadsheet's ROUND(1.125, 2)
+    // produces.
+    expect(round2(1.125)).toBe(1.13);
+  });
+
+  it("normalizes negative zero to zero", () => {
+    expect(round2(-0)).toBe(0);
   });
 });

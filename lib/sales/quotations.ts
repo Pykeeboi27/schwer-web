@@ -21,6 +21,8 @@ export type SalesQuotationItem = {
   sopPercentage: number | null;
   sopAmount: number | null;
   sellingAmount: number | null;
+  /** Per-unit selling price, rounded to the centavo -- unitSellingAmount * quantity === sellingAmount exactly. Null when unpriced, matching sellingAmount's null semantics. */
+  unitSellingAmount: number | null;
 };
 
 export type SalesQuotation = {
@@ -31,6 +33,8 @@ export type SalesQuotation = {
   subject: string;
   amount: number;
   cost: number | null;
+  /** SUM of directCost across priced items only (excludes unpriced items), matching the amounts repriced.aggregate rolls up. Null when no item is priced, so callers can fall back to `cost`. Use this instead of `cost` alongside marginAmount/bankAmount/sopAmount/sellingAmount so a mixed priced/unpriced quotation still foots exactly. */
+  pricedCost: number | null;
   items: SalesQuotationItem[];
   googleDriveLink: string | null;
   notes: string | null;
@@ -523,10 +527,21 @@ export async function listSalesQuotations(): Promise<SalesQuotation[]> {
       })),
     );
 
-    const items = storedItems.map((item, index) => ({
-      ...item,
-      ...repriced.items[index],
-    }));
+    // repriced.items[index].unitCost is directCost/quantity re-derived from
+    // the unrounded line_total -- deliberately not merged in below so it
+    // doesn't clobber the item's own (rounded, human-set) unit_cost display
+    // value; only the four amount fields plus unitSellingAmount are taken.
+    const items = storedItems.map((item, index) => {
+      const r = repriced.items[index];
+      return {
+        ...item,
+        marginAmount: r.marginAmount,
+        bankAmount: r.bankAmount,
+        sopAmount: r.sopAmount,
+        sellingAmount: r.sellingAmount,
+        unitSellingAmount: r.unitSellingAmount,
+      };
+    });
 
     return {
       id: row.id,
@@ -536,6 +551,7 @@ export async function listSalesQuotations(): Promise<SalesQuotation[]> {
       subject: row.subject,
       amount: repriced.aggregate ? repriced.aggregate.sellingAmount : Number(row.amount),
       cost: row.cost === null ? null : Number(row.cost),
+      pricedCost: repriced.aggregate ? repriced.aggregate.directCost : null,
       items,
       googleDriveLink: row.google_drive_link,
       notes: row.notes,

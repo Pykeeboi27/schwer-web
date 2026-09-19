@@ -792,6 +792,7 @@ export function QuotationDetailsDialog({
                       <th className="py-1 pr-3 font-medium">Margin Amt</th>
                       <th className="py-1 pr-3 font-medium">Bank Amt</th>
                       <th className="py-1 pr-3 font-medium">SOP Amt</th>
+                      <th className="py-1 pr-3 font-medium">Unit Selling</th>
                       <th className="py-1 font-medium">Selling</th>
                     </tr>
                   </thead>
@@ -846,6 +847,9 @@ export function QuotationDetailsDialog({
                         <td className="py-1 pr-3">{formatCurrency(item.marginAmount)}</td>
                         <td className="py-1 pr-3">{formatCurrency(item.bankAmount)}</td>
                         <td className="py-1 pr-3">{formatCurrency(item.sopAmount)}</td>
+                        <td className="py-1 pr-3">
+                          {formatCurrency(item.unitSellingAmount)}
+                        </td>
                         <td className="py-1">{formatCurrency(item.sellingAmount)}</td>
                       </tr>
                     ))}
@@ -862,6 +866,7 @@ export function QuotationDetailsDialog({
                       </td>
                       <td className="py-1 pr-3">{formatCurrency(pricing.bankAmount)}</td>
                       <td className="py-1 pr-3">{formatCurrency(pricing.sopAmount)}</td>
+                      <td className="py-1 pr-3"></td>
                       <td className="py-1">{formatCurrency(pricing.sellingAmount)}</td>
                     </tr>
                   </tfoot>
@@ -940,6 +945,10 @@ export function QuotationDetailsDialog({
                   />
                   <DataField label="Bank Amt" value={formatCurrency(item.bankAmount)} />
                   <DataField label="SOP Amt" value={formatCurrency(item.sopAmount)} />
+                  <DataField
+                    label="Unit Selling"
+                    value={formatCurrency(item.unitSellingAmount)}
+                  />
                   <DataField
                     label="Selling"
                     value={formatCurrency(item.sellingAmount)}
@@ -1125,6 +1134,7 @@ export function QuotationDetailsDialog({
                           <th className="py-1 pr-3 font-medium">Margin Amt</th>
                           <th className="py-1 pr-3 font-medium">Bank Amt</th>
                           <th className="py-1 pr-3 font-medium">SOP Amt</th>
+                          <th className="py-1 pr-3 font-medium">Unit Selling</th>
                           <th className="py-1 font-medium">Selling</th>
                         </tr>
                       </thead>
@@ -1161,6 +1171,11 @@ export function QuotationDetailsDialog({
                                 ? "—"
                                 : formatCurrency(item.sopAmount)}
                             </td>
+                            <td className="py-1 pr-3">
+                              {item.unitSellingAmount === null
+                                ? "—"
+                                : formatCurrency(item.unitSellingAmount)}
+                            </td>
                             <td className="py-1">
                               {item.sellingAmount === null
                                 ? "—"
@@ -1173,7 +1188,7 @@ export function QuotationDetailsDialog({
                         <tr className="border-t font-semibold">
                           <td className="py-1 pr-3">Total</td>
                           <td className="py-1 pr-3">
-                            {formatCurrency(quotation.cost ?? 0)}
+                            {formatCurrency(quotation.pricedCost ?? quotation.cost ?? 0)}
                           </td>
                           <td className="py-1 pr-3" colSpan={3}></td>
                           <td className="py-1 pr-3">
@@ -1185,6 +1200,7 @@ export function QuotationDetailsDialog({
                           <td className="py-1 pr-3">
                             {formatCurrency(quotation.sopAmount ?? 0)}
                           </td>
+                          <td className="py-1 pr-3"></td>
                           <td className="py-1">
                             {formatCurrency(quotation.sellingAmount ?? quotation.amount)}
                           </td>
@@ -1238,6 +1254,14 @@ export function QuotationDetailsDialog({
                         }
                       />
                       <DataField
+                        label="Unit Selling"
+                        value={
+                          item.unitSellingAmount === null
+                            ? "—"
+                            : formatCurrency(item.unitSellingAmount)
+                        }
+                      />
+                      <DataField
                         label="Selling"
                         value={
                           item.sellingAmount === null
@@ -1254,7 +1278,7 @@ export function QuotationDetailsDialog({
 
             <dl className="mt-5 grid gap-3 rounded-md border bg-muted/20 p-4 text-sm">
               <PricingBreakdown
-                directCost={quotation.cost ?? 0}
+                directCost={quotation.pricedCost ?? quotation.cost ?? 0}
                 marginAmount={quotation.marginAmount ?? 0}
                 bankAmount={quotation.bankAmount ?? 0}
                 sopAmount={quotation.sopAmount ?? 0}
