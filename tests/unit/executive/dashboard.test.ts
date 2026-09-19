@@ -25,8 +25,20 @@ import type { CurrentProfile } from "@/lib/profile/get-current-profile";
 const referenceDate = new Date(2026, 4, 16); // May 2026
 
 const rows: PurchaseOrderMetricRow[] = [
-  { po_amount: 200, margin_amount: 40, po_date: "2026-05-03", created_by: "o1" },
-  { po_amount: 100, margin_amount: 10, po_date: "2026-01-15", created_by: "o2" },
+  {
+    po_amount: 200,
+    margin_amount: 40,
+    po_date: "2026-05-03",
+    created_by: "o1",
+    quotation_id: null,
+  },
+  {
+    po_amount: 100,
+    margin_amount: 10,
+    po_date: "2026-01-15",
+    created_by: "o2",
+    quotation_id: null,
+  },
 ];
 
 const viewer: CurrentProfile = {

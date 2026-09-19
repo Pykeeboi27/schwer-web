@@ -8,14 +8,27 @@ import {
 describe("executive sales performance helpers", () => {
   it("ranks owners by booked revenue and applies tie-break on owner name", () => {
     const rows: PurchaseOrderMetricRow[] = [
-      { created_by: "owner-a", po_amount: 250, margin_amount: 50, po_date: "2026-01-10" },
+      {
+        created_by: "owner-a",
+        po_amount: 250,
+        margin_amount: 50,
+        po_date: "2026-01-10",
+        quotation_id: null,
+      },
       {
         created_by: "owner-b",
         po_amount: 400,
         margin_amount: 120,
         po_date: "2026-01-11",
+        quotation_id: null,
       },
-      { created_by: "owner-c", po_amount: 250, margin_amount: 40, po_date: "2026-01-12" },
+      {
+        created_by: "owner-c",
+        po_amount: 250,
+        margin_amount: 40,
+        po_date: "2026-01-12",
+        quotation_id: null,
+      },
     ];
 
     const names = new Map<string, string>([
@@ -35,12 +48,19 @@ describe("executive sales performance helpers", () => {
 
   it("uses fallback labels when owner name cannot be resolved", () => {
     const rows: PurchaseOrderMetricRow[] = [
-      { created_by: null, po_amount: 100, margin_amount: 10, po_date: "2026-02-01" },
+      {
+        created_by: null,
+        po_amount: 100,
+        margin_amount: 10,
+        po_date: "2026-02-01",
+        quotation_id: null,
+      },
       {
         created_by: "abc12345-ffff",
         po_amount: 200,
         margin_amount: 20,
         po_date: "2026-02-02",
+        quotation_id: null,
       },
     ];
 
@@ -56,7 +76,13 @@ describe("executive sales performance helpers", () => {
 
   it("seeds every roster owner at zero revenue so inactive salespeople still appear", () => {
     const rows: PurchaseOrderMetricRow[] = [
-      { created_by: "owner-a", po_amount: 500, margin_amount: 50, po_date: "2026-03-01" },
+      {
+        created_by: "owner-a",
+        po_amount: 500,
+        margin_amount: 50,
+        po_date: "2026-03-01",
+        quotation_id: null,
+      },
     ];
 
     const names = new Map<string, string>([["owner-a", "aimee"]]);
@@ -79,6 +105,7 @@ describe("executive sales performance helpers", () => {
         margin_amount: 150,
         po_date: "2026-04-01",
         margin_percentage: 15,
+        quotation_id: null,
       },
       {
         created_by: "owner-a",
@@ -86,6 +113,7 @@ describe("executive sales performance helpers", () => {
         margin_amount: 5,
         po_date: "2026-04-02",
         margin_percentage: 5,
+        quotation_id: null,
       },
     ];
 
@@ -126,6 +154,7 @@ describe("executive sales performance helpers", () => {
         margin_amount: 200,
         po_date: "2026-05-01",
         margin_percentage: 20,
+        quotation_id: null,
       },
       {
         created_by: "owner-a",
@@ -133,6 +162,7 @@ describe("executive sales performance helpers", () => {
         margin_amount: 50,
         po_date: "2026-05-02",
         margin_percentage: null,
+        quotation_id: null,
       },
     ];
 
