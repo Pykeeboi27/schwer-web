@@ -104,9 +104,13 @@
       "Bash(git --no-pager diff --stat)",
       "Bash(git --no-pager diff --cached --stat)",
       "Bash(git --no-pager diff --cached -- tailwind.config.ts components/patterns/index.ts)",
-      "Bash(git --no-pager diff --cached -- components/patterns/stat-card.tsx components/patterns/status-badge.tsx components/patterns/panel.tsx components/patterns/callout.tsx)"
+      "Bash(git --no-pager diff --cached -- components/patterns/stat-card.tsx components/patterns/status-badge.tsx components/patterns/panel.tsx components/patterns/callout.tsx)",
+      "Bash(npm view *)",
+      "Bash(npm ls *)"
     ]
   },
   "enableAllProjectMcpServers": true,
-  "enabledMcpjsonServers": ["supabase"]
+  "enabledMcpjsonServers": [
+    "supabase"
+  ]
 }
