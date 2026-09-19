@@ -12,21 +12,39 @@
  * formula computed in Excel.
  */
 export const round2 = (n: number) => Math.round(Number(n.toPrecision(12)) * 100) / 100;
+
+/**
+ * Ceilings to the nearest ₱100, first cleaning up binary floating-point
+ * noise the same way `round2` does -- otherwise a value that should land
+ * exactly on a clean hundred (e.g. 7600.00) could compute as
+ * 7599.9999999999998 / 100 and ceiling to 7700 instead of staying at 7600.
+ */
+export const ceilToHundred = (n: number) =>
+  Math.ceil(Number(n.toPrecision(12)) / 100) * 100;
 const VAT_RATE = 0.12;
 
 /** The four pre-VAT line amounts -- what an aggregate or a VAT breakdown needs. Excludes the per-unit fields, which only make sense for a single line. */
 export type SalesPricingAmounts = {
   marginAmount: number;
   bankAmount: number;
+  /** Includes the rounding bump (sellingAmount - the exact pre-ceiling total) when the selling price is ceiling'd -- see computeSalesPricing's doc comment. */
   sopAmount: number;
-  /** cost + margin + bank + sop -- pre-VAT, computed per unit then scaled by quantity. */
+  /** cost + margin + bank + sop -- pre-VAT, computed per unit then scaled by quantity, then ceiling'd to the nearest ₱100. */
   sellingAmount: number;
 };
 
 export type SalesPricing = SalesPricingAmounts & {
   /** directCost / quantity. Not necessarily a clean 2dp figure until the cost side is also rounded per-unit (see lib/engineering/landed-cost.ts). */
   unitCost: number;
-  /** The per-unit selling price, rounded to the centavo. unitSellingAmount * quantity === sellingAmount exactly -- this is the figure a manual costing sheet cross-checks against. */
+  /**
+   * The exact per-unit selling price, rounded only to the centavo -- kept
+   * unrounded-to-the-hundred on purpose, since a per-unit price landing on a
+   * clean ₱100 would badly distort prices on inexpensive items. This is
+   * what feeds the "Unit Selling" column and the worksheet's unit-price
+   * column. Because `sellingAmount` below is ceiling'd to the nearest ₱100,
+   * `unitSellingAmount * quantity` generally does NOT equal `sellingAmount`
+   * -- the same tension the original costing worksheet always had.
+   */
   unitSellingAmount: number;
 };
 
@@ -37,19 +55,23 @@ export type SalesPricing = SalesPricingAmounts & {
  *   2. Bank% and SOP% compound sequentially on top of the running total
  *      (bank on cost+margin, SOP on cost+margin+bank), not independently off
  *      raw cost.
- * Unlike the source worksheet, the final selling price is NOT rounded up to
- * the nearest ₱100 -- it's the exact cost+margin+bank+sop total, per product
- * decision to show precise figures instead of the spreadsheet's ceiling rule.
+ *   3. The final line selling price is rounded UP to the nearest ₱100 (e.g.
+ *      7562.79 -> 7600.00), matching the source worksheet's ceiling rule --
+ *      per product decision, this is now applied per line item, and the
+ *      resulting bump (sellingAmount minus the exact pre-ceiling total) is
+ *      folded entirely into sopAmount, so directCost + margin + bank + sop
+ *      still sums exactly to the ceiling'd sellingAmount.
  *
- * Rounds the per-unit cumulative subtotals to the centavo FIRST, then scales
- * each by quantity, then derives the margin/bank/sop components as
- * telescoping differences between consecutive rounded running totals
- * (lineCost -> lineAfterMargin -> lineAfterBank -> sellingAmount). This
- * guarantees unitSellingAmount * quantity === sellingAmount exactly (so it
- * reconciles with a costing sheet that works per-unit), and guarantees
+ * Rounds the per-unit cumulative subtotals to the centavo first, then scales
+ * each by quantity, then derives the margin/bank components as telescoping
+ * differences between consecutive rounded running totals (lineCost ->
+ * lineAfterMargin -> lineAfterBank), and sopAmount as the remainder up to
+ * the final ceiling'd sellingAmount. This guarantees
  * directCost + margin + bank + sop === sellingAmount exactly, by
  * construction rather than by luck -- there is no leftover rounding residual
- * to display or explain.
+ * to display or explain. unitSellingAmount (the exact per-unit price) is
+ * NOT scaled from the ceiling'd total, so it no longer multiplies out to
+ * sellingAmount except by coincidence -- see its own doc comment above.
  */
 export function computeSalesPricing(input: {
   /** Line total (quantity x unit cost) -- the same figure used everywhere else on the quotation/PO. */
@@ -80,12 +102,18 @@ export function computeSalesPricing(input: {
 
   const lineAfterMargin = round2(unitAfterMargin * quantity);
   const lineAfterBank = round2(unitAfterBank * quantity);
-  const sellingAmount = round2(unitSellingAmount * quantity);
+  const exactSellingAmount = round2(unitSellingAmount * quantity);
+
+  // The client's rule: the printed/stored Selling price always rounds UP to
+  // the nearest ₱100. The gap this opens up versus the exact waterfall total
+  // is folded entirely into sopAmount so the parts keep summing exactly.
+  const sellingAmount = ceilToHundred(exactSellingAmount);
+  const sopBump = round2(sellingAmount - exactSellingAmount);
 
   return {
     marginAmount: round2(lineAfterMargin - lineCost),
     bankAmount: round2(lineAfterBank - lineAfterMargin),
-    sopAmount: round2(sellingAmount - lineAfterBank),
+    sopAmount: round2(exactSellingAmount - lineAfterBank + sopBump),
     sellingAmount,
     unitCost,
     unitSellingAmount,
@@ -255,7 +283,10 @@ export type VatBreakdown = {
  * 1.12 = net, amount - net = VAT) -- it does not charge anything extra.
  * `grandTotal` is just `pricing.sellingAmount` unchanged; this exists purely
  * to break an already-final total into its net/VAT components for display
- * and worksheet printing.
+ * and worksheet printing. Note pricing.sopAmount may include the ₱100
+ * ceiling-rounding bump computeSalesPricing folds into it -- that bump gets
+ * decomposed into net/VAT along with the rest of sopAmount, same as any
+ * other peso of it.
  */
 export function computeVatBreakdown(pricing: SalesPricingAmounts): VatBreakdown {
   const decompose = (amount: number) => {
