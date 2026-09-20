@@ -544,14 +544,17 @@ describe("updatePurchaseOrderDetails", () => {
     expect(updatePayload).toMatchObject({
       // Margin is gross margin ON the selling price: Selling = 700000 / (1 - 0.10)
       // = 777777.78, so margin_amount is 77777.78, not 70000, and the blended
-      // margin_percentage (77777.78 / 700000) comes back as 11.11.
+      // margin_percentage (77777.78 / 700000) comes back as 11.11. margin_amount
+      // is untouched by the ceiling step below.
       margin_percentage: 11.11,
       margin_amount: 77777.78,
-      // The exact total, not rounded up to the nearest 100.
-      selling_amount: 777777.78,
+      // The exact total (777777.78) isn't a multiple of 100, so it ceilings
+      // up to 777800.00 (the 22.22 bump folds into sop_amount, not asserted
+      // here).
+      selling_amount: 777800,
       // VAT is already resolved within cost/margin (see computeSalesPricing) --
       // po_amount is just selling_amount, nothing added on top.
-      po_amount: 777777.78,
+      po_amount: 777800,
       client_po_number: "CPO-1",
       quotation_reference: "Q-1",
     });

@@ -11,8 +11,20 @@ import {
 describe("executive KPI metric helpers", () => {
   it("computes weighted margin and totals", () => {
     const rows: PurchaseOrderMetricRow[] = [
-      { po_amount: 100, margin_amount: 20, po_date: "2026-01-10" },
-      { po_amount: 300, margin_amount: 30, po_date: "2026-01-20" },
+      {
+        po_amount: 100,
+        margin_amount: 20,
+        po_date: "2026-01-10",
+        created_by: null,
+        quotation_id: null,
+      },
+      {
+        po_amount: 300,
+        margin_amount: 30,
+        po_date: "2026-01-20",
+        created_by: null,
+        quotation_id: null,
+      },
     ];
 
     const summary = summarizeRevenueAndMargin(rows);
@@ -25,8 +37,20 @@ describe("executive KPI metric helpers", () => {
 
   it("builds KPI summary with annual target delta", () => {
     const rows: PurchaseOrderMetricRow[] = [
-      { po_amount: 250, margin_amount: 50, po_date: "2026-02-01" },
-      { po_amount: 150, margin_amount: 30, po_date: "2026-03-01" },
+      {
+        po_amount: 250,
+        margin_amount: 50,
+        po_date: "2026-02-01",
+        created_by: null,
+        quotation_id: null,
+      },
+      {
+        po_amount: 150,
+        margin_amount: 30,
+        po_date: "2026-03-01",
+        created_by: null,
+        quotation_id: null,
+      },
     ];
 
     const kpis = buildKpiSummaryFromRows(rows, 500);
@@ -40,7 +64,13 @@ describe("executive KPI metric helpers", () => {
 
   it("returns null weighted margin when booked revenue is zero", () => {
     const rows: PurchaseOrderMetricRow[] = [
-      { po_amount: 0, margin_amount: 0, po_date: "2026-04-01" },
+      {
+        po_amount: 0,
+        margin_amount: 0,
+        po_date: "2026-04-01",
+        created_by: null,
+        quotation_id: null,
+      },
     ];
 
     const kpis = buildKpiSummaryFromRows(rows, null);
@@ -54,14 +84,30 @@ describe("executive KPI metric helpers", () => {
 describe("buildPoSummaryFromRows", () => {
   it("counts rows and totals PO, margin, and collected amounts, coercing strings and nulls", () => {
     const rows: PurchaseOrderMetricRow[] = [
-      { po_amount: 100, margin_amount: 20, po_date: "2026-01-10", recognized_amount: 60 },
+      {
+        po_amount: 100,
+        margin_amount: 20,
+        po_date: "2026-01-10",
+        recognized_amount: 60,
+        created_by: null,
+        quotation_id: null,
+      },
       {
         po_amount: "250",
         margin_amount: "30",
         po_date: "2026-02-10",
         recognized_amount: "250",
+        created_by: null,
+        quotation_id: null,
       },
-      { po_amount: null, margin_amount: null, po_date: null, recognized_amount: null },
+      {
+        po_amount: null,
+        margin_amount: null,
+        po_date: null,
+        recognized_amount: null,
+        created_by: null,
+        quotation_id: null,
+      },
     ];
 
     expect(buildPoSummaryFromRows(rows)).toEqual({
@@ -87,13 +133,43 @@ describe("buildRevenueBreakdownFromRows", () => {
     const referenceDate = new Date(2026, 4, 16); // May 2026 (month 5)
 
     const rowsForYear: PurchaseOrderMetricRow[] = [
-      { po_amount: 100, margin_amount: 0, po_date: "2026-01-15" }, // Jan / Q1
-      { po_amount: 200, margin_amount: 0, po_date: "2026-05-03" }, // May / Q2 / week 1
-      { po_amount: 50, margin_amount: 0, po_date: "2026-05-20" }, // May / Q2 / week 3
+      {
+        po_amount: 100,
+        margin_amount: 0,
+        po_date: "2026-01-15",
+        created_by: null,
+        quotation_id: null,
+      }, // Jan / Q1
+      {
+        po_amount: 200,
+        margin_amount: 0,
+        po_date: "2026-05-03",
+        created_by: null,
+        quotation_id: null,
+      }, // May / Q2 / week 1
+      {
+        po_amount: 50,
+        margin_amount: 0,
+        po_date: "2026-05-20",
+        created_by: null,
+        quotation_id: null,
+      }, // May / Q2 / week 3
     ];
     const rowsForYtd: PurchaseOrderMetricRow[] = [
-      { po_amount: 100, margin_amount: 0, po_date: "2026-01-15" },
-      { po_amount: 250, margin_amount: 0, po_date: "2026-05-03" },
+      {
+        po_amount: 100,
+        margin_amount: 0,
+        po_date: "2026-01-15",
+        created_by: null,
+        quotation_id: null,
+      },
+      {
+        po_amount: 250,
+        margin_amount: 0,
+        po_date: "2026-05-03",
+        created_by: null,
+        quotation_id: null,
+      },
     ];
 
     const breakdown = buildRevenueBreakdownFromRows(
@@ -127,8 +203,20 @@ describe("buildRevenueBreakdownFromRows", () => {
 
     const breakdown = buildRevenueBreakdownFromRows(
       [
-        { po_amount: 999, margin_amount: 0, po_date: null },
-        { po_amount: 999, margin_amount: 0, po_date: "bad" },
+        {
+          po_amount: 999,
+          margin_amount: 0,
+          po_date: null,
+          created_by: null,
+          quotation_id: null,
+        },
+        {
+          po_amount: 999,
+          margin_amount: 0,
+          po_date: "bad",
+          created_by: null,
+          quotation_id: null,
+        },
       ],
       [],
       referenceDate,

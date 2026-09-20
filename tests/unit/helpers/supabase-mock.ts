@@ -1,4 +1,13 @@
-import { vi } from "vitest";
+import { vi, type Mock } from "vitest";
+
+/**
+ * Bare `AnyMock` resolves to `Mock<Procedure | Constructable>`
+ * (the generic's constraint, since there's no call site to infer T from) --
+ * that union isn't directly callable, so every mocked method needs an
+ * explicit generic here instead.
+ */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any -- mocks here are reassigned per-test with varying signatures/return types; a concrete signature would be wrong for most callers.
+type AnyMock = Mock<(...args: any[]) => any>;
 
 /**
  * A minimal, reusable mock of the Supabase server client for unit-testing the
@@ -44,7 +53,7 @@ const CHAIN_METHODS = [
   "range",
 ] as const;
 
-export type QueryBuilderMock = Record<string, ReturnType<typeof vi.fn>> & {
+export type QueryBuilderMock = Record<string, AnyMock> & {
   then: (
     onFulfilled: (value: QueryResult) => unknown,
     onRejected?: (reason: unknown) => unknown,
@@ -94,15 +103,15 @@ export type SupabaseMockConfig = {
 };
 
 export type SupabaseMock = {
-  from: ReturnType<typeof vi.fn>;
-  rpc: ReturnType<typeof vi.fn>;
+  from: AnyMock;
+  rpc: AnyMock;
   auth: {
-    getUser: ReturnType<typeof vi.fn>;
-    getClaims: ReturnType<typeof vi.fn>;
-    signUp: ReturnType<typeof vi.fn>;
-    signInWithPassword: ReturnType<typeof vi.fn>;
-    updateUser: ReturnType<typeof vi.fn>;
-    signOut: ReturnType<typeof vi.fn>;
+    getUser: AnyMock;
+    getClaims: AnyMock;
+    signUp: AnyMock;
+    signInWithPassword: AnyMock;
+    updateUser: AnyMock;
+    signOut: AnyMock;
   };
 };
 

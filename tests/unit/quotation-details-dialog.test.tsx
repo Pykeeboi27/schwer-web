@@ -41,6 +41,7 @@ function buildQuotation(
     subject: "Cable trays",
     amount: 0,
     cost: 1000,
+    pricedCost: null,
     items: [
       {
         id: "i1",
@@ -55,6 +56,7 @@ function buildQuotation(
         sopPercentage: null,
         sopAmount: null,
         sellingAmount: null,
+        unitSellingAmount: null,
         ...itemOverrides,
       },
     ],

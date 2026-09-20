@@ -149,6 +149,7 @@ export async function generatePurchaseOrderWorksheetXlsx(
             unitCost: null,
             lineTotal: 0,
             sellingAmount: 0,
+            unitSellingAmount: 0,
             marginAmount: 0,
             bankAmount: 0,
             sopAmount: 0,
@@ -161,6 +162,10 @@ export async function generatePurchaseOrderWorksheetXlsx(
   const itemSelling = (item: (typeof items)[number]) =>
     item.sellingAmount ?? item.lineTotal;
   const totalSelling = items.reduce((sum, item) => sum + itemSelling(item), 0);
+  // Falls back to unit cost for legacy unpriced items (no selling price to
+  // show), matching itemSelling's fallback to lineTotal for the same case.
+  const itemUnitSelling = (item: (typeof items)[number]) =>
+    item.unitSellingAmount ?? item.unitCost ?? 0;
 
   // Title
   sheet.setString("I2", `SALES WORKSHEET No. ${data.poNumber}`);
@@ -193,16 +198,17 @@ export async function generatePurchaseOrderWorksheetXlsx(
   sheet.setString("C15", data.sector ?? ""); // Market Segment
   sheet.setString("D16", data.notes ?? ""); // Special Instructions
 
-  // Item rows (20-41). Columns: D=description, M=qty, P=unit cost,
-  // R=VAT-inclusive selling price. The Item # (A), Item Code (B), and Unit
-  // (O) columns have no source data and are left blank. The grand total is
-  // the sum of every line's VAT-inclusive selling price (not just the 22
-  // printed rows), so it stays correct even for POs with more items than fit.
+  // Item rows (20-41). Columns: D=description, M=qty, P=unit VAT-inclusive
+  // selling price, R=line VAT-inclusive selling price (so M x P = R). The
+  // Item # (A), Item Code (B), and Unit (O) columns have no source data and
+  // are left blank. The grand total is the sum of every line's VAT-inclusive
+  // selling price (not just the 22 printed rows), so it stays correct even
+  // for POs with more items than fit.
   items.slice(0, ITEM_ROW_COUNT).forEach((item, index) => {
     const row = ITEM_START_ROW + index;
     sheet.setString(`D${row}`, item.description);
     sheet.setNumber(`M${row}`, item.quantity);
-    sheet.setNumber(`P${row}`, item.unitCost);
+    sheet.setNumber(`P${row}`, itemUnitSelling(item));
     sheet.setNumber(`R${row}`, itemSelling(item));
   });
 

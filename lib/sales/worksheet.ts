@@ -26,6 +26,8 @@ export type PurchaseOrderWorksheetItem = {
    * per-item pricing feature shipped -- the worksheet falls back to lineTotal.
    */
   sellingAmount: number | null;
+  /** Per-unit selling price, rounded to the centavo -- unitSellingAmount * quantity === sellingAmount exactly. Null under the same conditions as sellingAmount. */
+  unitSellingAmount: number | null;
   marginAmount: number | null;
   bankAmount: number | null;
   sopAmount: number | null;
@@ -150,10 +152,21 @@ export async function getPurchaseOrderWorksheetData(
     })),
   );
 
-  const items = storedItems.map((item, index) => ({
-    ...item,
-    ...repriced.items[index],
-  }));
+  // repriced.items[index].unitCost is directCost/quantity re-derived from
+  // the unrounded line_total -- deliberately not merged in below so it
+  // doesn't clobber the item's own (rounded, human-set) unit_cost display
+  // value; only the four amount fields plus unitSellingAmount are taken.
+  const items = storedItems.map((item, index) => {
+    const r = repriced.items[index];
+    return {
+      ...item,
+      marginAmount: r.marginAmount,
+      bankAmount: r.bankAmount,
+      sopAmount: r.sopAmount,
+      sellingAmount: r.sellingAmount,
+      unitSellingAmount: r.unitSellingAmount,
+    };
+  });
 
   return {
     id: po.id,

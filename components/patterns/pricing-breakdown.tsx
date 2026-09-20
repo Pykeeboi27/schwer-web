@@ -19,6 +19,14 @@ type PricingBreakdownProps = {
  * unit costs), so sellingAmount IS the final total, nothing gets added on
  * top of it here. sellingAmount is not rounded up to the nearest ₱100 (the
  * source worksheet's rule) -- it's the exact total, to the centavo.
+ *
+ * directCost + marginAmount + bankAmount + sopAmount always foots exactly to
+ * sellingAmount -- computeSalesPricing derives the three amounts as
+ * telescoping differences between rounded running per-unit totals, so there
+ * is no rounding residual to show here (as long as callers pass a directCost
+ * that matches the same aggregate the other four amounts were rolled up
+ * from -- e.g. `pricedCost`, not the record's raw `cost`, when some items on
+ * the record are still unpriced).
  */
 export function PricingBreakdown({
   directCost,
@@ -28,12 +36,6 @@ export function PricingBreakdown({
   sellingAmount,
   className,
 }: PricingBreakdownProps) {
-  // sellingAmount is rounded once (to the centavo) from the exact per-unit
-  // sum, while the components above are each rounded independently -- so
-  // they can differ from sellingAmount by a centavo or two. This surfaces
-  // that residual, not a deliberate rounding rule.
-  const sumOfParts = directCost + marginAmount + bankAmount + sopAmount;
-  const rounding = sellingAmount - sumOfParts;
   const vat = computeVatBreakdown({ marginAmount, bankAmount, sopAmount, sellingAmount });
   const totalVat = vat.marginVat + vat.bankVat + vat.sopVat;
   const netOfVat = sellingAmount - totalVat;
@@ -60,12 +62,6 @@ export function PricingBreakdown({
         <div className="flex justify-between text-muted-foreground">
           <span>+ SOP</span>
           <span>{formatCurrency(sopAmount)}</span>
-        </div>
-      ) : null}
-      {Math.abs(rounding) >= 0.01 ? (
-        <div className="flex justify-between text-muted-foreground">
-          <span>Rounding</span>
-          <span>{formatCurrency(rounding)}</span>
         </div>
       ) : null}
       <div className="flex justify-between border-t pt-1 font-semibold">

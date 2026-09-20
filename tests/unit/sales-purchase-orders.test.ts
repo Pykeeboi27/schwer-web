@@ -236,8 +236,11 @@ describe("listPurchaseOrders", () => {
 
     const [po] = await listPurchaseOrders();
 
-    expect(po.items[0].sopAmount).toBeCloseTo(21375, 2);
-    expect(po.sopAmount).toBeCloseTo(21375, 2);
+    // Exact pre-ceiling sop is 21375 (not the old flat-formula 14250); the
+    // exact line total (448875) isn't a multiple of 100, so it ceilings to
+    // 448900, and that 25 bump folds into sopAmount (21375 -> 21400).
+    expect(po.items[0].sopAmount).toBeCloseTo(21400, 2);
+    expect(po.sopAmount).toBeCloseTo(21400, 2);
     expect(po.poAmount).toBeCloseTo(po.items[0].sellingAmount!, 2);
   });
 

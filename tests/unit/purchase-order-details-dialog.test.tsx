@@ -45,6 +45,7 @@ function buildPurchaseOrder(
     subject: "Cable trays",
     poAmount: 0,
     cost: 1000,
+    pricedCost: null,
     items: [
       {
         id: "i1",
@@ -59,6 +60,7 @@ function buildPurchaseOrder(
         sopPercentage: null,
         sopAmount: null,
         sellingAmount: null,
+        unitSellingAmount: null,
         ...itemOverrides,
       },
     ],

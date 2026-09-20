@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 // env.ts reads process.env at module-load time, so each scenario needs a fresh
 // module instance (vi.resetModules) after setting process.env, rather than a
