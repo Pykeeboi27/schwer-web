@@ -26,7 +26,7 @@ export type PurchaseOrderWorksheetItem = {
    * per-item pricing feature shipped -- the worksheet falls back to lineTotal.
    */
   sellingAmount: number | null;
-  /** Per-unit selling price, rounded to the centavo -- unitSellingAmount * quantity === sellingAmount exactly. Null under the same conditions as sellingAmount. */
+  /** Per-unit selling price, rounded UP to the nearest ₱100 -- unitSellingAmount * quantity === sellingAmount exactly. Null under the same conditions as sellingAmount. */
   unitSellingAmount: number | null;
   marginAmount: number | null;
   bankAmount: number | null;

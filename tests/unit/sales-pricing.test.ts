@@ -23,16 +23,17 @@ describe("computeSalesPricing", () => {
     // Selling = 1000 / (1 - 0.10) = 1111.111... -> margin = 111.11
     // Bank = 1111.111... * 0.05 = 55.555... (on top of cost+margin)
     // Sop  = (1111.111... + 55.555...) * 0.02 = 23.333... (on top of cost+margin+bank)
-    // Exact pre-ceiling total is 1190.00, which is NOT a multiple of 100, so
-    // it ceilings up to 1200.00; the 10.00 bump folds entirely into sopAmount
-    // (23.33 -> 33.33). marginAmount/bankAmount are untouched by the ceiling.
+    // Exact per-unit total is 1190.00, which is NOT a multiple of 100, so the
+    // unit price ceilings up to 1200.00; with quantity 1 the line follows it
+    // and the 10.00 bump folds entirely into sopAmount (23.33 -> 33.33).
+    // marginAmount/bankAmount are untouched by the ceiling.
     expect(result).toEqual({
       marginAmount: 111.11,
       bankAmount: 55.56,
       sopAmount: 33.33,
       sellingAmount: 1200,
       unitCost: 1000,
-      unitSellingAmount: 1190,
+      unitSellingAmount: 1200,
     });
   });
 
@@ -45,23 +46,22 @@ describe("computeSalesPricing", () => {
       sopPercentage: 0,
     });
 
-    // Unit cost = 3333.33; unit selling = 3333.33 / 0.75 = 4444.44 (exact per
-    // unit, unchanged by the ceiling step). Scaled by quantity 30, the exact
-    // line total is 133333.20, which ceilings up to 133400.00; the 66.80
-    // bump folds into sopAmount.
-    expect(result.unitSellingAmount).toBe(4444.44);
-    expect(result.sellingAmount).toBe(133400);
+    // Unit cost = 3333.33; exact unit selling = 3333.33 / 0.75 = 4444.44,
+    // which ceilings up to 4500.00. Scaled by quantity 30 the line total is
+    // 135000.00; the 55.56/unit bump (1666.80 across the line) folds into
+    // sopAmount.
+    expect(result.unitSellingAmount).toBe(4500);
+    expect(result.sellingAmount).toBe(135000);
     expect(result.marginAmount).toBe(33333.3);
     expect(result.bankAmount).toBe(0);
-    expect(result.sopAmount).toBe(66.8);
+    expect(result.sopAmount).toBe(1666.8);
   });
 
-  it("ceilings the exact per-unit price scaled by quantity up to the nearest ₱100, folding the bump into sopAmount -- so unit price x qty no longer equals the line total", () => {
-    // Unit cost = 3333.33 / 3 = 1111.11; unit selling = 1111.11 / 0.85 =
-    // 1307.1882... -> rounds to 1307.19 (exact, unaffected by the ceiling
-    // step -- this is what the "Unit Selling" column and worksheet column P
-    // show). The exact line total (1307.19 * 3 = 3921.57) is NOT a multiple
-    // of 100, so the printed/stored Selling ceilings up to 4000.00.
+  it("ceilings the per-unit price up to the nearest ₱100 and folds the bump into sopAmount -- so unit price x qty still equals the line total exactly", () => {
+    // Unit cost = 3333.33 / 3 = 1111.11; exact unit selling = 1111.11 / 0.85
+    // = 1307.1882..., which ceilings up to 1400.00 -- this is what the "Unit
+    // Selling" column and worksheet column P show. The line Selling is simply
+    // 1400.00 * 3 = 4200.00, with no second ceiling of its own.
     const result = computeSalesPricing({
       directCost: 3333.33,
       quantity: 3,
@@ -70,18 +70,17 @@ describe("computeSalesPricing", () => {
       sopPercentage: 0,
     });
 
-    expect(result.unitSellingAmount).toBe(1307.19);
-    expect(result.sellingAmount).toBe(4000);
+    expect(result.unitSellingAmount).toBe(1400);
+    expect(result.sellingAmount).toBe(4200);
     expect(result.marginAmount).toBe(588.24);
     expect(result.bankAmount).toBe(0);
-    expect(result.sopAmount).toBe(78.43);
-    // The old invariant (unit price x qty === line total) is deliberately
-    // broken by the ceiling rule -- this is the expected, client-requested
-    // divergence, not a bug.
-    expect(round2(result.unitSellingAmount * 3)).not.toBe(result.sellingAmount);
+    expect(result.sopAmount).toBe(278.43);
+    // Ceiling'ing per unit rather than per line keeps qty x unit price = line
+    // total, so the printed worksheet (column M x column P = column R) foots.
+    expect(round2(result.unitSellingAmount * 3)).toBe(result.sellingAmount);
   });
 
-  it("guarantees sellingAmount is always a whole multiple of ₱100, across awkward cost/qty/percentage combinations", () => {
+  it("guarantees unitSellingAmount is always a whole multiple of ₱100, across awkward cost/qty/percentage combinations", () => {
     const quantities = [3, 7, 11, 13];
     const costs = [1000.33, 285000.67, 12345.01];
     const percentageSets: Array<[number, number, number]> = [
@@ -101,6 +100,10 @@ describe("computeSalesPricing", () => {
             sopPercentage,
           });
 
+          expect(result.unitSellingAmount % 100).toBe(0);
+          // The line total inherits it only because these quantities are
+          // whole numbers; a fractional quantity legitimately lands off a
+          // hundred (see the NUMERIC-quantity test below).
           expect(result.sellingAmount % 100).toBe(0);
         }
       }
@@ -144,7 +147,10 @@ describe("computeSalesPricing", () => {
       sopPercentage: 1,
     });
 
-    expect(result.sellingAmount).toBe(3300);
+    // Exact unit selling = 1000 / 0.8 * 1.03 * 1.01 = 1300.15 -> ceilings to
+    // 1400.00; x 2.5 = 3500.00, which is a multiple of 100 only by luck here.
+    expect(result.unitSellingAmount).toBe(1400);
+    expect(result.sellingAmount).toBe(3500);
     expect(
       round2(2500 + result.marginAmount + result.bankAmount + result.sopAmount),
     ).toBe(result.sellingAmount);
@@ -213,12 +219,12 @@ describe("computeSalesPricing", () => {
   });
 
   it("derives marginAmount from the rounded per-unit selling price, not the unrounded exact value", () => {
-    // Unit cost = 2/3 = 0.6666...; unit selling = 0.6666.../0.64 =
-    // 1.041666... -> rounds to 1.04 (the per-unit rounding a prior fix
-    // introduced). Line total before the ceiling step = 1.04 * 3 = 3.12, so
-    // marginAmount = 3.12 - 2 = 1.12 -- this stage is unaffected by the
-    // ceiling-to-₱100 rule added here. The tiny 3.12 exact total, however,
-    // ceilings all the way up to the minimum next hundred: 100.00.
+    // Unit cost = 2/3 = 0.6666...; exact unit selling = 0.6666.../0.64 =
+    // 1.041666... The margin stage still works off the centavo-rounded
+    // running total (1.04 * 3 = 3.12), so marginAmount = 3.12 - 2 = 1.12 --
+    // unaffected by the ceiling. The unit price itself, though, ceilings all
+    // the way up to the minimum next hundred (100.00), making the line
+    // 300.00. This is the accepted distortion on very cheap items.
     const result = computeSalesPricing({
       directCost: 2,
       quantity: 3,
@@ -228,12 +234,14 @@ describe("computeSalesPricing", () => {
     });
 
     expect(result.marginAmount).toBe(1.12);
-    expect(result.sellingAmount).toBe(100);
+    expect(result.unitSellingAmount).toBe(100);
+    expect(result.sellingAmount).toBe(300);
+    expect(result.sopAmount).toBe(296.88);
   });
 
   it("ceilings the client's worked example (7,562.79) up to the next hundred (7,600.00)", () => {
-    // margin/bank/sop all zero -> unitSellingAmount === directCost exactly,
-    // isolating the ceiling step itself.
+    // margin/bank/sop all zero and quantity 1 -> the exact unit price is
+    // directCost itself, isolating the ceiling step.
     const result = computeSalesPricing({
       directCost: 7562.79,
       quantity: 1,
@@ -242,7 +250,7 @@ describe("computeSalesPricing", () => {
       sopPercentage: 0,
     });
 
-    expect(result.unitSellingAmount).toBe(7562.79);
+    expect(result.unitSellingAmount).toBe(7600);
     expect(result.sellingAmount).toBe(7600);
   });
 

@@ -27,9 +27,9 @@ const VAT_RATE = 0.12;
 export type SalesPricingAmounts = {
   marginAmount: number;
   bankAmount: number;
-  /** Includes the rounding bump (sellingAmount - the exact pre-ceiling total) when the selling price is ceiling'd -- see computeSalesPricing's doc comment. */
+  /** Includes the rounding bump carried down from the ceiling'd per-unit price (sellingAmount minus the exact pre-ceiling total) -- see computeSalesPricing's doc comment. */
   sopAmount: number;
-  /** cost + margin + bank + sop -- pre-VAT, computed per unit then scaled by quantity, then ceiling'd to the nearest ₱100. */
+  /** cost + margin + bank + sop -- pre-VAT. Simply unitSellingAmount x quantity: the ceiling to ₱100 already happened per unit, so nothing is rounded again here. */
   sellingAmount: number;
 };
 
@@ -37,13 +37,15 @@ export type SalesPricing = SalesPricingAmounts & {
   /** directCost / quantity. Not necessarily a clean 2dp figure until the cost side is also rounded per-unit (see lib/engineering/landed-cost.ts). */
   unitCost: number;
   /**
-   * The exact per-unit selling price, rounded only to the centavo -- kept
-   * unrounded-to-the-hundred on purpose, since a per-unit price landing on a
-   * clean ₱100 would badly distort prices on inexpensive items. This is
-   * what feeds the "Unit Selling" column and the worksheet's unit-price
-   * column. Because `sellingAmount` below is ceiling'd to the nearest ₱100,
-   * `unitSellingAmount * quantity` generally does NOT equal `sellingAmount`
-   * -- the same tension the original costing worksheet always had.
+   * The per-unit selling price, rounded UP to the nearest ₱100 -- this is
+   * where the source worksheet's ceiling rule is applied. It feeds the "Unit
+   * Selling" column and the worksheet's unit-price column, and
+   * `unitSellingAmount * quantity` is exactly `sellingAmount`, so the printed
+   * worksheet's qty x unit price = line total foots.
+   *
+   * Note this deliberately distorts inexpensive items -- a unit price working
+   * out to ₱72.10 prices at ₱100.00 -- which is the client's accepted
+   * trade-off for a clean per-unit figure.
    */
   unitSellingAmount: number;
 };
@@ -55,23 +57,26 @@ export type SalesPricing = SalesPricingAmounts & {
  *   2. Bank% and SOP% compound sequentially on top of the running total
  *      (bank on cost+margin, SOP on cost+margin+bank), not independently off
  *      raw cost.
- *   3. The final line selling price is rounded UP to the nearest ₱100 (e.g.
- *      7562.79 -> 7600.00), matching the source worksheet's ceiling rule --
- *      per product decision, this is now applied per line item, and the
- *      resulting bump (sellingAmount minus the exact pre-ceiling total) is
- *      folded entirely into sopAmount, so directCost + margin + bank + sop
- *      still sums exactly to the ceiling'd sellingAmount.
+ *   3. The resulting per-unit selling price is rounded UP to the nearest ₱100
+ *      (e.g. 7562.79 -> 7600.00), matching the source worksheet's ceiling
+ *      rule. The line selling price is then just that ceiling'd unit price
+ *      times quantity -- NOT rounded again -- so `unitSellingAmount *
+ *      quantity === sellingAmount` exactly and the worksheet's qty x unit
+ *      price = line total foots. The bump the ceiling opens up versus the
+ *      exact waterfall is folded entirely into sopAmount, so
+ *      directCost + margin + bank + sop still sums exactly to sellingAmount.
  *
  * Rounds the per-unit cumulative subtotals to the centavo first, then scales
  * each by quantity, then derives the margin/bank components as telescoping
  * differences between consecutive rounded running totals (lineCost ->
  * lineAfterMargin -> lineAfterBank), and sopAmount as the remainder up to
- * the final ceiling'd sellingAmount. This guarantees
- * directCost + margin + bank + sop === sellingAmount exactly, by
- * construction rather than by luck -- there is no leftover rounding residual
- * to display or explain. unitSellingAmount (the exact per-unit price) is
- * NOT scaled from the ceiling'd total, so it no longer multiplies out to
- * sellingAmount except by coincidence -- see its own doc comment above.
+ * sellingAmount. This guarantees directCost + margin + bank + sop ===
+ * sellingAmount exactly, by construction rather than by luck -- there is no
+ * leftover rounding residual to display or explain.
+ *
+ * Note sellingAmount is only a whole multiple of ₱100 when quantity is itself
+ * a whole number; `quantity` is NUMERIC, so a fractional quantity (2.5) times
+ * a ceiling'd unit price legitimately lands off a clean hundred.
  */
 export function computeSalesPricing(input: {
   /** Line total (quantity x unit cost) -- the same figure used everywhere else on the quotation/PO. */
@@ -98,22 +103,20 @@ export function computeSalesPricing(input: {
 
   const unitAfterMargin = round2(unitAfterMarginExact);
   const unitAfterBank = round2(unitAfterBankExact);
-  const unitSellingAmount = round2(unitAfterSopExact);
+  // The client's rule: the printed/stored Unit Selling price always rounds UP
+  // to the nearest ₱100. Every line-level figure below derives from it.
+  const unitSellingAmount = ceilToHundred(unitAfterSopExact);
 
   const lineAfterMargin = round2(unitAfterMargin * quantity);
   const lineAfterBank = round2(unitAfterBank * quantity);
-  const exactSellingAmount = round2(unitSellingAmount * quantity);
-
-  // The client's rule: the printed/stored Selling price always rounds UP to
-  // the nearest ₱100. The gap this opens up versus the exact waterfall total
-  // is folded entirely into sopAmount so the parts keep summing exactly.
-  const sellingAmount = ceilToHundred(exactSellingAmount);
-  const sopBump = round2(sellingAmount - exactSellingAmount);
+  const sellingAmount = round2(unitSellingAmount * quantity);
 
   return {
     marginAmount: round2(lineAfterMargin - lineCost),
     bankAmount: round2(lineAfterBank - lineAfterMargin),
-    sopAmount: round2(exactSellingAmount - lineAfterBank + sopBump),
+    // The remainder up to the ceiling'd selling amount -- absorbs both the
+    // true SOP% and the per-unit rounding bump, so the parts sum exactly.
+    sopAmount: round2(sellingAmount - lineAfterBank),
     sellingAmount,
     unitCost,
     unitSellingAmount,

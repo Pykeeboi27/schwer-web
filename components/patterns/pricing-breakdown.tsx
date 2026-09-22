@@ -17,8 +17,9 @@ type PricingBreakdownProps = {
  * margin/bank/sop as a net/VAT split -- not an additional charge. Matches
  * the source costing worksheet: cost is already VAT-inclusive (Engineering's
  * unit costs), so sellingAmount IS the final total, nothing gets added on
- * top of it here. sellingAmount is not rounded up to the nearest ₱100 (the
- * source worksheet's rule) -- it's the exact total, to the centavo.
+ * top of it here. sellingAmount carries the source worksheet's ceiling rule
+ * indirectly: computeSalesPricing rounds the per-unit selling price UP to the
+ * nearest ₱100, and sellingAmount is that ceiling'd figure times quantity.
  *
  * directCost + marginAmount + bankAmount + sopAmount always foots exactly to
  * sellingAmount -- computeSalesPricing derives the three amounts as
