@@ -33,7 +33,7 @@ export default async function NotificationsPage({
   const groupedItems = groupNotifications(items);
 
   return (
-    <div className="flex flex-col gap-6">
+    <div className="flex flex-col gap-8">
       <PageHeader
         title="Notifications"
         description="Every quotation, purchase order, and approval update related to you."

@@ -28,12 +28,12 @@ export function ExecutiveCostingApprovalsTable({
       <ResponsiveTable
         table={
           <table className="w-full text-sm">
-            <thead className="bg-muted/40 text-left">
+            <thead className="bg-wash text-left">
               <tr>
-                <th className="px-3 py-2 font-medium">Quotation</th>
-                <th className="px-3 py-2 font-medium">Client</th>
-                <th className="px-3 py-2 font-medium">Cost</th>
-                <th className="px-3 py-2 font-medium">Prepared By</th>
+                <th className="px-4 py-3 font-medium">Quotation</th>
+                <th className="px-4 py-3 font-medium">Client</th>
+                <th className="px-4 py-3 font-medium">Cost</th>
+                <th className="px-4 py-3 font-medium">Prepared By</th>
               </tr>
             </thead>
             <tbody>
@@ -49,12 +49,12 @@ export function ExecutiveCostingApprovalsTable({
                       setSelectedItem(item);
                     }
                   }}
-                  className="cursor-pointer border-t align-top transition-colors hover:bg-muted/40"
+                  className="cursor-pointer border-t align-top transition-colors hover:bg-wash"
                 >
-                  <td className="px-3 py-2 font-mono text-xs">{item.quotationNumber}</td>
-                  <td className="px-3 py-2">{item.clientName}</td>
-                  <td className="px-3 py-2">{formatCurrency(item.cost)}</td>
-                  <td className="px-3 py-2">{item.preparedByName}</td>
+                  <td className="px-4 py-3 font-mono text-xs">{item.quotationNumber}</td>
+                  <td className="px-4 py-3">{item.clientName}</td>
+                  <td className="px-4 py-3">{formatCurrency(item.cost)}</td>
+                  <td className="px-4 py-3">{item.preparedByName}</td>
                 </tr>
               ))}
             </tbody>

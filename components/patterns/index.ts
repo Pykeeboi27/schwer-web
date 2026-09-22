@@ -5,9 +5,11 @@ export { Panel } from "./panel";
 export {
   StatusBadge,
   statusLabel,
+  statusToneClassName,
   type StatusTone,
   type StatusBadgeProps,
 } from "./status-badge";
+export { StatusTile } from "./status-tile";
 export { EmptyState } from "./empty-state";
 export { Callout, type CalloutTone } from "./callout";
 export { fieldClassName, textareaClassName } from "./form-styles";

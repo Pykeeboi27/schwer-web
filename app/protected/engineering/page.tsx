@@ -41,7 +41,7 @@ export default async function EngineeringDashboardPage() {
   }));
 
   return (
-    <div className="flex flex-col gap-6">
+    <div className="flex flex-col gap-8">
       <RealtimeRefresh tables={["quotations"]} />
       <PageHeader
         title="Engineering Dashboard"
@@ -55,7 +55,7 @@ export default async function EngineeringDashboardPage() {
         size="hero"
       />
 
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <StatCard label="Total Costings" value={quotations.length} />
         <StatCard label="Drafts" value={draftCount} />
         <StatCard label="Returned for Edits" value={rejectedDrafts} />

@@ -73,7 +73,7 @@ const PERIOD_LABELS: Record<PeriodFilter, string> = {
 function ScopeRule({ label, note }: { label: string; note?: ReactNode }) {
   return (
     <div className="flex items-center gap-3">
-      <span className="shrink-0 text-[0.6875rem] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+      <span className="shrink-0 text-eyebrow uppercase text-muted-foreground">
         {label}
       </span>
       <span className="h-px flex-1 bg-border" aria-hidden="true" />
@@ -116,7 +116,7 @@ export default async function ExecutiveSalesDashboardPage({
     });
   } catch {
     return (
-      <div className="flex flex-col gap-6">
+      <div className="flex flex-col gap-8">
         <PageHeader title="Sales Detail" description="Unable to load sales metrics." />
         <Panel>
           <EmptyState
@@ -194,7 +194,7 @@ export default async function ExecutiveSalesDashboardPage({
         : `Year to date ${now.getFullYear()}`;
 
   return (
-    <div className="flex flex-col gap-6">
+    <div className="flex flex-col gap-8">
       <PageHeader
         title="Sales Detail"
         description="Revenue breakdown, PO summary, and sales performance for the selected period."
@@ -339,23 +339,23 @@ export default async function ExecutiveSalesDashboardPage({
                   <tr
                     key={row.ownerId}
                     className={cn(
-                      "border-t transition-colors hover:bg-muted/50",
+                      "border-t transition-colors hover:bg-wash",
                       index % 2 === 0 ? "bg-muted/20" : "",
                     )}
                   >
-                    <td className="px-3 py-2.5 font-semibold text-muted-foreground tabular-nums">
+                    <td className="px-4 py-3 font-semibold text-muted-foreground tabular-nums">
                       {index + 1}
                     </td>
-                    <td className="max-w-0 truncate px-3 py-2.5 font-medium">
+                    <td className="max-w-0 truncate px-4 py-3 font-medium">
                       {row.ownerName}
                     </td>
-                    <td className="px-3 py-2.5 text-right tabular-nums">
+                    <td className="px-4 py-3 text-right tabular-nums">
                       {formatCurrency(row.bookedRevenue)}
                     </td>
-                    <td className="px-3 py-2.5 text-right tabular-nums text-muted-foreground">
+                    <td className="px-4 py-3 text-right tabular-nums text-muted-foreground">
                       {formatCurrency(row.marginAmount)}
                     </td>
-                    <td className="px-3 py-2.5 text-right tabular-nums text-muted-foreground">
+                    <td className="px-4 py-3 text-right tabular-nums text-muted-foreground">
                       {row.marginPercentAverage === null
                         ? "N/A"
                         : formatPercent(row.marginPercentAverage)}

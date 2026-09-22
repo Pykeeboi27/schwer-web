@@ -29,9 +29,7 @@ export function SidebarNav({
   return (
     <div className="flex h-full flex-col">
       <div className="px-3 pb-3 pt-1">
-        <p className="text-[0.7rem] font-medium uppercase tracking-wider text-muted-foreground">
-          {config.module}
-        </p>
+        <p className="text-eyebrow uppercase text-muted-foreground">{config.module}</p>
         <p className="mt-0.5 text-sm font-semibold text-foreground">Workspace</p>
       </div>
 
@@ -50,7 +48,7 @@ export function SidebarNav({
               onClick={onNavigate}
               aria-current={active ? "page" : undefined}
               className={cn(
-                "group relative flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors",
+                "group relative flex items-center gap-3 rounded-md px-3 py-2.5 text-sm font-medium transition-colors",
                 active
                   ? "bg-primary/10 text-primary"
                   : "text-muted-foreground hover:bg-muted hover:text-foreground",

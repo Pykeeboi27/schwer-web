@@ -39,7 +39,7 @@ export default async function ExecutiveDashboardPage() {
 
   if (dashboardResult.status === "rejected") {
     return (
-      <div className="flex flex-col gap-6">
+      <div className="flex flex-col gap-8">
         <PageHeader
           title="Executive Dashboard"
           description="Unable to load executive metrics."
@@ -77,7 +77,7 @@ export default async function ExecutiveDashboardPage() {
   const scopeRange = `${new Intl.DateTimeFormat("en-PH", { day: "2-digit", month: "short" }).format(yearStart)} – ${new Intl.DateTimeFormat("en-PH", { day: "2-digit", month: "short", year: "numeric" }).format(now)}`;
 
   return (
-    <div className="flex flex-col gap-6">
+    <div className="flex flex-col gap-8">
       <PageHeader
         title="Executive Dashboard"
         description="Company-wide KPI snapshot — year to date."
@@ -104,7 +104,7 @@ export default async function ExecutiveDashboardPage() {
       </StatCard>
 
       {/* Supporting KPIs */}
-      <div className="grid gap-3 sm:grid-cols-3">
+      <div className="grid gap-4 sm:grid-cols-3">
         <StatCard
           label="Annual Target"
           value={

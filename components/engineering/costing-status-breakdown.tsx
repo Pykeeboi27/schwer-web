@@ -26,8 +26,8 @@ export function CostingStatusBreakdown({
   const segments: StatusCount[] = [
     { label: "Draft", count: draft, barClassName: "bg-muted-foreground/40" },
     { label: "Returned", count: returned, barClassName: "bg-destructive" },
-    { label: "Pending", count: pending, barClassName: "bg-amber-500" },
-    { label: "Approved", count: approved, barClassName: "bg-emerald-500" },
+    { label: "Pending", count: pending, barClassName: "bg-status-pending" },
+    { label: "Approved", count: approved, barClassName: "bg-status-approved" },
   ];
 
   const total = segments.reduce((sum, s) => sum + s.count, 0);

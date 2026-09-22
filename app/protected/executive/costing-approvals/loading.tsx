@@ -2,7 +2,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 
 export default function CostingApprovalsLoading() {
   return (
-    <div className="flex flex-col gap-6">
+    <div className="flex flex-col gap-8">
       <Skeleton className="h-16 w-full rounded-none" />
 
       <section className="rounded-lg border bg-card p-4 shadow-xs sm:p-5">

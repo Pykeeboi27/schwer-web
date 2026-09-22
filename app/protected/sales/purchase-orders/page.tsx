@@ -75,7 +75,7 @@ export default async function SalesPurchaseOrdersPage() {
   );
 
   return (
-    <div className="flex flex-col gap-6">
+    <div className="flex flex-col gap-8">
       <RealtimeRefresh tables={["purchase_orders", "po_approvals"]} />
       <MarkSectionRead section="purchase_orders" />
       <PageHeader

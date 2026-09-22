@@ -111,39 +111,39 @@ export function CostingApprovalHistoryTable({ items }: CostingApprovalHistoryTab
         <ResponsiveTable
           table={
             <table className="w-full text-sm">
-              <thead className="bg-muted/40 text-left">
+              <thead className="bg-wash text-left">
                 <tr>
-                  <th className="px-3 py-2 font-medium">Quotation</th>
-                  <th className="px-3 py-2 font-medium">Client</th>
-                  <th className="px-3 py-2 font-medium">Subject</th>
-                  <th className="px-3 py-2 font-medium">Amount</th>
-                  <th className="px-3 py-2 font-medium">Cost</th>
-                  <th className="px-3 py-2 font-medium">Prepared By</th>
-                  <th className="px-3 py-2 font-medium">Decision</th>
-                  <th className="px-3 py-2 font-medium">Rejection Reason</th>
-                  <th className="px-3 py-2 font-medium">Date</th>
+                  <th className="px-4 py-3 font-medium">Quotation</th>
+                  <th className="px-4 py-3 font-medium">Client</th>
+                  <th className="px-4 py-3 font-medium">Subject</th>
+                  <th className="px-4 py-3 font-medium">Amount</th>
+                  <th className="px-4 py-3 font-medium">Cost</th>
+                  <th className="px-4 py-3 font-medium">Prepared By</th>
+                  <th className="px-4 py-3 font-medium">Decision</th>
+                  <th className="px-4 py-3 font-medium">Rejection Reason</th>
+                  <th className="px-4 py-3 font-medium">Date</th>
                 </tr>
               </thead>
               <tbody>
                 {filtered.map((item) => (
                   <tr key={item.quotationId} className="border-t align-top">
-                    <td className="px-3 py-2 font-mono text-xs">
+                    <td className="px-4 py-3 font-mono text-xs">
                       {item.quotationNumber}
                     </td>
-                    <td className="px-3 py-2">{item.clientName}</td>
-                    <td className="px-3 py-2">{item.subject || "-"}</td>
-                    <td className="px-3 py-2">{formatCurrency(item.amount)}</td>
-                    <td className="px-3 py-2">
+                    <td className="px-4 py-3">{item.clientName}</td>
+                    <td className="px-4 py-3">{item.subject || "-"}</td>
+                    <td className="px-4 py-3">{formatCurrency(item.amount)}</td>
+                    <td className="px-4 py-3">
                       {item.cost === null ? "-" : formatCurrency(item.cost)}
                     </td>
-                    <td className="px-3 py-2">{item.preparedByName}</td>
-                    <td className="px-3 py-2">
+                    <td className="px-4 py-3">{item.preparedByName}</td>
+                    <td className="px-4 py-3">
                       <StatusBadge status={item.decision} />
                     </td>
-                    <td className="px-3 py-2 text-xs text-muted-foreground">
+                    <td className="px-4 py-3 text-xs text-muted-foreground">
                       {item.rejectionReason ?? "-"}
                     </td>
-                    <td className="px-3 py-2 text-muted-foreground">
+                    <td className="px-4 py-3 text-muted-foreground">
                       {formatDate(item.resolvedAt)}
                     </td>
                   </tr>

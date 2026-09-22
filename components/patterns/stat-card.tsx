@@ -34,8 +34,8 @@ export function StatCard({
   return (
     <div
       className={cn(
-        "rounded-lg border bg-card shadow-xs",
-        isHero ? "p-5 sm:p-6" : "p-4 sm:p-5",
+        "rounded-lg border border-frame bg-card shadow-card",
+        isHero ? "p-6 sm:p-8" : "p-5 sm:p-6",
         accent &&
           (isHero ? "border-l-[6px] border-l-primary" : "border-l-4 border-l-primary"),
         className,
@@ -44,15 +44,15 @@ export function StatCard({
       <p
         className={cn(
           "text-sm text-muted-foreground",
-          isHero && "text-[0.6875rem] font-semibold uppercase tracking-[0.18em]",
+          isHero && "text-eyebrow uppercase",
         )}
       >
         {label}
       </p>
       <p
         className={cn(
-          "mt-2 font-display font-semibold tabular-nums tracking-[-0.02em]",
-          isHero ? "text-4xl sm:text-5xl" : "text-3xl",
+          "mt-2 font-display font-semibold tabular-nums",
+          isHero ? "text-4xl tracking-tighter sm:text-5xl" : "text-3xl tracking-tight",
         )}
       >
         {value}

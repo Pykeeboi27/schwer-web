@@ -61,13 +61,13 @@ export function CostingHistoryTable({ items }: CostingHistoryTableProps) {
       <ResponsiveTable
         table={
           <table className="w-full min-w-[780px] text-sm">
-            <thead className="bg-muted/40 text-left">
+            <thead className="bg-wash text-left">
               <tr>
-                <th className="px-3 py-2 font-medium">Client</th>
-                <th className="px-3 py-2 font-medium">Subject</th>
-                <th className="px-3 py-2 font-medium">Direct Cost</th>
-                <th className="px-3 py-2 font-medium">Sales Person</th>
-                <th className="px-3 py-2 font-medium">Approved</th>
+                <th className="px-4 py-3 font-medium">Client</th>
+                <th className="px-4 py-3 font-medium">Subject</th>
+                <th className="px-4 py-3 font-medium">Direct Cost</th>
+                <th className="px-4 py-3 font-medium">Sales Person</th>
+                <th className="px-4 py-3 font-medium">Approved</th>
               </tr>
             </thead>
             <tbody>
@@ -79,15 +79,15 @@ export function CostingHistoryTable({ items }: CostingHistoryTableProps) {
                   aria-label={`View ${item.quotationNumber}`}
                   onClick={() => setViewing(item)}
                   onKeyDown={(event) => onRowKeyDown(event, () => setViewing(item))}
-                  className="cursor-pointer border-t transition-colors hover:bg-muted/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset"
+                  className="cursor-pointer border-t transition-colors hover:bg-wash focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset"
                 >
-                  <td className="px-3 py-2">{item.clientName}</td>
-                  <td className="px-3 py-2">{item.subject || "-"}</td>
-                  <td className="px-3 py-2">{formatCurrency(item.cost)}</td>
-                  <td className="px-3 py-2 text-muted-foreground">
+                  <td className="px-4 py-3">{item.clientName}</td>
+                  <td className="px-4 py-3">{item.subject || "-"}</td>
+                  <td className="px-4 py-3">{formatCurrency(item.cost)}</td>
+                  <td className="px-4 py-3 text-muted-foreground">
                     {item.salesPersonName ?? "Unassigned"}
                   </td>
-                  <td className="px-3 py-2 text-muted-foreground">
+                  <td className="px-4 py-3 text-muted-foreground">
                     {formatDate(item.approvedAt)}
                   </td>
                 </tr>

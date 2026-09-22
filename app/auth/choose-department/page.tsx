@@ -130,7 +130,7 @@ async function ChooseDepartmentContent({ searchParams }: ChooseDepartmentPagePro
   return (
     <Card className="border-none bg-transparent shadow-none">
       <CardHeader className="px-0">
-        <CardTitle className="text-2xl font-semibold tracking-tight">
+        <CardTitle className="font-display text-2xl font-semibold tracking-tight">
           Choose your department
         </CardTitle>
         <CardDescription>
@@ -165,7 +165,7 @@ async function ChooseDepartmentContent({ searchParams }: ChooseDepartmentPagePro
 
           {errorMessage && <p className="text-sm text-destructive">{errorMessage}</p>}
 
-          <Button type="submit" className="w-full">
+          <Button type="submit" size="cta" className="w-full">
             Continue
           </Button>
         </form>

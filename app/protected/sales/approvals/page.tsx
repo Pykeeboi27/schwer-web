@@ -62,7 +62,7 @@ export default async function SalesApprovalsPage() {
   );
 
   return (
-    <div className="flex flex-col gap-6">
+    <div className="flex flex-col gap-8">
       <RealtimeRefresh
         tables={["quotations", "quotation_approvals", "purchase_orders", "po_approvals"]}
       />

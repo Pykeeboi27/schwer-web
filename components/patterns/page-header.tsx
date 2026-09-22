@@ -42,14 +42,14 @@ export function PageHeader({
   return (
     <div
       className={cn(
-        "flex flex-col gap-4 border-b pb-5 sm:flex-row sm:items-start sm:justify-between",
+        "flex flex-col gap-4 border-b pb-6 sm:flex-row sm:items-start sm:justify-between",
         className,
       )}
     >
       <div className="flex gap-3">
         <span aria-hidden="true" className="w-1.5 shrink-0 rounded-full bg-primary" />
         <div className="space-y-1">
-          <h1 className="font-display text-2xl font-semibold tracking-[-0.02em] sm:text-3xl">
+          <h1 className="font-display text-2xl font-semibold tracking-tight sm:text-4xl">
             {title}
           </h1>
           {description ? (
@@ -66,7 +66,7 @@ export function PageHeader({
                   key={item.label}
                   className="flex items-baseline gap-2 sm:justify-end"
                 >
-                  <dt className="text-[0.6875rem] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+                  <dt className="text-eyebrow uppercase text-muted-foreground">
                     {item.label}
                   </dt>
                   <dd className="text-xs font-medium text-foreground">{item.value}</dd>

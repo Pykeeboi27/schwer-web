@@ -54,13 +54,10 @@ export function ToastViewport() {
           <div
             key={toast.id}
             className={cn(
-              "flex items-start gap-2 rounded-md border px-3 py-2 text-sm shadow-sm",
-              isSuccess &&
-                "border-emerald-300 bg-emerald-50 text-emerald-900 dark:border-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300",
-              isError &&
-                "border-red-300 bg-red-50 text-red-900 dark:border-red-700 dark:bg-red-950/40 dark:text-red-300",
-              toast.variant === "info" &&
-                "border-blue-300 bg-blue-50 text-blue-900 dark:border-blue-700 dark:bg-blue-950/40 dark:text-blue-300",
+              "flex items-start gap-2 rounded-md border bg-card px-3 py-2 text-sm shadow-float",
+              isSuccess && "border-status-approved/40 text-status-approved",
+              isError && "border-status-rejected/40 text-status-rejected",
+              toast.variant === "info" && "border-status-info/40 text-status-info",
             )}
             role={isError ? "alert" : "status"}
           >

@@ -81,15 +81,15 @@ export function RequestForQuotationTable({ requests }: RequestForQuotationTableP
     <ResponsiveTable
       table={
         <table className="w-full min-w-[640px] text-sm">
-          <thead className="bg-muted/40 text-left">
+          <thead className="bg-wash text-left">
             <tr>
-              <th className="w-8 px-3 py-2" />
-              <th className="px-3 py-2 font-medium">Quotation #</th>
-              <th className="px-3 py-2 font-medium">Client</th>
-              <th className="px-3 py-2 font-medium">Subject</th>
-              <th className="px-3 py-2 font-medium">Items</th>
-              <th className="px-3 py-2 font-medium">Cost So Far</th>
-              <th className="px-3 py-2 font-medium">Status</th>
+              <th className="w-8 px-4 py-3" />
+              <th className="px-4 py-3 font-medium">Quotation #</th>
+              <th className="px-4 py-3 font-medium">Client</th>
+              <th className="px-4 py-3 font-medium">Subject</th>
+              <th className="px-4 py-3 font-medium">Items</th>
+              <th className="px-4 py-3 font-medium">Cost So Far</th>
+              <th className="px-4 py-3 font-medium">Status</th>
             </tr>
           </thead>
           <tbody>
@@ -111,34 +111,34 @@ export function RequestForQuotationTable({ requests }: RequestForQuotationTableP
                         toggle(request.id);
                       }
                     }}
-                    className="cursor-pointer border-t transition-colors hover:bg-muted/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset"
+                    className="cursor-pointer border-t transition-colors hover:bg-wash focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset"
                   >
-                    <td className="px-3 py-2 text-muted-foreground">
+                    <td className="px-4 py-3 text-muted-foreground">
                       {expanded.has(request.id) ? (
                         <ChevronDown className="h-4 w-4" />
                       ) : (
                         <ChevronRight className="h-4 w-4" />
                       )}
                     </td>
-                    <td className="px-3 py-2">{request.quotationNumber}</td>
-                    <td className="px-3 py-2">{request.clientName}</td>
-                    <td className="px-3 py-2">{request.subject}</td>
-                    <td className="px-3 py-2">{request.items.length}</td>
-                    <td className="px-3 py-2">
+                    <td className="px-4 py-3">{request.quotationNumber}</td>
+                    <td className="px-4 py-3">{request.clientName}</td>
+                    <td className="px-4 py-3">{request.subject}</td>
+                    <td className="px-4 py-3">{request.items.length}</td>
+                    <td className="px-4 py-3">
                       {request.cost === null ? (
                         <span className="text-muted-foreground">Not costed yet</span>
                       ) : (
                         formatCurrency(request.cost)
                       )}
                     </td>
-                    <td className="px-3 py-2">
+                    <td className="px-4 py-3">
                       <StatusBadge status={badgeStatus(request)} />
                     </td>
                   </tr>
                   {expanded.has(request.id) ? (
                     <tr className="border-t bg-muted/20">
                       <td />
-                      <td colSpan={6} className="px-3 py-2">
+                      <td colSpan={6} className="px-4 py-3">
                         <ItemsBreakdown request={request} />
                       </td>
                     </tr>

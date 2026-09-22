@@ -48,7 +48,7 @@ export function ForgotPasswordForm({
       {success ? (
         <Card className="border-none bg-transparent shadow-none">
           <CardHeader className="px-0">
-            <CardTitle className="text-3xl font-semibold tracking-tight">
+            <CardTitle className="font-display text-3xl font-semibold tracking-tight">
               Check your email
             </CardTitle>
             <CardDescription className="text-base">
@@ -73,7 +73,7 @@ export function ForgotPasswordForm({
       ) : (
         <Card className="border-none bg-transparent shadow-none">
           <CardHeader className="px-0">
-            <CardTitle className="text-3xl font-semibold tracking-tight">
+            <CardTitle className="font-display text-3xl font-semibold tracking-tight">
               Reset password
             </CardTitle>
             <CardDescription className="text-base">
@@ -104,7 +104,7 @@ export function ForgotPasswordForm({
                   </div>
                 )}
 
-                <Button type="submit" className="w-full text-base" disabled={isLoading}>
+                <Button type="submit" size="cta" className="w-full" disabled={isLoading}>
                   {isLoading ? "Sending…" : "Send reset email"}
                 </Button>
               </div>
