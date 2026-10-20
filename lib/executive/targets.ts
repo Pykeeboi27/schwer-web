@@ -53,6 +53,42 @@ export async function getAnnualTarget(year: number): Promise<AnnualTargetRecord 
   };
 }
 
+export type AnnualTargetEditInfo = {
+  /** Display name of whoever last saved the annual target; null if unknown (e.g. profile deleted). */
+  editorName: string | null;
+  /** ISO timestamp of the last save. */
+  updatedAt: string;
+};
+
+/** Who last edited the annual target for `year`, and when. Null when no target is set. */
+export async function getAnnualTargetEditInfo(
+  year: number,
+): Promise<AnnualTargetEditInfo | null> {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("revenue_targets")
+    .select("updated_at, editor:set_by(full_name, email)")
+    .eq("year", year)
+    .is("month", null)
+    .is("sector", null)
+    .order("updated_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (error || !data) {
+    return null;
+  }
+
+  const editorRaw = data.editor as
+    | { full_name: string | null; email: string | null }
+    | { full_name: string | null; email: string | null }[]
+    | null;
+  const editor = Array.isArray(editorRaw) ? editorRaw[0] : editorRaw;
+  const editorName = editor?.full_name?.trim() || editor?.email?.trim() || null;
+
+  return { editorName, updatedAt: String(data.updated_at) };
+}
+
 /**
  * `(year, month, sector)` is unique in Postgres only when all three are
  * non-NULL — NULL is never equal to NULL, so `onConflict` upserts on rows with

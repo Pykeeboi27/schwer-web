@@ -10,6 +10,7 @@ import { getExecutiveAccessRedirect, isTargetEditor } from "@/lib/executive/acce
 import { getExecutiveDashboardData } from "@/lib/executive/dashboard";
 import { formatCurrency, formatPercent } from "@/lib/executive/format";
 import { getAverageCostingToPoDays } from "@/lib/executive/quotas";
+import { getAnnualTargetEditInfo } from "@/lib/executive/targets";
 import { getCurrentProfile } from "@/lib/profile/get-current-profile";
 import { redirect } from "next/navigation";
 
@@ -32,9 +33,10 @@ export default async function ExecutiveDashboardPage() {
   // Independent loaders (different tables, no data dependency) run concurrently.
   // allSettled preserves each one's own fail-soft behavior instead of letting
   // one rejection abort both, as a plain Promise.all would.
-  const [dashboardResult, avgCostingResult] = await Promise.allSettled([
+  const [dashboardResult, avgCostingResult, targetEditResult] = await Promise.allSettled([
     getExecutiveDashboardData("ytd", { viewer: profile }),
     getAverageCostingToPoDays("ytd"),
+    getAnnualTargetEditInfo(new Date().getFullYear()),
   ]);
 
   if (dashboardResult.status === "rejected") {
@@ -57,6 +59,19 @@ export default async function ExecutiveDashboardPage() {
   const dashboard = dashboardResult.value;
   const avgCostingToPoDays =
     avgCostingResult.status === "fulfilled" ? avgCostingResult.value : null;
+
+  const targetEditInfo =
+    targetEditResult.status === "fulfilled" ? targetEditResult.value : null;
+  const lastEditedBy = targetEditInfo
+    ? `${targetEditInfo.editorName ?? "Unknown"} · ${new Intl.DateTimeFormat("en-PH", {
+        day: "2-digit",
+        month: "short",
+        year: "numeric",
+        hour: "numeric",
+        minute: "2-digit",
+        timeZone: "Asia/Manila",
+      }).format(new Date(targetEditInfo.updatedAt))}`
+    : null;
 
   const canEditTarget = isTargetEditor(profile);
   const now = new Date();
@@ -106,7 +121,7 @@ export default async function ExecutiveDashboardPage() {
       {/* Supporting KPIs */}
       <div className="grid gap-4 sm:grid-cols-3">
         <StatCard
-          label="Annual Target"
+          label={`Annual Target (${currentYear})`}
           value={
             annualTarget === null ? (
               <span className="text-xl font-normal text-muted-foreground">Not set</span>
@@ -114,7 +129,13 @@ export default async function ExecutiveDashboardPage() {
               formatCurrency(annualTarget)
             )
           }
-        />
+        >
+          {lastEditedBy ? (
+            <p className="text-xs text-muted-foreground">
+              Last edited by: {lastEditedBy}
+            </p>
+          ) : null}
+        </StatCard>
 
         <StatCard
           label="Avg. Overall Margin (YTD)"

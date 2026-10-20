@@ -61,6 +61,7 @@ function buildPurchaseOrder(
         sopAmount: null,
         sellingAmount: null,
         unitSellingAmount: null,
+        unitNetOfSopAmount: null,
         ...itemOverrides,
       },
     ],

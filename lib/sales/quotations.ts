@@ -21,8 +21,10 @@ export type SalesQuotationItem = {
   sopPercentage: number | null;
   sopAmount: number | null;
   sellingAmount: number | null;
-  /** Per-unit selling price, rounded to the centavo -- unitSellingAmount * quantity === sellingAmount exactly. Null when unpriced, matching sellingAmount's null semantics. */
+  /** Per-unit selling price, rounded UP to the nearest ₱100 -- unitSellingAmount * quantity === sellingAmount exactly. Null when unpriced, matching sellingAmount's null semantics. */
   unitSellingAmount: number | null;
+  /** (Line Total + Margin Amt + Bank Amt) / quantity -- the per-unit selling price before SOP ("Unit Selling (Net of SOP)"), exact to the centavo. Null when unpriced. */
+  unitNetOfSopAmount: number | null;
 };
 
 export type SalesQuotation = {
@@ -540,6 +542,7 @@ export async function listSalesQuotations(): Promise<SalesQuotation[]> {
         sopAmount: r.sopAmount,
         sellingAmount: r.sellingAmount,
         unitSellingAmount: r.unitSellingAmount,
+        unitNetOfSopAmount: r.unitNetOfSopAmount,
       };
     });
 

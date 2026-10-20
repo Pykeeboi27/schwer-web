@@ -786,13 +786,14 @@ export function QuotationDetailsDialog({
                       {hasUnequalMargins ? <th className="w-6 py-1"></th> : null}
                       <th className="py-1 pr-3 font-medium">Item</th>
                       <th className="py-1 pr-3 font-medium">Direct Cost</th>
-                      <th className="py-1 pr-3 font-medium">Margin %</th>
-                      <th className="py-1 pr-3 font-medium">Bank %</th>
-                      <th className="py-1 pr-3 font-medium">SOP %</th>
                       <th className="py-1 pr-3 font-medium">Margin Amt</th>
+                      <th className="py-1 pr-3 font-medium">Margin %</th>
                       <th className="py-1 pr-3 font-medium">Bank Amt</th>
+                      <th className="py-1 pr-3 font-medium">Bank %</th>
+                      <th className="py-1 pr-3 font-medium">Unit Selling (Net of SOP)</th>
                       <th className="py-1 pr-3 font-medium">SOP Amt</th>
-                      <th className="py-1 pr-3 font-medium">Unit Selling</th>
+                      <th className="py-1 pr-3 font-medium">SOP %</th>
+                      <th className="py-1 pr-3 font-medium">Selling w/ SOP</th>
                       <th className="py-1 font-medium">Selling</th>
                     </tr>
                   </thead>
@@ -814,6 +815,7 @@ export function QuotationDetailsDialog({
                           <TruncatedText>{item.description}</TruncatedText>
                         </td>
                         <td className="py-1 pr-3">{formatCurrency(item.directCost)}</td>
+                        <td className="py-1 pr-3">{formatCurrency(item.marginAmount)}</td>
                         <td className="py-1 pr-3">
                           <NumberInput
                             value={item.marginPercentage}
@@ -824,6 +826,7 @@ export function QuotationDetailsDialog({
                             className="h-7 w-20 text-xs"
                           />
                         </td>
+                        <td className="py-1 pr-3">{formatCurrency(item.bankAmount)}</td>
                         <td className="py-1 pr-3">
                           <NumberInput
                             value={item.bankPercentage}
@@ -835,6 +838,10 @@ export function QuotationDetailsDialog({
                           />
                         </td>
                         <td className="py-1 pr-3">
+                          {formatCurrency(item.unitNetOfSopAmount)}
+                        </td>
+                        <td className="py-1 pr-3">{formatCurrency(item.sopAmount)}</td>
+                        <td className="py-1 pr-3">
                           <NumberInput
                             value={item.sopPercentage}
                             onValueChange={(value) =>
@@ -844,9 +851,6 @@ export function QuotationDetailsDialog({
                             className="h-7 w-20 text-xs"
                           />
                         </td>
-                        <td className="py-1 pr-3">{formatCurrency(item.marginAmount)}</td>
-                        <td className="py-1 pr-3">{formatCurrency(item.bankAmount)}</td>
-                        <td className="py-1 pr-3">{formatCurrency(item.sopAmount)}</td>
                         <td className="py-1 pr-3">
                           {formatCurrency(item.unitSellingAmount)}
                         </td>
@@ -860,13 +864,17 @@ export function QuotationDetailsDialog({
                         Total
                       </td>
                       <td className="py-1 pr-3">{formatCurrency(pricing.directCost)}</td>
-                      <td className="py-1 pr-3" colSpan={3}></td>
                       <td className="py-1 pr-3">
                         {formatCurrency(pricing.marginAmount)}
                       </td>
-                      <td className="py-1 pr-3">{formatCurrency(pricing.bankAmount)}</td>
-                      <td className="py-1 pr-3">{formatCurrency(pricing.sopAmount)}</td>
                       <td className="py-1 pr-3"></td>
+                      <td className="py-1 pr-3">{formatCurrency(pricing.bankAmount)}</td>
+                      <td className="py-1 pr-3"></td>
+                      <td className="py-1 pr-3">
+                        {formatCurrency(pricing.netOfSopAmount)}
+                      </td>
+                      <td className="py-1 pr-3">{formatCurrency(pricing.sopAmount)}</td>
+                      <td className="py-1 pr-3" colSpan={2}></td>
                       <td className="py-1">{formatCurrency(pricing.sellingAmount)}</td>
                     </tr>
                   </tfoot>
@@ -898,6 +906,10 @@ export function QuotationDetailsDialog({
                     value={formatCurrency(item.directCost)}
                   />
                   <DataField
+                    label="Margin Amt"
+                    value={formatCurrency(item.marginAmount)}
+                  />
+                  <DataField
                     label="Margin %"
                     value={
                       <NumberInput
@@ -911,6 +923,7 @@ export function QuotationDetailsDialog({
                       />
                     }
                   />
+                  <DataField label="Bank Amt" value={formatCurrency(item.bankAmount)} />
                   <DataField
                     label="Bank %"
                     value={
@@ -926,6 +939,11 @@ export function QuotationDetailsDialog({
                     }
                   />
                   <DataField
+                    label="Unit Selling (Net of SOP)"
+                    value={formatCurrency(item.unitNetOfSopAmount)}
+                  />
+                  <DataField label="SOP Amt" value={formatCurrency(item.sopAmount)} />
+                  <DataField
                     label="SOP %"
                     value={
                       <NumberInput
@@ -940,13 +958,7 @@ export function QuotationDetailsDialog({
                     }
                   />
                   <DataField
-                    label="Margin Amt"
-                    value={formatCurrency(item.marginAmount)}
-                  />
-                  <DataField label="Bank Amt" value={formatCurrency(item.bankAmount)} />
-                  <DataField label="SOP Amt" value={formatCurrency(item.sopAmount)} />
-                  <DataField
-                    label="Unit Selling"
+                    label="Selling w/ SOP"
                     value={formatCurrency(item.unitSellingAmount)}
                   />
                   <DataField
@@ -1128,13 +1140,16 @@ export function QuotationDetailsDialog({
                         <tr>
                           <th className="py-1 pr-3 font-medium">Item</th>
                           <th className="py-1 pr-3 font-medium">Direct Cost</th>
-                          <th className="py-1 pr-3 font-medium">Margin %</th>
-                          <th className="py-1 pr-3 font-medium">Bank %</th>
-                          <th className="py-1 pr-3 font-medium">SOP %</th>
                           <th className="py-1 pr-3 font-medium">Margin Amt</th>
+                          <th className="py-1 pr-3 font-medium">Margin %</th>
                           <th className="py-1 pr-3 font-medium">Bank Amt</th>
+                          <th className="py-1 pr-3 font-medium">Bank %</th>
+                          <th className="py-1 pr-3 font-medium">
+                            Unit Selling (Net of SOP)
+                          </th>
                           <th className="py-1 pr-3 font-medium">SOP Amt</th>
-                          <th className="py-1 pr-3 font-medium">Unit Selling</th>
+                          <th className="py-1 pr-3 font-medium">SOP %</th>
+                          <th className="py-1 pr-3 font-medium">Selling w/ SOP</th>
                           <th className="py-1 font-medium">Selling</th>
                         </tr>
                       </thead>
@@ -1148,18 +1163,12 @@ export function QuotationDetailsDialog({
                               {formatCurrency(item.lineTotal)}
                             </td>
                             <td className="py-1 pr-3">
-                              {formatPercent(item.marginPercentage)}
-                            </td>
-                            <td className="py-1 pr-3">
-                              {formatPercent(item.bankPercentage)}
-                            </td>
-                            <td className="py-1 pr-3">
-                              {formatPercent(item.sopPercentage)}
-                            </td>
-                            <td className="py-1 pr-3">
                               {item.marginAmount === null
                                 ? "—"
                                 : formatCurrency(item.marginAmount)}
+                            </td>
+                            <td className="py-1 pr-3">
+                              {formatPercent(item.marginPercentage)}
                             </td>
                             <td className="py-1 pr-3">
                               {item.bankAmount === null
@@ -1167,9 +1176,20 @@ export function QuotationDetailsDialog({
                                 : formatCurrency(item.bankAmount)}
                             </td>
                             <td className="py-1 pr-3">
+                              {formatPercent(item.bankPercentage)}
+                            </td>
+                            <td className="py-1 pr-3">
+                              {item.unitNetOfSopAmount === null
+                                ? "—"
+                                : formatCurrency(item.unitNetOfSopAmount)}
+                            </td>
+                            <td className="py-1 pr-3">
                               {item.sopAmount === null
                                 ? "—"
                                 : formatCurrency(item.sopAmount)}
+                            </td>
+                            <td className="py-1 pr-3">
+                              {formatPercent(item.sopPercentage)}
                             </td>
                             <td className="py-1 pr-3">
                               {item.unitSellingAmount === null
@@ -1190,17 +1210,24 @@ export function QuotationDetailsDialog({
                           <td className="py-1 pr-3">
                             {formatCurrency(quotation.pricedCost ?? quotation.cost ?? 0)}
                           </td>
-                          <td className="py-1 pr-3" colSpan={3}></td>
                           <td className="py-1 pr-3">
                             {formatCurrency(quotation.marginAmount ?? 0)}
                           </td>
+                          <td className="py-1 pr-3"></td>
                           <td className="py-1 pr-3">
                             {formatCurrency(quotation.bankAmount ?? 0)}
+                          </td>
+                          <td className="py-1 pr-3"></td>
+                          <td className="py-1 pr-3">
+                            {formatCurrency(
+                              (quotation.sellingAmount ?? quotation.amount) -
+                                (quotation.sopAmount ?? 0),
+                            )}
                           </td>
                           <td className="py-1 pr-3">
                             {formatCurrency(quotation.sopAmount ?? 0)}
                           </td>
-                          <td className="py-1 pr-3"></td>
+                          <td className="py-1 pr-3" colSpan={2}></td>
                           <td className="py-1">
                             {formatCurrency(quotation.sellingAmount ?? quotation.amount)}
                           </td>
@@ -1222,18 +1249,6 @@ export function QuotationDetailsDialog({
                         value={formatCurrency(item.lineTotal)}
                       />
                       <DataField
-                        label="Margin %"
-                        value={formatPercent(item.marginPercentage)}
-                      />
-                      <DataField
-                        label="Bank %"
-                        value={formatPercent(item.bankPercentage)}
-                      />
-                      <DataField
-                        label="SOP %"
-                        value={formatPercent(item.sopPercentage)}
-                      />
-                      <DataField
                         label="Margin Amt"
                         value={
                           item.marginAmount === null
@@ -1242,9 +1257,25 @@ export function QuotationDetailsDialog({
                         }
                       />
                       <DataField
+                        label="Margin %"
+                        value={formatPercent(item.marginPercentage)}
+                      />
+                      <DataField
                         label="Bank Amt"
                         value={
                           item.bankAmount === null ? "—" : formatCurrency(item.bankAmount)
+                        }
+                      />
+                      <DataField
+                        label="Bank %"
+                        value={formatPercent(item.bankPercentage)}
+                      />
+                      <DataField
+                        label="Unit Selling (Net of SOP)"
+                        value={
+                          item.unitNetOfSopAmount === null
+                            ? "—"
+                            : formatCurrency(item.unitNetOfSopAmount)
                         }
                       />
                       <DataField
@@ -1254,7 +1285,11 @@ export function QuotationDetailsDialog({
                         }
                       />
                       <DataField
-                        label="Unit Selling"
+                        label="SOP %"
+                        value={formatPercent(item.sopPercentage)}
+                      />
+                      <DataField
+                        label="Selling w/ SOP"
                         value={
                           item.unitSellingAmount === null
                             ? "—"
