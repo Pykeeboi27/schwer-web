@@ -34,6 +34,14 @@ export type SalesPricingAmounts = {
 };
 
 export type SalesPricing = SalesPricingAmounts & {
+  /** Line Total + Margin Amt + Bank Amt, i.e. sellingAmount minus sopAmount -- the line selling price before SOP. This is the basis for booked-revenue analytics. */
+  netOfSopAmount: number;
+  /**
+   * (Line Total + Margin Amt + Bank Amt) / quantity -- the per-unit selling
+   * price before SOP ("Unit Selling (Net of SOP)"). Exact to the centavo, not
+   * ceiling'd: the ₱100 ceiling stays on unitSellingAmount (with SOP).
+   */
+  unitNetOfSopAmount: number;
   /** directCost / quantity. Not necessarily a clean 2dp figure until the cost side is also rounded per-unit (see lib/engineering/landed-cost.ts). */
   unitCost: number;
   /**
@@ -118,12 +126,16 @@ export function computeSalesPricing(input: {
     // true SOP% and the per-unit rounding bump, so the parts sum exactly.
     sopAmount: round2(sellingAmount - lineAfterBank),
     sellingAmount,
+    // lineCost + marginAmount + bankAmount === lineAfterBank by construction.
+    netOfSopAmount: lineAfterBank,
+    unitNetOfSopAmount: unitAfterBank,
     unitCost,
     unitSellingAmount,
   };
 }
 
 export type AggregateSalesPricing = SalesPricingAmounts & {
+  netOfSopAmount: number;
   directCost: number;
   marginPercentage: number;
   bankPercentage: number;
@@ -153,6 +165,7 @@ export function computeAggregatePricing(
     bankAmount: number;
     sopAmount: number;
     sellingAmount: number;
+    netOfSopAmount: number;
   }>,
 ): AggregateSalesPricing {
   const finite = (n: number) => (Number.isFinite(n) ? n : 0);
@@ -164,8 +177,16 @@ export function computeAggregatePricing(
       bankAmount: acc.bankAmount + finite(item.bankAmount),
       sopAmount: acc.sopAmount + finite(item.sopAmount),
       sellingAmount: acc.sellingAmount + finite(item.sellingAmount),
+      netOfSopAmount: acc.netOfSopAmount + finite(item.netOfSopAmount),
     }),
-    { directCost: 0, marginAmount: 0, bankAmount: 0, sopAmount: 0, sellingAmount: 0 },
+    {
+      directCost: 0,
+      marginAmount: 0,
+      bankAmount: 0,
+      sopAmount: 0,
+      sellingAmount: 0,
+      netOfSopAmount: 0,
+    },
   );
 
   const blendedPercent = (amount: number) =>
@@ -177,6 +198,7 @@ export function computeAggregatePricing(
     bankAmount: round2(totals.bankAmount),
     sopAmount: round2(totals.sopAmount),
     sellingAmount: round2(totals.sellingAmount),
+    netOfSopAmount: round2(totals.netOfSopAmount),
     marginPercentage: blendedPercent(totals.marginAmount),
     bankPercentage: blendedPercent(totals.bankAmount),
     sopPercentage: blendedPercent(totals.sopAmount),
@@ -190,6 +212,7 @@ export type RepricedItem = {
   sellingAmount: number | null;
   unitCost: number | null;
   unitSellingAmount: number | null;
+  unitNetOfSopAmount: number | null;
 };
 
 export type RepriceResult = {
@@ -238,6 +261,7 @@ export function repriceStoredItems(
         sellingAmount: null,
         unitCost: null,
         unitSellingAmount: null,
+        unitNetOfSopAmount: null,
       };
     }
     return computeSalesPricing({

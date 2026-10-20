@@ -765,14 +765,14 @@ export function PurchaseOrderDetailsDialog({
                       <th className="py-1 pr-3 font-medium">Item</th>
                       <th className="py-1 pr-3 font-medium">Qty</th>
                       <th className="py-1 pr-3 font-medium">Unit Cost</th>
-                      <th className="py-1 pr-3 font-medium">Line Total</th>
-                      <th className="py-1 pr-3 font-medium">Margin %</th>
-                      <th className="py-1 pr-3 font-medium">Bank %</th>
-                      <th className="py-1 pr-3 font-medium">SOP %</th>
                       <th className="py-1 pr-3 font-medium">Margin Amt</th>
+                      <th className="py-1 pr-3 font-medium">Margin %</th>
                       <th className="py-1 pr-3 font-medium">Bank Amt</th>
+                      <th className="py-1 pr-3 font-medium">Bank %</th>
+                      <th className="py-1 pr-3 font-medium">Unit Selling (Net of SOP)</th>
                       <th className="py-1 pr-3 font-medium">SOP Amt</th>
-                      <th className="py-1 pr-3 font-medium">Unit Selling</th>
+                      <th className="py-1 pr-3 font-medium">SOP %</th>
+                      <th className="py-1 pr-3 font-medium">Selling w/ SOP</th>
                       <th className="py-1 font-medium">Selling</th>
                     </tr>
                   </thead>
@@ -790,18 +790,13 @@ export function PurchaseOrderDetailsDialog({
                             formatCurrency(item.unitCost)
                           )}
                         </td>
-                        <td className="py-1 pr-3">{formatCurrency(item.lineTotal)}</td>
-                        <td className="py-1 pr-3">
-                          {formatPercent(item.marginPercentage)}
-                        </td>
-                        <td className="py-1 pr-3">
-                          {formatPercent(item.bankPercentage)}
-                        </td>
-                        <td className="py-1 pr-3">{formatPercent(item.sopPercentage)}</td>
                         <td className="py-1 pr-3">
                           {item.marginAmount === null
                             ? "—"
                             : formatCurrency(item.marginAmount)}
+                        </td>
+                        <td className="py-1 pr-3">
+                          {formatPercent(item.marginPercentage)}
                         </td>
                         <td className="py-1 pr-3">
                           {item.bankAmount === null
@@ -809,8 +804,17 @@ export function PurchaseOrderDetailsDialog({
                             : formatCurrency(item.bankAmount)}
                         </td>
                         <td className="py-1 pr-3">
+                          {formatPercent(item.bankPercentage)}
+                        </td>
+                        <td className="py-1 pr-3">
+                          {item.unitNetOfSopAmount === null
+                            ? "—"
+                            : formatCurrency(item.unitNetOfSopAmount)}
+                        </td>
+                        <td className="py-1 pr-3">
                           {item.sopAmount === null ? "—" : formatCurrency(item.sopAmount)}
                         </td>
+                        <td className="py-1 pr-3">{formatPercent(item.sopPercentage)}</td>
                         <td className="py-1 pr-3">
                           {item.unitSellingAmount === null
                             ? "—"
@@ -828,21 +832,23 @@ export function PurchaseOrderDetailsDialog({
                         Total
                       </td>
                       <td className="py-1 pr-3">
-                        {formatCurrency(
-                          purchaseOrder.pricedCost ?? purchaseOrder.cost ?? 0,
-                        )}
-                      </td>
-                      <td className="py-1 pr-3" colSpan={3}></td>
-                      <td className="py-1 pr-3">
                         {formatCurrency(purchaseOrder.marginAmount ?? 0)}
                       </td>
+                      <td className="py-1 pr-3"></td>
                       <td className="py-1 pr-3">
                         {formatCurrency(purchaseOrder.bankAmount ?? 0)}
+                      </td>
+                      <td className="py-1 pr-3"></td>
+                      <td className="py-1 pr-3">
+                        {formatCurrency(
+                          (purchaseOrder.sellingAmount ?? purchaseOrder.poAmount) -
+                            (purchaseOrder.sopAmount ?? 0),
+                        )}
                       </td>
                       <td className="py-1 pr-3">
                         {formatCurrency(purchaseOrder.sopAmount ?? 0)}
                       </td>
-                      <td className="py-1 pr-3"></td>
+                      <td className="py-1 pr-3" colSpan={2}></td>
                       <td className="py-1">
                         {formatCurrency(
                           purchaseOrder.sellingAmount ?? purchaseOrder.poAmount,
@@ -955,13 +961,16 @@ export function PurchaseOrderDetailsDialog({
                             {hasUnequalMargins ? <th className="w-6 py-1"></th> : null}
                             <th className="py-1 pr-3 font-medium">Item</th>
                             <th className="py-1 pr-3 font-medium">Direct Cost</th>
-                            <th className="py-1 pr-3 font-medium">Margin %</th>
-                            <th className="py-1 pr-3 font-medium">Bank %</th>
-                            <th className="py-1 pr-3 font-medium">SOP %</th>
                             <th className="py-1 pr-3 font-medium">Margin Amt</th>
+                            <th className="py-1 pr-3 font-medium">Margin %</th>
                             <th className="py-1 pr-3 font-medium">Bank Amt</th>
+                            <th className="py-1 pr-3 font-medium">Bank %</th>
+                            <th className="py-1 pr-3 font-medium">
+                              Unit Selling (Net of SOP)
+                            </th>
                             <th className="py-1 pr-3 font-medium">SOP Amt</th>
-                            <th className="py-1 pr-3 font-medium">Unit Selling</th>
+                            <th className="py-1 pr-3 font-medium">SOP %</th>
+                            <th className="py-1 pr-3 font-medium">Selling w/ SOP</th>
                             <th className="py-1 font-medium">Selling</th>
                           </tr>
                         </thead>
@@ -986,6 +995,9 @@ export function PurchaseOrderDetailsDialog({
                                 {formatCurrency(item.directCost)}
                               </td>
                               <td className="py-1 pr-3">
+                                {formatCurrency(item.marginAmount)}
+                              </td>
+                              <td className="py-1 pr-3">
                                 <NumberInput
                                   value={item.marginPercentage}
                                   onValueChange={(value) =>
@@ -1000,6 +1012,9 @@ export function PurchaseOrderDetailsDialog({
                                 />
                               </td>
                               <td className="py-1 pr-3">
+                                {formatCurrency(item.bankAmount)}
+                              </td>
+                              <td className="py-1 pr-3">
                                 <NumberInput
                                   value={item.bankPercentage}
                                   onValueChange={(value) =>
@@ -1010,6 +1025,12 @@ export function PurchaseOrderDetailsDialog({
                                 />
                               </td>
                               <td className="py-1 pr-3">
+                                {formatCurrency(item.unitNetOfSopAmount)}
+                              </td>
+                              <td className="py-1 pr-3">
+                                {formatCurrency(item.sopAmount)}
+                              </td>
+                              <td className="py-1 pr-3">
                                 <NumberInput
                                   value={item.sopPercentage}
                                   onValueChange={(value) =>
@@ -1018,15 +1039,6 @@ export function PurchaseOrderDetailsDialog({
                                   disabled={!hasUnequalMargins}
                                   className="h-7 w-20 text-xs"
                                 />
-                              </td>
-                              <td className="py-1 pr-3">
-                                {formatCurrency(item.marginAmount)}
-                              </td>
-                              <td className="py-1 pr-3">
-                                {formatCurrency(item.bankAmount)}
-                              </td>
-                              <td className="py-1 pr-3">
-                                {formatCurrency(item.sopAmount)}
                               </td>
                               <td className="py-1 pr-3">
                                 {formatCurrency(item.unitSellingAmount)}
@@ -1045,17 +1057,21 @@ export function PurchaseOrderDetailsDialog({
                             <td className="py-1 pr-3">
                               {formatCurrency(pricingPreview.directCost)}
                             </td>
-                            <td className="py-1 pr-3" colSpan={3}></td>
                             <td className="py-1 pr-3">
                               {formatCurrency(pricingPreview.marginAmount)}
                             </td>
+                            <td className="py-1 pr-3"></td>
                             <td className="py-1 pr-3">
                               {formatCurrency(pricingPreview.bankAmount)}
+                            </td>
+                            <td className="py-1 pr-3"></td>
+                            <td className="py-1 pr-3">
+                              {formatCurrency(pricingPreview.netOfSopAmount)}
                             </td>
                             <td className="py-1 pr-3">
                               {formatCurrency(pricingPreview.sopAmount)}
                             </td>
-                            <td className="py-1 pr-3"></td>
+                            <td className="py-1 pr-3" colSpan={2}></td>
                             <td className="py-1">
                               {formatCurrency(pricingPreview.sellingAmount)}
                             </td>

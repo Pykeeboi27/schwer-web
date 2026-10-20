@@ -32,9 +32,33 @@ describe("computeSalesPricing", () => {
       bankAmount: 55.56,
       sopAmount: 33.33,
       sellingAmount: 1200,
+      // Net of SOP = cost + margin + bank = 1000 + 111.11 + 55.56 (no ceiling).
+      netOfSopAmount: 1166.67,
+      unitNetOfSopAmount: 1166.67,
       unitCost: 1000,
       unitSellingAmount: 1200,
     });
+  });
+
+  it("derives Unit Selling (Net of SOP) as (line total + margin + bank) / quantity, before the SOP step and ceiling", () => {
+    const result = computeSalesPricing({
+      directCost: 10000,
+      quantity: 10,
+      marginPercentage: 20,
+      bankPercentage: 3,
+      sopPercentage: 1,
+    });
+
+    // Unit cost 1000; /0.8 = 1250.00; bank +3% = 1287.50 -> Net of SOP.
+    // SOP +1% = 1300.375 -> ceilings to 1400 (Selling w/ SOP).
+    expect(result.unitNetOfSopAmount).toBe(1287.5);
+    expect(result.netOfSopAmount).toBe(12875);
+    expect(result.unitSellingAmount).toBe(1400);
+    expect(result.sellingAmount).toBe(14000);
+    expect(result.netOfSopAmount).toBe(
+      round2(10000 + result.marginAmount + result.bankAmount),
+    );
+    expect(result.netOfSopAmount).toBe(round2(result.sellingAmount - result.sopAmount));
   });
 
   it("scales the per-unit price by quantity, using directCost/quantity as the unit cost", () => {
@@ -200,6 +224,8 @@ describe("computeSalesPricing", () => {
       bankAmount: 0,
       sopAmount: 0,
       sellingAmount: 0,
+      netOfSopAmount: 0,
+      unitNetOfSopAmount: 0,
       unitCost: 0,
       unitSellingAmount: 0,
     });
@@ -314,6 +340,7 @@ describe("computeAggregatePricing", () => {
       // (sop 0 -> 75.00). Summed bump-inclusive sop: 33.33 + 75 = 108.33.
       sopAmount: 108.33,
       sellingAmount: 1900,
+      netOfSopAmount: 1791.67,
       // Blended percentages are an effective on-cost markup rollup (amount /
       // totalCost), not a reconstruction of the input margin/bank/sop% --
       // margin% is gross-margin-on-price now, so it won't match 10/20's blend.
@@ -330,6 +357,7 @@ describe("computeAggregatePricing", () => {
       bankAmount: 0,
       sopAmount: 0,
       sellingAmount: 0,
+      netOfSopAmount: 0,
       marginPercentage: 0,
       bankPercentage: 0,
       sopPercentage: 0,
@@ -344,6 +372,7 @@ describe("computeAggregatePricing", () => {
         bankAmount: 10,
         sopAmount: 5,
         sellingAmount: Number.NaN,
+        netOfSopAmount: Number.NaN,
       },
       {
         directCost: 1000,
@@ -351,6 +380,7 @@ describe("computeAggregatePricing", () => {
         bankAmount: 0,
         sopAmount: 0,
         sellingAmount: 1100,
+        netOfSopAmount: 1100,
       },
     ]);
 
@@ -360,6 +390,7 @@ describe("computeAggregatePricing", () => {
       bankAmount: 10,
       sopAmount: 5,
       sellingAmount: 1100,
+      netOfSopAmount: 1100,
       marginPercentage: 10,
       bankPercentage: 1,
       sopPercentage: 0.5,
@@ -413,6 +444,7 @@ describe("repriceStoredItems", () => {
       sellingAmount: null,
       unitCost: null,
       unitSellingAmount: null,
+      unitNetOfSopAmount: null,
     });
     expect(aggregate).toBeNull();
   });

@@ -1,0 +1,1057 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Archivo:wght@300;400;500;600;700&family=Geist:wght@400;500;600;700&display=block"
+      rel="stylesheet"
+    />
+    <style>
+      :root {
+        --background: 25 22% 96.5%;
+        --foreground: 0 0% 3.9%;
+        --card: 0 0% 100%;
+        --primary: 25 87% 40%;
+        --primary-bright: 25 90% 55%;
+        --muted-foreground: 25 4% 41%;
+        --border: 25 8% 90%;
+        --frame: 25 35% 86%;
+        --wash: 25 45% 95%;
+        --band: 220 14% 20%;
+        --band-foreground: 0 0% 98%;
+        --status-pending: 38 92% 34%;
+        --status-approved: 174 62% 28%;
+        --status-approved-bright: 174 52% 48%;
+        --chart-3: 43 85% 38%;
+        --shadow-color: 0 0% 4%;
+      }
+      * {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+      }
+      html,
+      body {
+        width: 1920px;
+        height: 1080px;
+        overflow: hidden;
+        background: hsl(var(--background));
+      }
+      body {
+        font-family: Geist, "Segoe UI", sans-serif;
+        color: hsl(var(--foreground));
+        -webkit-font-smoothing: antialiased;
+        text-rendering: optimizeLegibility;
+      }
+      #stage {
+        position: relative;
+        width: 1920px;
+        height: 1080px;
+        overflow: hidden;
+        background: hsl(var(--background));
+      }
+      .scene {
+        position: absolute;
+        inset: 0;
+        display: none;
+      }
+      .display {
+        font-family: Archivo, Geist, sans-serif;
+      }
+      .mono {
+        font-family: "Cascadia Mono", Consolas, ui-monospace, monospace;
+      }
+      .eyebrow {
+        font-size: 26px;
+        line-height: 1.33;
+        letter-spacing: 0.14em;
+        font-weight: 700;
+        text-transform: uppercase;
+      }
+      .tick {
+        display: inline-block;
+        width: 7px;
+        height: 30px;
+        border-radius: 99px;
+        background: hsl(var(--primary));
+        vertical-align: -5px;
+        margin-right: 16px;
+      }
+      .keyword {
+        background: linear-gradient(
+          104deg,
+          hsl(var(--foreground)) 9.56%,
+          hsl(var(--primary)) 102.66%
+        );
+        -webkit-background-clip: text;
+        background-clip: text;
+        color: transparent;
+      }
+      .dot {
+        color: hsl(var(--primary));
+      }
+      .badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 10px;
+        border-radius: 999px;
+        border: 2px solid;
+        padding: 6px 20px;
+        font-size: 24px;
+        font-weight: 600;
+        white-space: nowrap;
+      }
+      .badge.pending {
+        border-color: hsl(var(--status-pending) / 0.3);
+        background: hsl(var(--status-pending) / 0.1);
+        color: hsl(var(--status-pending));
+      }
+      .badge.approved {
+        border-color: hsl(var(--status-approved) / 0.3);
+        background: hsl(var(--status-approved) / 0.1);
+        color: hsl(var(--status-approved));
+      }
+      .badge.solar {
+        border-color: hsl(var(--chart-3) / 0.3);
+        background: hsl(var(--chart-3) / 0.1);
+        color: hsl(var(--chart-3));
+      }
+
+      /* Graphite band (landing process rail surface) with orange leading edges */
+      #band {
+        position: absolute;
+        left: 0;
+        top: 0;
+        width: 1920px;
+        height: 1080px;
+        background: hsl(var(--band));
+        z-index: 1;
+        will-change: transform;
+      }
+      #band::before,
+      #band::after {
+        content: "";
+        position: absolute;
+        left: 0;
+        width: 100%;
+        height: 14px;
+        background: hsl(var(--primary));
+      }
+      #band::before {
+        top: -14px;
+      }
+      #band::after {
+        bottom: -14px;
+      }
+      .scene {
+        z-index: 2;
+      }
+
+      /* S1 */
+      #s1 .lines {
+        position: absolute;
+        left: 200px;
+        top: 300px;
+        font-size: 168px;
+        line-height: 1.08;
+        font-weight: 400;
+        letter-spacing: -0.015em;
+      }
+      #s1 .caret {
+        display: inline-block;
+        width: 10px;
+        height: 150px;
+        background: hsl(var(--primary));
+        vertical-align: -18px;
+        margin-left: 8px;
+      }
+
+      /* S2 */
+      #s2 .col {
+        position: absolute;
+        left: 0;
+        right: 0;
+        top: 190px;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        text-align: center;
+      }
+      #s2 svg {
+        height: 190px;
+        width: auto;
+        overflow: visible;
+      }
+      #s2 .eyebrow {
+        margin-top: 56px;
+        color: hsl(var(--muted-foreground));
+      }
+      #s2 .name {
+        margin-top: 18px;
+        font-size: 44px;
+        font-weight: 600;
+        letter-spacing: -0.02em;
+      }
+      #s2 .headline {
+        margin-top: 26px;
+        font-size: 136px;
+        line-height: 1.05;
+        font-weight: 400;
+        letter-spacing: -0.012em;
+      }
+
+      /* S3 */
+      #s3 {
+        color: hsl(var(--band-foreground));
+      }
+      #s3 .lines {
+        position: absolute;
+        left: 200px;
+        top: 150px;
+        font-size: 92px;
+        line-height: 1.12;
+        font-weight: 400;
+        letter-spacing: -0.012em;
+      }
+      #s3 .lines span.dept {
+        font-weight: 600;
+      }
+      #s3 .rail {
+        position: absolute;
+        left: 200px;
+        right: 200px;
+        top: 680px;
+        height: 260px;
+      }
+      #s3 .track {
+        position: absolute;
+        left: 0;
+        right: 0;
+        top: 0;
+        height: 4px;
+        background: hsl(var(--band-foreground) / 0.14);
+        border-radius: 4px;
+      }
+      #s3 .fill {
+        position: absolute;
+        left: 0;
+        top: 0;
+        height: 4px;
+        width: 0;
+        background: hsl(var(--primary-bright));
+        border-radius: 4px;
+      }
+      #s3 .step {
+        position: absolute;
+        top: 34px;
+        width: 380px;
+      }
+      #s3 .step .n {
+        font-size: 128px;
+        font-weight: 600;
+        letter-spacing: -0.02em;
+        line-height: 1;
+        font-variant-numeric: tabular-nums;
+      }
+      #s3 .step .l {
+        margin-top: 18px;
+        color: hsl(var(--band-foreground) / 0.7);
+      }
+      #s3 .step .notch {
+        position: absolute;
+        top: -34px;
+        left: 0;
+        width: 64px;
+        height: 8px;
+        margin-top: -2px;
+        background: hsl(var(--primary-bright));
+        border-radius: 2px;
+      }
+
+      /* S4 */
+      #s4 .left {
+        position: absolute;
+        left: 160px;
+        top: 290px;
+        width: 700px;
+      }
+      #s4 .left .eyebrow {
+        color: hsl(var(--muted-foreground));
+      }
+      #s4 .left h2 {
+        margin-top: 26px;
+        font-size: 92px;
+        line-height: 1.06;
+        font-weight: 400;
+        letter-spacing: -0.015em;
+      }
+      #s4 .left .sub {
+        margin-top: 34px;
+        font-size: 32px;
+        color: hsl(var(--muted-foreground));
+      }
+      #s4 .card {
+        position: absolute;
+        left: 930px;
+        top: 170px;
+        width: 830px;
+        background: hsl(var(--card));
+        border: 2px solid hsl(var(--frame));
+        border-radius: 24px;
+        box-shadow:
+          0 2px 6px 0 hsl(var(--shadow-color) / 0.08),
+          0 24px 64px -20px hsl(var(--shadow-color) / 0.18);
+        padding: 48px 52px 40px;
+      }
+      #s4 .card .hdr {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+      }
+      #s4 .card .ref {
+        font-size: 26px;
+        color: hsl(var(--muted-foreground));
+      }
+      #s4 .card .client {
+        margin-top: 22px;
+        display: flex;
+        align-items: center;
+        gap: 18px;
+        font-size: 34px;
+        font-weight: 600;
+        letter-spacing: -0.02em;
+      }
+      #s4 .card .amtlabel {
+        margin-top: 30px;
+        font-size: 20px;
+        color: hsl(var(--muted-foreground));
+      }
+      #s4 .card .amt {
+        margin-top: 6px;
+        font-size: 92px;
+        font-weight: 600;
+        letter-spacing: -0.03em;
+        font-variant-numeric: tabular-nums;
+        line-height: 1.05;
+      }
+      #s4 .card hr {
+        border: 0;
+        border-top: 2px solid hsl(var(--border));
+        margin: 34px 0 28px;
+      }
+      #s4 .card .chainlabel {
+        font-size: 24px;
+        font-weight: 600;
+        display: flex;
+        align-items: center;
+      }
+      #s4 .card .chainlabel .tick {
+        height: 26px;
+        width: 6px;
+        vertical-align: 0;
+      }
+      #s4 .rows {
+        margin-top: 14px;
+        position: relative;
+      }
+      #s4 .row {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        height: 92px;
+        border-top: 2px solid hsl(var(--border));
+      }
+      #s4 .row:first-child {
+        border-top: 0;
+      }
+      #s4 .row .who {
+        display: flex;
+        align-items: center;
+        gap: 22px;
+        font-size: 32px;
+        font-weight: 500;
+      }
+      #s4 .row .idx {
+        width: 48px;
+        height: 48px;
+        border-radius: 99px;
+        background: hsl(var(--wash));
+        border: 2px solid hsl(var(--frame));
+        display: grid;
+        place-items: center;
+        font-size: 22px;
+        font-weight: 700;
+        color: hsl(var(--muted-foreground));
+      }
+      #s4 .row .gate {
+        font-size: 20px;
+        font-weight: 700;
+        letter-spacing: 0.08em;
+        color: hsl(var(--primary));
+        border: 2px solid hsl(var(--primary) / 0.35);
+        border-radius: 8px;
+        padding: 2px 10px;
+      }
+      #s4 .row .act {
+        position: relative;
+        width: 230px;
+        height: 60px;
+      }
+      #s4 .row .btn,
+      #s4 .row .badge {
+        position: absolute;
+        right: 0;
+        top: 50%;
+      }
+      #s4 .btn {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        height: 58px;
+        padding: 0 34px;
+        border-radius: 999px;
+        background: hsl(var(--primary));
+        color: #fff;
+        font-size: 26px;
+        font-weight: 600;
+        box-shadow: 0 1px 2px 0 hsl(var(--shadow-color) / 0.05);
+      }
+      #s4 .hdrbadge {
+        position: relative;
+        width: 240px;
+        height: 50px;
+      }
+      #s4 .hdrbadge .badge {
+        position: absolute;
+        right: 0;
+        top: 50%;
+      }
+      #cursor {
+        position: absolute;
+        left: 0;
+        top: 0;
+        width: 46px;
+        height: 46px;
+        z-index: 20;
+        pointer-events: none;
+      }
+      #ripple {
+        position: absolute;
+        width: 90px;
+        height: 90px;
+        margin: -45px 0 0 -45px;
+        border-radius: 99px;
+        border: 4px solid hsl(var(--primary));
+        z-index: 19;
+        opacity: 0;
+      }
+
+      /* S5 */
+      #s5 .col {
+        position: absolute;
+        left: 0;
+        right: 0;
+        top: 150px;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        text-align: center;
+      }
+      #s5 .eyebrow {
+        color: hsl(var(--muted-foreground));
+      }
+      #s5 .numwrap {
+        position: relative;
+        margin-top: 190px;
+        height: 260px;
+        width: 1400px;
+      }
+      #s5 .old,
+      #s5 .num {
+        position: absolute;
+        left: 0;
+        right: 0;
+        text-align: center;
+        font-variant-numeric: tabular-nums;
+        font-weight: 600;
+      }
+      #s5 .num {
+        top: 20px;
+        font-size: 220px;
+        letter-spacing: -0.03em;
+        line-height: 1;
+      }
+      #s5 .old {
+        top: 20px;
+        font-size: 220px;
+        letter-spacing: -0.03em;
+        line-height: 1;
+        color: hsl(var(--muted-foreground));
+      }
+      #s5 .old s {
+        text-decoration-thickness: 6px;
+        text-decoration-color: hsl(var(--primary));
+      }
+      #s5 .underline {
+        position: absolute;
+        left: 50%;
+        top: 262px;
+        height: 10px;
+        width: 760px;
+        margin-left: -380px;
+        background: hsl(var(--primary));
+        border-radius: 99px;
+        transform-origin: left center;
+      }
+      #s5 .cap {
+        margin-top: 70px;
+        font-size: 64px;
+        font-weight: 400;
+        letter-spacing: -0.012em;
+      }
+
+      /* S6 */
+      #s6 {
+        color: hsl(var(--band-foreground));
+      }
+      #s6 .col {
+        position: absolute;
+        left: 0;
+        right: 0;
+        top: 300px;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        text-align: center;
+      }
+      #s6 .l1 {
+        font-size: 118px;
+        line-height: 1.1;
+        font-weight: 400;
+        letter-spacing: -0.015em;
+      }
+      #s6 .l1 .w {
+        display: inline-block;
+      }
+      #s6 .l1 .a {
+        transition: none;
+      }
+      #s6 .l2 {
+        margin-top: 56px;
+        display: flex;
+        align-items: center;
+        gap: 40px;
+        font-size: 118px;
+        font-weight: 400;
+        letter-spacing: -0.015em;
+      }
+      #s6 .stamp {
+        display: inline-flex;
+        align-items: center;
+        gap: 22px;
+        border: 5px solid hsl(var(--status-approved-bright) / 0.55);
+        background: hsl(var(--status-approved-bright) / 0.14);
+        color: hsl(var(--status-approved-bright));
+        border-radius: 999px;
+        padding: 10px 56px 16px;
+        font-weight: 600;
+      }
+
+      /* S7 */
+      #s7 {
+        color: hsl(var(--band-foreground));
+      }
+      #s7 .col {
+        position: absolute;
+        left: 0;
+        right: 0;
+        top: 220px;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        text-align: center;
+      }
+      #s7 svg {
+        height: 170px;
+        width: auto;
+        overflow: visible;
+      }
+      #s7 .name {
+        margin-top: 48px;
+        font-size: 44px;
+        font-weight: 600;
+        letter-spacing: -0.02em;
+        color: hsl(var(--band-foreground) / 0.85);
+      }
+      #s7 .now {
+        margin-top: 20px;
+        font-size: 140px;
+        line-height: 1.05;
+        font-weight: 400;
+        letter-spacing: -0.015em;
+      }
+      #s7 .now .dot {
+        color: hsl(var(--primary-bright));
+      }
+      #s7 .eyebrow {
+        margin-top: 44px;
+        color: hsl(var(--band-foreground) / 0.7);
+      }
+      #s7 .eyebrow .tick {
+        background: hsl(var(--primary-bright));
+      }
+    </style>
+  </head>
+  <body>
+    <div id="stage">
+      <div id="band"></div>
+
+      <!-- S1 hook -->
+      <section class="scene" id="s1">
+        <div class="lines display">
+          <div id="s1l1"></div>
+          <div id="s1l2"></div>
+        </div>
+      </section>
+
+      <!-- S2 reveal -->
+      <section class="scene" id="s2">
+        <div class="col">
+          <svg viewBox="0 0 420 280" id="s2logo">
+            <rect x="8" y="18" width="88" height="116" rx="6" fill="hsl(25 87% 40%)" />
+            <rect x="8" y="146" width="88" height="116" rx="6" fill="hsl(25 87% 40%)" />
+            <rect x="108" y="18" width="88" height="244" rx="6" fill="hsl(25 4% 41%)" />
+            <rect x="208" y="18" width="88" height="244" rx="6" fill="hsl(25 4% 41%)" />
+            <rect x="308" y="18" width="88" height="244" rx="6" fill="hsl(25 4% 41%)" />
+          </svg>
+          <p class="eyebrow" id="s2eb"><span class="tick"></span>Introducing</p>
+          <p class="name" id="s2name">Schwer Online Management</p>
+          <h1 class="headline display" id="s2h">
+            From costing to <span class="keyword">collection</span
+            ><span class="dot">.</span>
+          </h1>
+        </div>
+      </section>
+
+      <!-- S3 pipeline -->
+      <section class="scene" id="s3">
+        <div class="lines display">
+          <div id="s3a"><span class="dept">Engineering</span> costs it.</div>
+          <div id="s3b"><span class="dept">Sales</span> closes it.</div>
+          <div id="s3c"><span class="dept">Executives</span> approve it.</div>
+        </div>
+        <div class="rail">
+          <div class="track"></div>
+          <div class="fill" id="s3fill"></div>
+          <div class="step" style="left: 0">
+            <span class="notch"></span>
+            <div class="n display">01</div>
+            <div class="l eyebrow">Costing</div>
+          </div>
+          <div class="step" style="left: 380px">
+            <span class="notch"></span>
+            <div class="n display">02</div>
+            <div class="l eyebrow">Quotation</div>
+          </div>
+          <div class="step" style="left: 760px">
+            <span class="notch"></span>
+            <div class="n display">03</div>
+            <div class="l eyebrow">Purchase order</div>
+          </div>
+          <div class="step" style="left: 1140px">
+            <span class="notch"></span>
+            <div class="n display">04</div>
+            <div class="l eyebrow">Collection</div>
+          </div>
+        </div>
+      </section>
+
+      <!-- S4 approval chain -->
+      <section class="scene" id="s4">
+        <div class="left">
+          <p class="eyebrow" id="s4eb"><span class="tick"></span>Approval chain</p>
+          <h2 class="display">
+            <div id="s4h1">Over ₱3M?</div>
+            <div id="s4h2">The owner signs off too<span class="dot">.</span></div>
+          </h2>
+          <p class="sub" id="s4sub">Sales manager → Executive → Owner</p>
+        </div>
+        <div class="card" id="s4card">
+          <div class="hdr">
+            <span class="ref mono">QT-2026-0142</span>
+            <span class="hdrbadge"
+              ><span class="badge pending" id="hb-p">Pending</span
+              ><span class="badge approved" id="hb-a">✓ Approved</span></span
+            >
+          </div>
+          <div class="client">
+            Rooftop solar install <span class="badge solar">Solar</span>
+          </div>
+          <p class="amtlabel eyebrow">Selling price</p>
+          <p class="amt display">₱3,450,000.00</p>
+          <hr />
+          <p class="chainlabel"><span class="tick"></span>Approvals</p>
+          <div class="rows">
+            <div class="row" id="r1">
+              <span class="who"><span class="idx">1</span>Sales manager</span
+              ><span class="act"
+                ><span class="btn">Approve</span
+                ><span class="badge approved">✓ Approved</span></span
+              >
+            </div>
+            <div class="row" id="r2">
+              <span class="who"><span class="idx">2</span>Executive</span
+              ><span class="act"
+                ><span class="btn">Approve</span
+                ><span class="badge approved">✓ Approved</span></span
+              >
+            </div>
+            <div class="row" id="r3">
+              <span class="who"
+                ><span class="idx">3</span>Owner <span class="gate">≥ ₱3M</span></span
+              ><span class="act"
+                ><span class="btn">Approve</span
+                ><span class="badge approved">✓ Approved</span></span
+              >
+            </div>
+          </div>
+        </div>
+        <div id="ripple"></div>
+        <svg id="cursor" viewBox="0 0 24 24">
+          <path
+            d="M4 2 L4 19 L8.5 14.8 L11.6 21.6 L14.6 20.3 L11.6 13.6 L17.8 13.6 Z"
+            fill="#0a0a0a"
+            stroke="#fff"
+            stroke-width="1.6"
+            stroke-linejoin="round"
+          />
+        </svg>
+      </section>
+
+      <!-- S5 ceiling -->
+      <section class="scene" id="s5">
+        <div class="col">
+          <p class="eyebrow" id="s5eb"><span class="tick"></span>Unit selling price</p>
+          <div class="numwrap">
+            <div class="old display" id="s5old"><s>₱7,562.79</s></div>
+            <div class="num display" id="s5num">₱7,562.79</div>
+            <div class="underline" id="s5ul"></div>
+          </div>
+          <p class="cap display" id="s5cap">
+            Ceilinged to the nearest ₱100<span class="dot">.</span>
+          </p>
+        </div>
+      </section>
+
+      <!-- S6 series A -->
+      <section class="scene" id="s6">
+        <div class="col">
+          <div class="l1 display" id="s6l1">
+            <span class="w">We</span> <span class="w">just</span>
+            <span class="w">closed</span> <span class="w">our</span>
+            <span class="w">Series</span> <span class="w a" id="s6A">A</span
+            ><span class="w">.</span>
+          </div>
+          <div class="l2 display" id="s6l2">
+            <span id="s6for">A for</span
+            ><span class="stamp" id="s6stamp">✓ Approved</span>
+          </div>
+        </div>
+      </section>
+
+      <!-- S7 outro -->
+      <section class="scene" id="s7">
+        <div class="col">
+          <svg viewBox="0 0 420 280" id="s7logo">
+            <rect x="8" y="18" width="88" height="116" rx="6" fill="hsl(25 90% 55%)" />
+            <rect x="8" y="146" width="88" height="116" rx="6" fill="hsl(25 90% 55%)" />
+            <rect x="108" y="18" width="88" height="244" rx="6" fill="hsl(0 0% 88%)" />
+            <rect x="208" y="18" width="88" height="244" rx="6" fill="hsl(0 0% 88%)" />
+            <rect x="308" y="18" width="88" height="244" rx="6" fill="hsl(0 0% 88%)" />
+          </svg>
+          <p class="name" id="s7name">Schwer Online Management</p>
+          <p class="now display" id="s7now">Now available<span class="dot">.</span></p>
+          <p class="eyebrow" id="s7eb"><span class="tick"></span>Internal use only</p>
+        </div>
+      </section>
+    </div>
+
+    <script>
+      const $ = (id) => document.getElementById(id);
+      const clamp = (x, a = 0, b = 1) => Math.min(b, Math.max(a, x));
+      const prog = (t, a, b) => clamp((t - a) / (b - a));
+      const outCubic = (x) => 1 - Math.pow(1 - x, 3);
+      const inCubic = (x) => x * x * x;
+      const inOut = (x) => (x < 0.5 ? 4 * x * x * x : 1 - Math.pow(-2 * x + 2, 3) / 2);
+      const outBack = (x, s = 1.70158) =>
+        1 + (s + 1) * Math.pow(x - 1, 3) + s * Math.pow(x - 1, 2);
+      const lerp = (a, b, x) => a + (b - a) * x;
+
+      // Enter (rise + fade) at `a` over `d`, exit (rise out + fade) at `o` over 0.25s.
+      function rise(el, t, a, o, { d = 0.45, dy = 40, oy = -30 } = {}) {
+        const i = outCubic(prog(t, a, a + d));
+        const e = o == null ? 0 : inCubic(prog(t, o, o + 0.25));
+        el.style.opacity = i * (1 - e);
+        el.style.transform = `translateY(${(1 - i) * dy + e * oy}px)`;
+      }
+
+      function show(id, t, a, b) {
+        const on = t >= a && t < b;
+        $(id).style.display = on ? "block" : "none";
+        return on;
+      }
+
+      // Band wipes: in from bottom, out through top.
+      function bandY(t) {
+        const seg = (a, from, to) => lerp(from, to, inOut(prog(t, a, a + 0.45)));
+        if (t < 6.3) return 1080 + 20;
+        if (t < 10.3) return seg(6.3, 1100, 0);
+        if (t < 17.8) return seg(10.3, 0, -1100);
+        return seg(17.8, 1100, 0);
+      }
+
+      function logoBars(svg, t, a) {
+        [...svg.querySelectorAll("rect")].forEach((r, i) => {
+          const p = outBack(prog(t, a + i * 0.07, a + i * 0.07 + 0.42), 1.4);
+          r.style.transformBox = "fill-box";
+          r.style.transformOrigin = "50% 100%";
+          r.style.transform = `scaleY(${clamp(p, 0, 1.2)})`;
+          r.style.opacity = clamp(prog(t, a + i * 0.07, a + i * 0.07 + 0.12));
+        });
+      }
+
+      function render(t) {
+        $("band").style.transform = `translateY(${bandY(t)}px)`;
+
+        // S1 — typed pitch line
+        if (show("s1", t, 0, 3.0)) {
+          const L1 = "It's like Uber,";
+          const L2 = "but for quotations.";
+          const n1 = Math.floor(clamp((t - 0.15) / 0.6) * L1.length);
+          const n2 = Math.floor(clamp((t - 0.95) / 0.8) * L2.length);
+          const blink = Math.floor(t * 2.2) % 2 === 0;
+          const caret = (on) =>
+            `<span class="caret" style="opacity:${on ? 1 : 0}"></span>`;
+          const typing2 = t >= 0.9;
+          $("s1l1").innerHTML =
+            L1.slice(0, n1) + (!typing2 ? caret(t < 0.75 || blink) : "");
+          let s = L2.slice(0, n2);
+          const k0 = 8,
+            k1 = 18; // "quotations"
+          let html = s.slice(0, Math.min(s.length, k0));
+          if (s.length > k0)
+            html += `<span class="keyword">${s.slice(k0, Math.min(s.length, k1))}</span>`;
+          if (s.length > k1) html += `<span class="dot">.</span>`;
+          $("s1l2").innerHTML = typing2 ? html + caret(t < 1.75 || blink) : "&nbsp;";
+          const e = inCubic(prog(t, 2.72, 2.97));
+          const lines = document.querySelector("#s1 .lines");
+          lines.style.opacity = 1 - e;
+          lines.style.transform = `translateY(${-50 * e}px)`;
+        }
+
+        // S2 — reveal
+        if (show("s2", t, 3.0, 6.5)) {
+          logoBars($("s2logo"), t, 3.05);
+          const ex = inCubic(prog(t, 6.2, 6.45));
+          $("s2logo").style.opacity = 1 - ex;
+          $("s2logo").style.transform = `translateY(${-30 * ex}px)`;
+          rise($("s2eb"), t, 3.55, 6.2);
+          rise($("s2name"), t, 3.7, 6.2);
+          rise($("s2h"), t, 3.9, 6.2, { dy: 60, d: 0.55 });
+        }
+
+        // S3 — pipeline on the graphite band
+        if (show("s3", t, 6.5, 10.5)) {
+          rise($("s3a"), t, 6.7, 10.2);
+          rise($("s3b"), t, 6.88, 10.2);
+          rise($("s3c"), t, 7.06, 10.2);
+          const steps = [...document.querySelectorAll("#s3 .step")];
+          const at = [7.5, 8.0, 8.5, 9.0];
+          steps.forEach((el, i) => {
+            rise(el, t, at[i], 10.2, { d: 0.35, dy: 50 });
+            const notch = el.querySelector(".notch");
+            notch.style.transformOrigin = "left center";
+            notch.style.transform = `scaleX(${outCubic(prog(t, at[i], at[i] + 0.3))})`;
+          });
+          // progress line runs from step to step
+          let w = 0;
+          for (let i = 0; i < 4; i++) {
+            const target = i < 3 ? (i + 1) * 380 : 1520;
+            const from = i * 380;
+            w = Math.max(
+              w,
+              lerp(from, target, inOut(prog(t, at[i], at[i] + 0.45))) *
+                (t >= at[i] ? 1 : 0),
+            );
+          }
+          const fe = inCubic(prog(t, 10.2, 10.45));
+          $("s3fill").style.width = `${w}px`;
+          document.querySelector("#s3 .rail .track").style.opacity =
+            outCubic(prog(t, 7.3, 7.7)) * (1 - fe);
+          $("s3fill").style.opacity = 1 - fe;
+        }
+
+        // S4 — approval chain with simulated clicks
+        if (show("s4", t, 10.5, 15.0)) {
+          rise($("s4eb"), t, 10.75, 14.75);
+          rise($("s4h1"), t, 10.85, 14.75);
+          rise($("s4h2"), t, 12.4, 14.75);
+          rise($("s4sub"), t, 12.55, 14.75);
+          rise($("s4card"), t, 10.8, 14.75, { d: 0.55, dy: 70 });
+
+          const clicks = [11.5, 12.25, 13.25];
+          ["r1", "r2", "r3"].forEach((id, i) => {
+            const row = $(id);
+            const btn = row.querySelector(".btn");
+            const bd = row.querySelector(".badge");
+            const c = clicks[i];
+            const press = t >= c - 0.08 && t < c + 0.06 ? 0.94 : 1;
+            const bo = 1 - prog(t, c, c + 0.12);
+            btn.style.opacity = bo;
+            btn.style.transform = `translateY(-50%) scale(${press})`;
+            const bp = prog(t, c + 0.04, c + 0.34);
+            bd.style.opacity = clamp(bp * 3);
+            bd.style.transform = `translateY(-50%) scale(${lerp(0.6, 1, outBack(bp, 2.2))})`;
+          });
+          // Owner row joins the chain only once executive has approved (>= 3M)
+          const r3 = $("r3");
+          const rp = outCubic(prog(t, 12.4, 12.75));
+          r3.style.height = `${92 * rp}px`;
+          r3.style.opacity = rp;
+          r3.style.overflow = "hidden";
+          r3.style.borderTopWidth = `${2 * rp}px`;
+
+          // header badge flip
+          const hp = prog(t, 13.7, 14.0);
+          $("hb-p").style.opacity = 1 - clamp(hp * 2);
+          $("hb-p").style.transform = `translateY(-50%) scale(${1 - 0.2 * hp})`;
+          $("hb-a").style.opacity = clamp(hp * 2);
+          $("hb-a").style.transform =
+            `translateY(-50%) scale(${lerp(1.5, 1, outBack(hp, 2))})`;
+
+          // cursor path (card-relative button centers computed from layout)
+          const btnCenter = (id) => {
+            const r = $(id).querySelector(".act").getBoundingClientRect();
+            return [r.right - 92, r.top + r.height / 2];
+          };
+          const p1 = btnCenter("r1"),
+            p2 = btnCenter("r2");
+          // r3 final position: one row below r2
+          const p3 = [p2[0], p2[1] + 92];
+          const start = [1880, 1150];
+          const keys = [
+            [10.9, start],
+            [11.42, p1],
+            [11.6, p1],
+            [12.17, p2],
+            [12.45, p2],
+            [13.17, p3],
+            [13.5, p3],
+            [14.2, [p3[0] + 140, p3[1] + 120]],
+          ];
+          let pos = keys[0][1];
+          for (let i = 0; i < keys.length - 1; i++) {
+            const [ta, a] = keys[i],
+              [tb, b] = keys[i + 1];
+            if (t >= ta)
+              pos = [
+                lerp(a[0], b[0], inOut(prog(t, ta, tb))),
+                lerp(a[1], b[1], inOut(prog(t, ta, tb))),
+              ];
+          }
+          const cur = $("cursor");
+          const ce = inCubic(prog(t, 14.6, 14.85));
+          cur.style.opacity = 1 - ce;
+          cur.style.transform = `translate(${pos[0] - 6}px, ${pos[1] - 4}px)`;
+          const rip = $("ripple");
+          let ro = 0,
+            rs = 0.4,
+            rc = p1;
+          clicks.forEach((c, i) => {
+            const q = prog(t, c, c + 0.4);
+            if (t >= c && t < c + 0.4) {
+              ro = 1 - q;
+              rs = lerp(0.3, 1.1, outCubic(q));
+              rc = [p1, p2, p3][i];
+            }
+          });
+          rip.style.opacity = ro * 0.7;
+          rip.style.left = rc[0] + "px";
+          rip.style.top = rc[1] + "px";
+          rip.style.transform = `scale(${rs})`;
+        }
+
+        // S5 — the ₱100 ceiling
+        if (show("s5", t, 15.0, 18.0)) {
+          rise($("s5eb"), t, 15.15, 17.75);
+          rise($("s5cap"), t, 15.35, 17.75);
+          const from = 7562.79,
+            to = 7600.0;
+          const rp = outCubic(prog(t, 16.0, 16.5));
+          const v = lerp(from, to, rp);
+          $("s5num").textContent =
+            "₱" +
+            v.toLocaleString("en-US", {
+              minimumFractionDigits: 2,
+              maximumFractionDigits: 2,
+            });
+          const numIn = outCubic(prog(t, 15.2, 15.65));
+          const bump = t > 16.5 ? 1 + 0.06 * Math.sin(Math.PI * prog(t, 16.5, 16.8)) : 1;
+          const ex = inCubic(prog(t, 17.75, 18.0));
+          $("s5num").style.opacity = numIn * (1 - ex);
+          $("s5num").style.transform =
+            `translateY(${(1 - numIn) * 50 - ex * 30}px) scale(${bump})`;
+          $("s5num").style.color =
+            rp >= 1 ? "hsl(var(--foreground))" : "hsl(var(--foreground))";
+          // old value floats up, shrinks, gets struck
+          const op = outCubic(prog(t, 16.0, 16.5));
+          $("s5old").style.opacity = prog(t, 16.1, 16.4) * (1 - ex) * 0.9;
+          $("s5old").style.transform =
+            `translateY(${lerp(0, -240, op)}px) scale(${lerp(1, 0.3, op)})`;
+          $("s5ul").style.transform = `scaleX(${outCubic(prog(t, 16.4, 16.75))})`;
+          $("s5ul").style.opacity = 1 - ex;
+        }
+
+        // S6 — Series A
+        if (show("s6", t, 18.0, 21.0)) {
+          [...document.querySelectorAll("#s6l1 .w")].forEach((w, i) => {
+            const a = 18.2 + i * 0.06;
+            const p = outCubic(prog(t, a, a + 0.4));
+            const ex = inCubic(prog(t, 20.75, 21.0));
+            w.style.opacity = p * (1 - ex);
+            w.style.transform = `translateY(${(1 - p) * 50 - ex * 30}px)`;
+          });
+          const aOn = prog(t, 19.5, 19.65);
+          $("s6A").style.color = aOn > 0 ? `hsl(25 90% ${lerp(98, 55, aOn)}%)` : "";
+          rise($("s6for"), t, 19.35, 20.75, { d: 0.3 });
+          const sp = prog(t, 19.5, 19.85);
+          const ex = inCubic(prog(t, 20.75, 21.0));
+          $("s6stamp").style.opacity = clamp(sp * 4) * (1 - ex);
+          $("s6stamp").style.transform =
+            `scale(${lerp(1.7, 1, outBack(sp, 1.6))}) rotate(${lerp(-6, -2, outCubic(sp))}deg) translateY(${-ex * 30}px)`;
+        }
+
+        // S7 — outro
+        if (show("s7", t, 21.0, 99)) {
+          logoBars($("s7logo"), t, 21.05);
+          rise($("s7name"), t, 21.35, null);
+          rise($("s7now"), t, 21.5, null, { dy: 60, d: 0.5 });
+          rise($("s7eb"), t, 21.85, null);
+        }
+      }
+
+      window.render = render;
+      window.ready = (async () => {
+        await document.fonts.ready;
+        await Promise.all(
+          ["Archivo", "Geist"].flatMap((f) =>
+            [400, 600].map((w) => document.fonts.load(`${w} 40px ${f}`)),
+          ),
+        );
+        render(0);
+        return true;
+      })();
+    </script>
+  </body>
+</html>

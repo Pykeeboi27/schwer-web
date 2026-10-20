@@ -54,12 +54,12 @@ export async function getSalesDashboardCharts(): Promise<SalesDashboardCharts> {
   ] = await Promise.all([
     supabase
       .from("quotations")
-      .select("amount, client_id, clients:client_id(company_name, sector)")
+      .select("amount, sop_amount, client_id, clients:client_id(company_name, sector)")
       .eq("phase", "sales")
       .in("status", ["approved", "closed"]),
     supabase
       .from("purchase_orders")
-      .select("po_amount, client_id, sector, clients:client_id(company_name)")
+      .select("po_amount, sop_amount, client_id, sector, clients:client_id(company_name)")
       .eq("status", "approved")
       .eq("is_manually_encoded", true),
   ]);
@@ -113,7 +113,7 @@ export async function getSalesDashboardCharts(): Promise<SalesDashboardCharts> {
   for (const row of quotationRows ?? []) {
     const client = Array.isArray(row.clients) ? row.clients[0] : row.clients;
     accumulate(
-      Number(row.amount ?? 0),
+      Number(row.amount ?? 0) - Number(row.sop_amount ?? 0),
       client?.sector,
       row.client_id,
       client?.company_name,
@@ -123,7 +123,7 @@ export async function getSalesDashboardCharts(): Promise<SalesDashboardCharts> {
   for (const row of encodedPoRows ?? []) {
     const client = Array.isArray(row.clients) ? row.clients[0] : row.clients;
     accumulate(
-      Number(row.po_amount ?? 0),
+      Number(row.po_amount ?? 0) - Number(row.sop_amount ?? 0),
       row.sector,
       row.client_id,
       client?.company_name,

@@ -19,6 +19,7 @@ import type {
 } from "@/lib/executive/types";
 import type { CurrentProfile } from "@/lib/profile/get-current-profile";
 import {
+  bookedNetAmount,
   fetchBookedPoRows,
   resolveBookedOwnerId,
   sumBookedRevenue,
@@ -92,15 +93,6 @@ function toNumber(value: number | string | null | undefined): number {
   }
 
   return 0;
-}
-
-function toNullableNumber(value: number | string | null | undefined): number | null {
-  if (value === null || value === undefined) {
-    return null;
-  }
-
-  const parsed = toNumber(value);
-  return Number.isFinite(parsed) ? parsed : null;
 }
 
 function getMonthFromPoDate(dateValue: string | null): number | null {
@@ -226,12 +218,13 @@ export function summarizeRevenueAndMargin(rows: PurchaseOrderMetricRow[]): {
 } {
   const totalPoValue = sumBookedRevenue(rows);
   const marginAmount = rows.reduce((sum, row) => sum + toNumber(row.margin_amount), 0);
-  // "Booked Revenue" is the gross total PO value -- the same figure the sales
-  // page reports as Total PO Value, and what the annual target is measured
-  // against. Margin stays its own tracked figure (weightedMarginPercent / the
-  // Avg. Overall Margin card) rather than being netted out of revenue, which
-  // also keeps this consistent with the revenue breakdown charts and per-owner
-  // sales performance -- both of which already sum the full po_amount.
+  // "Booked Revenue" is the PO value Net of SOP (po_amount - sop_amount) -- the
+  // same figure the sales page reports as Total PO Value, and what the annual
+  // target is measured against. Margin stays its own tracked figure
+  // (weightedMarginPercent / the Avg. Overall Margin card) rather than being
+  // netted out of revenue, which also keeps this consistent with the revenue
+  // breakdown charts and per-owner sales performance -- both of which sum the
+  // same Net of SOP amount.
   const bookedRevenue = totalPoValue;
   const weightedMarginPercent =
     totalPoValue > 0 ? (marginAmount / totalPoValue) * 100 : null;
@@ -285,7 +278,7 @@ export function buildRevenueBreakdownFromRows(
       continue;
     }
 
-    const amount = toNumber(row.po_amount);
+    const amount = bookedNetAmount(row);
     monthlyMap.set(month, (monthlyMap.get(month) ?? 0) + amount);
 
     const quarter = getQuarterFromMonth(month);
@@ -306,7 +299,7 @@ export function buildRevenueBreakdownFromRows(
       continue;
     }
 
-    const amount = toNumber(row.po_amount);
+    const amount = bookedNetAmount(row);
     ytdMonthlyMap.set(month, (ytdMonthlyMap.get(month) ?? 0) + amount);
   }
 
@@ -358,11 +351,6 @@ export function buildSalesPerformanceFromRows(
       ownerName: string;
       bookedRevenue: number;
       marginAmount: number;
-      // Simple (unweighted) mean of each PO's own margin_percentage: sum + count
-      // of the rows that actually had one, so POs never priced per-item don't
-      // drag the average toward zero.
-      marginPercentSum: number;
-      marginPercentCount: number;
     }
   >();
 
@@ -372,8 +360,6 @@ export function buildSalesPerformanceFromRows(
       ownerName: owner.ownerName,
       bookedRevenue: 0,
       marginAmount: 0,
-      marginPercentSum: 0,
-      marginPercentCount: 0,
     });
   }
 
@@ -393,20 +379,12 @@ export function buildSalesPerformanceFromRows(
         ownerName,
         bookedRevenue: 0,
         marginAmount: 0,
-        marginPercentSum: 0,
-        marginPercentCount: 0,
       });
     }
 
     const current = aggregateMap.get(ownerId)!;
-    current.bookedRevenue += toNumber(row.po_amount);
+    current.bookedRevenue += bookedNetAmount(row);
     current.marginAmount += toNumber(row.margin_amount);
-
-    const marginPercentage = toNullableNumber(row.margin_percentage);
-    if (marginPercentage !== null) {
-      current.marginPercentSum += marginPercentage;
-      current.marginPercentCount += 1;
-    }
   }
 
   return Array.from(aggregateMap.values())
@@ -422,9 +400,12 @@ export function buildSalesPerformanceFromRows(
       ownerName: entry.ownerName,
       bookedRevenue: entry.bookedRevenue,
       marginAmount: entry.marginAmount,
+      // Weighted margin on PO value -- the same basis as the Avg. Overall Margin
+      // card, so the rows reconcile to it. (A simple mean of each PO's stored
+      // margin_percentage, which is markup on cost, overstated small POs.)
       marginPercentAverage:
-        entry.marginPercentCount > 0
-          ? Math.round((entry.marginPercentSum / entry.marginPercentCount) * 100) / 100
+        entry.bookedRevenue > 0
+          ? Math.round((entry.marginAmount / entry.bookedRevenue) * 10000) / 100
           : null,
     }));
 }

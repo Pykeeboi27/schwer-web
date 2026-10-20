@@ -75,6 +75,60 @@ describe("getExecutiveKpiSummary", () => {
   });
 });
 
+describe("Net of SOP revenue basis", () => {
+  const sopRows: PurchaseOrderMetricRow[] = [
+    {
+      po_amount: 1000,
+      sop_amount: 100,
+      margin_amount: 180,
+      recognized_amount: 1000,
+      po_date: "2026-05-03",
+      created_by: "o1",
+      quotation_id: null,
+    },
+    {
+      po_amount: 500,
+      sop_amount: null,
+      margin_amount: 50,
+      recognized_amount: 250,
+      po_date: "2026-01-15",
+      created_by: "o2",
+      quotation_id: null,
+    },
+  ];
+
+  beforeEach(() => {
+    vi.spyOn(executiveDashboardQueries, "fetchPurchaseOrderRows").mockResolvedValue(
+      sopRows,
+    );
+  });
+
+  it("books revenue as po_amount minus sop_amount across KPIs, breakdown, PO summary and owners", async () => {
+    const data = await getExecutiveDashboardData("ytd", { viewer, referenceDate });
+
+    // (1000 - 100) + (500 - 0) = 1400; a missing sop_amount counts as 0.
+    expect(data.kpis.revenueYtdBooked).toBe(1400);
+    expect(data.poSummary.totalPoValue).toBe(1400);
+    expect(
+      data.revenueBreakdown.monthlyRevenue.find((m) => m.month === 5)?.bookedRevenue,
+    ).toBe(900);
+    expect(data.salesPerformance.find((o) => o.ownerId === "o1")?.bookedRevenue).toBe(
+      900,
+    );
+    // Margin % is measured against the same Net of SOP base: 230 / 1400.
+    expect(data.kpis.marginYtdWeightedPercent).toBeCloseTo((230 / 1400) * 100, 5);
+    expect(
+      data.salesPerformance.find((o) => o.ownerId === "o1")?.marginPercentAverage,
+    ).toBe(20);
+  });
+
+  it("leaves collected amounts on the full with-SOP basis", async () => {
+    const summary = await getExecutivePoSummary("ytd", { referenceDate });
+
+    expect(summary.totalCollectedAmount).toBe(1250);
+  });
+});
+
 describe("getExecutivePoSummary", () => {
   it("counts POs and sums value, margin, and collected amounts", async () => {
     await expect(getExecutivePoSummary("ytd", { referenceDate })).resolves.toEqual({

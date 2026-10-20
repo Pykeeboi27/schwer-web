@@ -41,9 +41,8 @@ describe("executive sales performance helpers", () => {
 
     expect(result.map((entry) => entry.ownerName)).toEqual(["Brian", "Aimee", "Cesar"]);
     expect(result[0].bookedRevenue).toBe(400);
-    // None of the fixture rows carry a margin_percentage -> average stays null (N/A),
-    // rather than silently collapsing to 0.
-    expect(result.every((entry) => entry.marginPercentAverage === null)).toBe(true);
+    // Brian: 120 / 400 = 30%, Aimee: 50 / 250 = 20%, Cesar: 40 / 250 = 16%.
+    expect(result.map((entry) => entry.marginPercentAverage)).toEqual([30, 20, 16]);
   });
 
   it("uses fallback labels when owner name cannot be resolved", () => {
@@ -97,7 +96,7 @@ describe("executive sales performance helpers", () => {
     expect(result.find((entry) => entry.ownerId === "owner-b")?.bookedRevenue).toBe(0);
   });
 
-  it("averages margin_percentage as a simple (unweighted) mean of each PO's own value", () => {
+  it("weights margin by PO value (Σ margin / Σ PO amount), not a mean of per-PO percentages", () => {
     const rows: PurchaseOrderMetricRow[] = [
       {
         created_by: "owner-a",
@@ -119,11 +118,11 @@ describe("executive sales performance helpers", () => {
 
     const result = buildSalesPerformanceFromRows(rows, new Map([["owner-a", "Aimee"]]));
 
-    // Simple mean (15 + 5) / 2 = 10 -- deliberately ignores PO size, unlike the
-    // amount-weighted KPI formula used elsewhere on the dashboard.
+    // (150 + 5) / (1000 + 100) = 14.09% -- the large PO dominates, matching the
+    // Avg. Overall Margin card, instead of the simple mean (15 + 5) / 2 = 10.
     expect(
       result.find((entry) => entry.ownerId === "owner-a")?.marginPercentAverage,
-    ).toBe(10);
+    ).toBe(14.09);
   });
 
   it("attributes a PO to its linked quotation's sales_person_id, not its own created_by", () => {
@@ -146,7 +145,7 @@ describe("executive sales performance helpers", () => {
     expect(result.some((entry) => entry.ownerId === "coordinator-1")).toBe(false);
   });
 
-  it("excludes POs with no margin_percentage from the average instead of treating them as zero", () => {
+  it("ignores the stored margin_percentage and returns null for an owner with no revenue", () => {
     const rows: PurchaseOrderMetricRow[] = [
       {
         created_by: "owner-a",
@@ -166,10 +165,21 @@ describe("executive sales performance helpers", () => {
       },
     ];
 
-    const result = buildSalesPerformanceFromRows(rows, new Map([["owner-a", "Aimee"]]));
+    const result = buildSalesPerformanceFromRows(
+      rows,
+      new Map([
+        ["owner-a", "Aimee"],
+        ["owner-b", "Brian"],
+      ]),
+      [{ ownerId: "owner-b", ownerName: "Brian" }],
+    );
 
+    // (200 + 50) / (1000 + 500) = 16.67%, regardless of the stored percentages.
     expect(
       result.find((entry) => entry.ownerId === "owner-a")?.marginPercentAverage,
-    ).toBe(20);
+    ).toBe(16.67);
+    expect(
+      result.find((entry) => entry.ownerId === "owner-b")?.marginPercentAverage,
+    ).toBeNull();
   });
 });

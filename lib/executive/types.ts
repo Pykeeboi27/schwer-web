@@ -44,7 +44,7 @@ export type ExecutiveSalesPerformanceRow = {
   ownerName: string;
   bookedRevenue: number;
   marginAmount: number;
-  /** Simple (unweighted) mean of each owner's POs' own margin_percentage; null when none had one. */
+  /** Weighted margin: Σ margin_amount / Σ PO value Net of SOP × 100 (same basis as the Avg. Overall Margin card); null when the owner has no revenue. */
   marginPercentAverage: number | null;
 };
 

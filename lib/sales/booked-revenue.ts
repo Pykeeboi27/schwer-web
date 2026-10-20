@@ -7,9 +7,12 @@ import { createClient } from "@/lib/supabase/server";
  * claims to show it: Revenue YTD (Booked), Total PO Value, Booked this year,
  * Company/My Closed Sales, and the Purchase Orders tab's Closed Sales.
  *
- * Booked revenue = SUM(purchase_orders.po_amount) where status = 'approved'
- * and po_date falls within the requested period, company-wide. See
- * lib/executive/period.ts for building the date bounds.
+ * Booked revenue = SUM(purchase_orders.po_amount - purchase_orders.sop_amount)
+ * -- i.e. the selling price Net of SOP (line total + margin + bank) -- where
+ * status = 'approved' and po_date falls within the requested period,
+ * company-wide. See lib/executive/period.ts for building the date bounds.
+ * Collections (recognized_amount) are NOT netted: they track what the client
+ * actually pays, SOP included.
  */
 export const BOOKED_PO_STATUS = "approved" as const;
 
@@ -23,6 +26,8 @@ const PO_ROW_PAGE_SIZE = 1000;
 
 export type BookedPoRow = {
   po_amount: number | string | null;
+  /** Stripped from po_amount to get the Net of SOP booked amount; absent/null counts as 0. */
+  sop_amount?: number | string | null;
   po_date: string | null;
   created_by: string | null;
   quotation_id: string | null;
@@ -47,7 +52,7 @@ function toNumber(value: number | string | null | undefined): number {
 }
 
 const BOOKED_PO_SELECT =
-  "po_amount, po_date, created_by, quotation_id, margin_amount, margin_percentage, recognized_amount, quotations:quotation_id(sales_person_id)";
+  "po_amount, sop_amount, po_date, created_by, quotation_id, margin_amount, margin_percentage, recognized_amount, quotations:quotation_id(sales_person_id)";
 
 async function fetchBookedPoRowsUncached(
   startDate: string,
@@ -95,8 +100,18 @@ async function fetchBookedPoRowsUncached(
  */
 export const fetchBookedPoRows = cache(fetchBookedPoRowsUncached);
 
+/**
+ * A PO's booked amount: po_amount (with SOP) minus sop_amount, i.e. the selling
+ * price Net of SOP. Every revenue analytic goes through this so they agree.
+ */
+export function bookedNetAmount(
+  row: Pick<BookedPoRow, "po_amount" | "sop_amount">,
+): number {
+  return toNumber(row.po_amount) - toNumber(row.sop_amount);
+}
+
 export function sumBookedRevenue(rows: BookedPoRow[]): number {
-  return rows.reduce((sum, row) => sum + toNumber(row.po_amount), 0);
+  return rows.reduce((sum, row) => sum + bookedNetAmount(row), 0);
 }
 
 /**
@@ -122,7 +137,7 @@ export function attributeBookedRevenue(rows: BookedPoRow[]): Map<string, number>
 
   for (const row of rows) {
     const ownerId = resolveBookedOwnerId(row);
-    totals.set(ownerId, (totals.get(ownerId) ?? 0) + toNumber(row.po_amount));
+    totals.set(ownerId, (totals.get(ownerId) ?? 0) + bookedNetAmount(row));
   }
 
   return totals;
